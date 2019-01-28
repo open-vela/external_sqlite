@@ -1,5 +1,5 @@
-C Fix\sa\sperformance\sregression\scaused\sby\sthe\sprevious\scommit.
-D 2019-01-28T18:58:54.614
+C Fix\sthe\squery\splanner\sso\sthat\sit\sis\sable\sto\suse\san\sindex\son\sa\sCAST\sexpression.
+D 2019-01-28T19:06:17.490
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F Makefile.in 9947eae873c07ae894d4c8633b76c0a0daca7b9fd54401096a77d1a6c7b74359
@@ -1804,7 +1804,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 3ef711d98fb239cf24472f124e7b36b0dde33355de5a2c9a3a978bbdd042a735
+P a9faf9033910927c74553e66c474d84ed3386f263cef3eec299e25d8306f410d c4db0ad12d4f3d2800d36404f391b325cdc4aa7f8dcea93b2d63a489d9095ad4
 R 54fc32c05e999eaa7483855f7fbb2719
+T +closed c4db0ad12d4f3d2800d36404f391b325cdc4aa7f8dcea93b2d63a489d9095ad4
 U drh
-Z 51fba204c69fae1056723ec255ec3703
+Z d2bf11950d89b1b09c3cca064a694bb6
