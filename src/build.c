@@ -1821,7 +1821,6 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
     pTab->iPKey = -1;
   }else{
     pPk = sqlite3PrimaryKeyIndex(pTab);
-    assert( pPk!=0 );
 
     /*
     ** Remove all redundant columns from the PRIMARY KEY.  For example, change
