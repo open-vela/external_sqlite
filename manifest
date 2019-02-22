@@ -1,5 +1,5 @@
-C Remove\sa\stestcase()\smacro\swhich\sis\snow\sunreachable\sdue\sto\sthe\scontraction\sof\nthe\suse\sof\sIN_INDEX_ROWID.
-D 2019-02-23T00:08:09.169
+C Check-in\s[fa792714ae62fa98]\sis\sincorrect.\s\sAdd\sa\stest\scase\sto\srefute\sit\sand\nalso\sa\sfix\sto\smake\sit\sright.\s\nThen\sadd\san\salternative\sfix\sto\sticket\s[df46dfb631f75694]\sin\swhich\nall\sephemeral\stables\sused\sas\sthe\sRHS\sof\san\sIN\soperator\sbe\sindex\sbtrees\nand\snever\stable\sbtrees\sso\sthat\sthey\scan\salways\sbe\sreused.
+D 2019-02-23T00:21:00.186
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F Makefile.in 178d8eb6840771149cee40b322d1b3be30d330198c522c903c1b66fb5a1bfca4
@@ -1805,7 +1805,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P c2d50df8fd1a1fdae6226a3e77296ded09b53a74540caedd4868e686a93cbc10
+P 579b66eaa0816561c6e47ea116b46f229188f0fc84c1173bfe0d21df2dff9a9a 90c5a17cd526b256753f876e575f3e731d5e8b9dd6e196cf8d8f7306e099b91c
 R c922ba3f62286cb9bc5a2acd31d21a66
+T +closed 90c5a17cd526b256753f876e575f3e731d5e8b9dd6e196cf8d8f7306e099b91c
 U drh
-Z 4c57ce6adbcc41ffca57692643360ae6
+Z 6d379fa0271550d77de94db4756b85a3
