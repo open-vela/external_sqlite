@@ -260,11 +260,7 @@ void sqlite3NestedParse(Parse *pParse, const char *zFormat, ...){
   zSql = sqlite3VMPrintf(db, zFormat, ap);
   va_end(ap);
   if( zSql==0 ){
-    /* This can result either from an OOM or because the formatted string
-    ** exceeds SQLITE_LIMIT_LENGTH.  In the latter case, we need to set
-    ** an error */
-    if( !db->mallocFailed ) pParse->rc = SQLITE_TOOBIG;
-    return;
+    return;   /* A malloc must have failed */
   }
   pParse->nested++;
   memcpy(saveBuf, PARSE_TAIL(pParse), PARSE_TAIL_SZ);
@@ -1994,11 +1990,6 @@ void sqlite3EndTable(
     p->tnum = db->init.newTnum;
     if( p->tnum==1 ) p->tabFlags |= TF_Readonly;
   }
-
-  assert( (p->tabFlags & TF_HasPrimaryKey)==0
-       || p->iPKey>=0 || sqlite3PrimaryKeyIndex(p)!=0 );
-  assert( (p->tabFlags & TF_HasPrimaryKey)!=0
-       || (p->iPKey<0 && sqlite3PrimaryKeyIndex(p)==0) );
 
   /* Special processing for WITHOUT ROWID Tables */
   if( tabOpts & TF_WithoutRowid ){
