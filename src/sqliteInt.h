@@ -3555,11 +3555,13 @@ struct TreeView {
 */
 struct Window {
   char *zName;            /* Name of window (may be NULL) */
+  char *zBase;            /* Name of base window for chaining (may be NULL) */
   ExprList *pPartition;   /* PARTITION BY clause */
   ExprList *pOrderBy;     /* ORDER BY clause */
   u8 eType;               /* TK_RANGE or TK_ROWS */
   u8 eStart;              /* UNBOUNDED, CURRENT, PRECEDING or FOLLOWING */
   u8 eEnd;                /* UNBOUNDED, CURRENT, PRECEDING or FOLLOWING */
+  u8 bImplicitFrame;      /* True if frame was implicitly specified */
   Expr *pStart;           /* Expression for "<expr> PRECEDING" */
   Expr *pEnd;             /* Expression for "<expr> FOLLOWING" */
   Window *pNextWin;       /* Next window function belonging to this SELECT */
@@ -3575,6 +3577,8 @@ struct Window {
   Expr *pOwner;           /* Expression object this window is attached to */
   int nBufferCol;         /* Number of columns in buffer table */
   int iArgCol;            /* Offset of first argument for this function */
+
+  int regFirst;
 };
 
 #ifndef SQLITE_OMIT_WINDOWFUNC
@@ -3591,6 +3595,8 @@ void sqlite3WindowUpdate(Parse*, Window*, Window*, FuncDef*);
 Window *sqlite3WindowDup(sqlite3 *db, Expr *pOwner, Window *p);
 Window *sqlite3WindowListDup(sqlite3 *db, Window *p);
 void sqlite3WindowFunctions(void);
+void sqlite3WindowChain(Parse*, Window*, Window*);
+Window *sqlite3WindowAssemble(Parse*, Window*, ExprList*, ExprList*, Token*);
 #else
 # define sqlite3WindowDelete(a,b)
 # define sqlite3WindowFunctions()
@@ -4281,7 +4287,7 @@ void sqlite3AlterRenameColumn(Parse*, SrcList*, Token*, Token*);
 int sqlite3GetToken(const unsigned char *, int *);
 void sqlite3NestedParse(Parse*, const char*, ...);
 void sqlite3ExpirePreparedStatements(sqlite3*, int);
-void sqlite3CodeRhsOfIN(Parse*, Expr*, int);
+void sqlite3CodeRhsOfIN(Parse*, Expr*, int, int);
 int sqlite3CodeSubselect(Parse*, Expr*);
 void sqlite3SelectPrep(Parse*, Select*, NameContext*);
 void sqlite3SelectWrongNumTermsError(Parse *pParse, Select *p);

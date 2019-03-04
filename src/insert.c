@@ -1669,9 +1669,7 @@ void sqlite3GenerateConstraintChecks(
     sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx, pIdx->nColumn, aRegIdx[ix]);
     VdbeComment((v, "for %s", pIdx->zName));
 #ifdef SQLITE_ENABLE_NULL_TRIM
-    if( pIdx->idxType==SQLITE_IDXTYPE_PRIMARYKEY ){
-      sqlite3SetMakeRecordP5(v, pIdx->pTable);
-    }
+    if( pIdx->idxType==2 ) sqlite3SetMakeRecordP5(v, pIdx->pTable);
 #endif
 
     /* In an UPDATE operation, if this index is the PRIMARY KEY index 
@@ -1921,13 +1919,10 @@ void sqlite3CompleteInsertion(
       pik_flags |= (update_flags & OPFLAG_SAVEPOSITION);
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
       if( update_flags==0 ){
-        int r = sqlite3GetTempReg(pParse);
-        sqlite3VdbeAddOp2(v, OP_Integer, 0, r);
-        sqlite3VdbeAddOp4(v, OP_Insert, 
-            iIdxCur+i, aRegIdx[i], r, (char*)pTab, P4_TABLE
+        sqlite3VdbeAddOp4(v, OP_InsertInt, 
+            iIdxCur+i, aRegIdx[i], 0, (char*)pTab, P4_TABLE
         );
         sqlite3VdbeChangeP5(v, OPFLAG_ISNOOP);
-        sqlite3ReleaseTempReg(pParse, r);
       }
 #endif
     }
@@ -2415,7 +2410,7 @@ static int xferOptimization(
         sqlite3VdbeAddOp1(v, OP_SeekEnd, iDest);
       }
     }
-    if( !HasRowid(pSrc) && pDestIdx->idxType==SQLITE_IDXTYPE_PRIMARYKEY ){
+    if( !HasRowid(pSrc) && pDestIdx->idxType==2 ){
       idxInsFlags |= OPFLAG_NCHANGE;
     }
     sqlite3VdbeAddOp2(v, OP_IdxInsert, iDest, regData);

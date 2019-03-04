@@ -106,9 +106,7 @@ static void fts3TokenizerFunc(
       return;
     }
   }
-  if( fts3TokenizerEnabled(context) ){
-    sqlite3_result_blob(context, (void *)&pPtr, sizeof(pPtr), SQLITE_TRANSIENT);
-  }
+  sqlite3_result_blob(context, (void *)&pPtr, sizeof(pPtr), SQLITE_TRANSIENT);
 }
 
 int sqlite3Fts3IsIdChar(char c){

@@ -1348,9 +1348,7 @@ static int fts3SegReaderNext(
 
     /* If iCurrentBlock>=iLeafEndBlock, this is an EOF condition. All leaf 
     ** blocks have already been traversed.  */
-#ifdef CORRUPT_DB
-    assert( pReader->iCurrentBlock<=pReader->iLeafEndBlock || CORRUPT_DB );
-#endif
+    assert( pReader->iCurrentBlock<=pReader->iLeafEndBlock );
     if( pReader->iCurrentBlock>=pReader->iLeafEndBlock ){
       return SQLITE_OK;
     }
