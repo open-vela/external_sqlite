@@ -7177,12 +7177,8 @@ int sqlite3PagerMovepage(Pager *pPager, DbPage *pPg, Pgno pgno, int isCommit){
   */
   pPg->flags &= ~PGHDR_NEED_SYNC;
   pPgOld = sqlite3PagerLookup(pPager, pgno);
-  assert( !pPgOld || pPgOld->nRef==1 || CORRUPT_DB );
+  assert( !pPgOld || pPgOld->nRef==1 );
   if( pPgOld ){
-    if( pPgOld->nRef>1 ){
-      sqlite3PagerUnrefNotNull(pPgOld);
-      return SQLITE_CORRUPT_BKPT;
-    }
     pPg->flags |= (pPgOld->flags&PGHDR_NEED_SYNC);
     if( pPager->tempFile ){
       /* Do not discard pages from an in-memory database since we might
