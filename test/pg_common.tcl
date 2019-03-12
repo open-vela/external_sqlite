@@ -67,6 +67,20 @@ proc execsql_test {tn sql} {
   puts $::fd ""
 }
 
+proc errorsql_test {tn sql} {
+  set rc [catch {execsql $sql} msg]
+  if {$rc==0} {
+    error "errorsql_test SQL did not cause an error!"
+  }
+  set msg [lindex [split [string trim $msg] "\n"] 0]
+  puts $::fd "# PG says $msg"
+  set sql [string map {string_agg group_concat} $sql]
+  puts $::fd "do_test $tn { catch { execsql {"
+  puts $::fd "  [string trim $sql]"
+  puts $::fd "} } } 1"
+  puts $::fd ""
+}
+
 # Same as [execsql_test], except coerce all results to floating point values
 # with two decimal points.
 #
@@ -88,10 +102,12 @@ do_test $tn {
     lappend myres [format $F [set r]]
   }
   set res2 {$res2}
+  set i 0
   foreach r [set myres] r2 [set res2] {
     if {[set r]<([set r2]-$T) || [set r]>([set r2]+$T)} {
       error "list element [set i] does not match: got=[set r] expected=[set r2]"
     }
+    incr i
   }
   set {} {}
 } {}
