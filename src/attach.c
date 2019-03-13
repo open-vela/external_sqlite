@@ -234,9 +234,7 @@ static void attachFunc(
     sqlite3BtreeEnterAll(db);
     db->init.iDb = 0;
     db->mDbFlags &= ~(DBFLAG_SchemaKnownOk);
-    if( !REOPEN_AS_MEMDB(db) ){
-      rc = sqlite3Init(db, &zErrDyn);
-    }
+    rc = sqlite3Init(db, &zErrDyn);
     sqlite3BtreeLeaveAll(db);
     assert( zErrDyn==0 || rc!=SQLITE_OK );
   }

@@ -1573,7 +1573,7 @@ static u8 *pageFindSlot(MemPage *pPg, int nByte, int *pRc){
     }
     iAddr = pc;
     pc = get2byte(&aData[pc]);
-    if( pc<=iAddr+size ){
+    if( pc<iAddr+size ){
       if( pc ){
         /* The next slot in the chain is not past the end of the current slot */
         *pRc = SQLITE_CORRUPT_PAGE(pPg);
@@ -8828,9 +8828,13 @@ int sqlite3BtreeDelete(BtCursor *pCur, u8 flags){
   assert( pCur->curFlags & BTCF_WriteFlag );
   assert( hasSharedCacheTableLock(p, pCur->pgnoRoot, pCur->pKeyInfo!=0, 2) );
   assert( !hasReadConflicts(p, pCur->pgnoRoot) );
-  assert( pCur->ix<pCur->pPage->nCell );
-  assert( pCur->eState==CURSOR_VALID );
   assert( (flags & ~(BTREE_SAVEPOSITION | BTREE_AUXDELETE))==0 );
+  if( pCur->eState==CURSOR_REQUIRESEEK ){
+    rc = btreeRestoreCursorPosition(pCur);
+    if( rc ) return rc;
+  }
+  assert( pCur->eState==CURSOR_VALID );
+  assert( pCur->ix<pCur->pPage->nCell );
 
   iCellDepth = pCur->iPage;
   iCellIdx = pCur->ix;
