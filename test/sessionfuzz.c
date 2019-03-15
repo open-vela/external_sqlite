@@ -830,6 +830,7 @@ static int conflictCall(
 ){
   (void)NotUsed;
   (void)p;
+  printf("Conflict %d\n", eConflict);
   return SQLITE_CHANGESET_OMIT;
 }
 
