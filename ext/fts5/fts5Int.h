@@ -583,9 +583,8 @@ void sqlite3Fts5HashClear(Fts5Hash*);
 
 int sqlite3Fts5HashQuery(
   Fts5Hash*,                      /* Hash table to query */
-  int nPre,
   const char *pTerm, int nTerm,   /* Query term */
-  void **ppObj,                   /* OUT: Pointer to doclist for pTerm */
+  const u8 **ppDoclist,           /* OUT: Pointer to doclist for pTerm */
   int *pnDoclist                  /* OUT: Size of doclist in bytes */
 );
 
