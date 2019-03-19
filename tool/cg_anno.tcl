@@ -1,6 +1,4 @@
-#!/bin/sh
-# \
-exec tclsh "$0" ${1+"$@"}
+#!/usr/bin/tclsh
 #
 # A wrapper around cg_annotate that sets appropriate command-line options
 # and rearranges the output so that annotated files occur in a consistent
