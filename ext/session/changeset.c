@@ -55,18 +55,17 @@ static void readFile(const char *zFilename, int *pSz, void **ppBuf){
   pBuf = sqlite3_malloc64( sz ? sz : 1 );
   if( pBuf==0 ){
     fprintf(stderr, "cannot allocate %d to hold content of \"%s\"\n",
-            (int)sz, zFilename);
+            sz, zFilename);
     exit(1);
   }
   if( sz>0 ){
-    if( fread(pBuf, (size_t)sz, 1, f)!=1 ){
-      fprintf(stderr, "cannot read all %d bytes of \"%s\"\n",
-              (int)sz, zFilename);
+    if( fread(pBuf, sz, 1, f)!=1 ){
+      fprintf(stderr, "cannot read all %d bytes of \"%s\"\n", sz, zFilename);
       exit(1);
     }
     fclose(f);
   }
-  *pSz = (int)sz;
+  *pSz = sz;
   *ppBuf = pBuf;
 }
 
