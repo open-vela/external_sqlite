@@ -1237,7 +1237,6 @@ case OP_Variable: {            /* out2 */
   }
   pOut = &aMem[pOp->p2];
   sqlite3VdbeMemShallowCopy(pOut, pVar, MEM_Static);
-  pOut->flags |= MEM_FromBind;
   UPDATE_MAX_BLOBSIZE(pOut);
   break;
 }
