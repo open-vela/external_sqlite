@@ -1309,21 +1309,25 @@ static void windowCheckValue(Parse *pParse, int reg, int eCond){
     int regString = sqlite3GetTempReg(pParse);
     sqlite3VdbeAddOp4(v, OP_String8, 0, regString, 0, "", P4_STATIC);
     sqlite3VdbeAddOp3(v, OP_Ge, regString, sqlite3VdbeCurrentAddr(v)+2, reg);
-    sqlite3VdbeChangeP5(v, SQLITE_AFF_NUMERIC);
+    sqlite3VdbeChangeP5(v, SQLITE_AFF_NUMERIC|SQLITE_JUMPIFNULL);
+    VdbeCoverage(v);
+    assert( eCond==3 || eCond==4 );
+    VdbeCoverageIf(v, eCond==3);
+    VdbeCoverageIf(v, eCond==4);
   }else{
     sqlite3VdbeAddOp2(v, OP_MustBeInt, reg, sqlite3VdbeCurrentAddr(v)+2);
+    VdbeCoverage(v);
+    assert( eCond==0 || eCond==1 || eCond==2 );
+    VdbeCoverageIf(v, eCond==0);
+    VdbeCoverageIf(v, eCond==1);
+    VdbeCoverageIf(v, eCond==2);
   }
-  VdbeCoverageIf(v, eCond==0);
-  VdbeCoverageIf(v, eCond==1);
-  VdbeCoverageIf(v, eCond==2);
-  VdbeCoverageIf(v, eCond==3);
-  VdbeCoverageIf(v, eCond==4);
   sqlite3VdbeAddOp3(v, aOp[eCond], regZero, sqlite3VdbeCurrentAddr(v)+2, reg);
-  VdbeCoverageNeverNullIf(v, eCond==0);
-  VdbeCoverageNeverNullIf(v, eCond==1);
+  VdbeCoverageNeverNullIf(v, eCond==0); /* NULL case captured by */
+  VdbeCoverageNeverNullIf(v, eCond==1); /*   the OP_MustBeInt */
   VdbeCoverageNeverNullIf(v, eCond==2);
-  VdbeCoverageNeverNullIf(v, eCond==3);
-  VdbeCoverageNeverNullIf(v, eCond==4);
+  VdbeCoverageNeverNullIf(v, eCond==3); /* NULL case caught by */
+  VdbeCoverageNeverNullIf(v, eCond==4); /*   the OP_Ge */
   sqlite3MayAbort(pParse);
   sqlite3VdbeAddOp2(v, OP_Halt, SQLITE_ERROR, OE_Abort);
   sqlite3VdbeAppendP4(v, (void*)azErr[eCond], P4_STATIC);
@@ -1573,6 +1577,7 @@ static void windowFullScan(WindowCodeArg *p){
 
   if( pMWin->eExclude==TK_CURRENT ){
     sqlite3VdbeAddOp3(v, OP_Eq, regCRowid, lblNext, regRowid);
+    VdbeCoverageNeverNull(v);
   }else if( pMWin->eExclude!=TK_NO ){
     int addr;
     int addrEq = 0;
@@ -1583,6 +1588,7 @@ static void windowFullScan(WindowCodeArg *p){
     }
     if( pMWin->eExclude==TK_TIES ){
       addrEq = sqlite3VdbeAddOp3(v, OP_Eq, regCRowid, 0, regRowid);
+      VdbeCoverageNeverNull(v);
     }
     if( pKeyInfo ){
       windowReadPeerValues(p, csr, regPeer);
@@ -1833,9 +1839,13 @@ static void windowCodeRangeTest(
   VdbeCoverage(v);
   sqlite3VdbeAddOp3(v, arith, regVal, reg1, reg1);
   sqlite3VdbeJumpHere(v, addrGe);
-  sqlite3VdbeAddOp3(v, op, reg2, lbl, reg1);
+  sqlite3VdbeAddOp3(v, op, reg2, lbl, reg1); VdbeCoverage(v);
   sqlite3VdbeChangeP5(v, SQLITE_NULLEQ);
-  VdbeCoverage(v);
+  assert( op==OP_Ge || op==OP_Gt || op==OP_Lt || op==OP_Le );
+  testcase(op==OP_Ge); VdbeCoverageIf(v, op==OP_Ge);
+  testcase(op==OP_Lt); VdbeCoverageIf(v, op==OP_Lt);
+  testcase(op==OP_Le); VdbeCoverageIf(v, op==OP_Le);
+  testcase(op==OP_Gt); VdbeCoverageIf(v, op==OP_Gt);
 
   sqlite3ReleaseTempReg(pParse, reg1);
   sqlite3ReleaseTempReg(pParse, reg2);
@@ -2516,7 +2526,7 @@ void sqlite3WindowCodeStep(
   sqlite3VdbeAddOp2(v, OP_NewRowid, csrWrite, regRowid);
   sqlite3VdbeAddOp3(v, OP_Insert, csrWrite, regRecord, regRowid);
   addrNe = sqlite3VdbeAddOp3(v, OP_Ne, pMWin->regOne, 0, regRowid);
-  VdbeCoverage(v);
+  VdbeCoverageNeverNull(v);
 
   /* This block is run for the first row of each partition */
   s.regArg = windowInitAccum(pParse, pMWin);
@@ -2533,7 +2543,8 @@ void sqlite3WindowCodeStep(
   if( pMWin->eStart==pMWin->eEnd && regStart ){
     int op = ((pMWin->eStart==TK_FOLLOWING) ? OP_Ge : OP_Le);
     int addrGe = sqlite3VdbeAddOp3(v, op, regStart, 0, regEnd);
-    VdbeCoverage(v);
+    VdbeCoverageNeverNullIf(v, op==OP_Ge); /* NeverNull because bound <expr> */
+    VdbeCoverageNeverNullIf(v, op==OP_Le); /*   values previously checked */
     windowAggFinal(&s, 0);
     sqlite3VdbeAddOp2(v, OP_Rewind, s.current.csr, 1);
     VdbeCoverageNeverTaken(v);
