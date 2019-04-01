@@ -833,14 +833,18 @@ moveto_done:
 */
 static int btreeRestoreCursorPosition(BtCursor *pCur){
   int rc;
-  int skipNext;
+  int skipNext = 0;
   assert( cursorOwnsBtShared(pCur) );
   assert( pCur->eState>=CURSOR_REQUIRESEEK );
   if( pCur->eState==CURSOR_FAULT ){
     return pCur->skipNext;
   }
   pCur->eState = CURSOR_INVALID;
-  rc = btreeMoveto(pCur, pCur->pKey, pCur->nKey, 0, &skipNext);
+  if( sqlite3FaultSim(410) ){
+    rc = SQLITE_IOERR;
+  }else{
+    rc = btreeMoveto(pCur, pCur->pKey, pCur->nKey, 0, &skipNext);
+  }
   if( rc==SQLITE_OK ){
     sqlite3_free(pCur->pKey);
     pCur->pKey = 0;
@@ -1432,11 +1436,7 @@ static int defragmentPage(MemPage *pPage, int nMaxFrag){
   ** reconstruct the entire page.  */
   if( (int)data[hdr+7]<=nMaxFrag ){
     int iFree = get2byte(&data[hdr+1]);
-
-    /* If the initial freeblock offset were out of bounds, that would have
-    ** been detected by btreeComputeFreeSpace() when it was computing the
-    ** number of free bytes on the page. */
-    assert( iFree<=usableSize-4 );
+    if( iFree>usableSize-4 ) return SQLITE_CORRUPT_PAGE(pPage);
     if( iFree ){
       int iFree2 = get2byte(&data[iFree]);
       if( iFree2>usableSize-4 ) return SQLITE_CORRUPT_PAGE(pPage);
@@ -5272,23 +5272,6 @@ int sqlite3BtreeFirst(BtCursor *pCur, int *pRes){
   }
   return rc;
 }
-
-/*
-** This function is a no-op if cursor pCur does not point to a valid row.
-** Otherwise, if pCur is valid, configure it so that the next call to
-** sqlite3BtreeNext() is a no-op.
-*/
-#ifndef SQLITE_OMIT_WINDOWFUNC
-void sqlite3BtreeSkipNext(BtCursor *pCur){
-  /* We believe that the cursor must always be in the valid state when
-  ** this routine is called, but the proof is difficult, so we add an
-  ** ALWaYS() test just in case we are wrong. */
-  if( ALWAYS(pCur->eState==CURSOR_VALID) ){
-    pCur->eState = CURSOR_SKIPNEXT;
-    pCur->skipNext = 1;
-  }
-}
-#endif /* SQLITE_OMIT_WINDOWFUNC */
 
 /* Move the cursor to the last entry in the table.  Return SQLITE_OK
 ** on success.  Set *pRes to 0 if the cursor actually points to something
