@@ -122,20 +122,12 @@ int sqlite3_found_count = 0;
 ** feature is used for test suite validation only and does not appear an
 ** production builds.
 **
-** M is the type of branch.  I is the direction taken for this instance of
-** the branch.
-**
-**   M: 2 - two-way branch (I=0: fall-thru   1: jump                )
-**      3 - two-way + NULL (I=0: fall-thru   1: jump      2: NULL   )
-**      4 - OP_Jump        (I=0: jump p1     1: jump p2   2: jump p3)
-**
-** In other words, if M is 2, then I is either 0 (for fall-through) or
-** 1 (for when the branch is taken).  If M is 3, the I is 0 for an
-** ordinary fall-through, I is 1 if the branch was taken, and I is 2 
-** if the result of comparison is NULL.  For M=3, I=2 the jump may or
-** may not be taken, depending on the SQLITE_JUMPIFNULL flags in p5.
-** When M is 4, that means that an OP_Jump is being run.  I is 0, 1, or 2
-** depending on if the operands are less than, equal, or greater than.
+** M is an integer between 2 and 4.  2 indicates a ordinary two-way
+** branch (I=0 means fall through and I=1 means taken).  3 indicates
+** a 3-way branch where the third way is when one of the operands is
+** NULL.  4 indicates the OP_Jump instruction which has three destinations
+** depending on whether the first operand is less than, equal to, or greater
+** than the second. 
 **
 ** iSrcLine is the source code line (from the __LINE__ macro) that
 ** generated the VDBE instruction combined with flag bits.  The source
@@ -146,9 +138,9 @@ int sqlite3_found_count = 0;
 ** alternate branch are never taken.  If a branch is never taken then
 ** flags should be 0x06 since only the fall-through approach is allowed.
 **
-** Bit 0x08 of the flags indicates an OP_Jump opcode that is only
+** Bit 0x04 of the flags indicates an OP_Jump opcode that is only
 ** interested in equal or not-equal.  In other words, I==0 and I==2
-** should be treated as equivalent
+** should be treated the same.
 **
 ** Since only a line number is retained, not the filename, this macro
 ** only works for amalgamation builds.  But that is ok, since these macros
@@ -172,18 +164,6 @@ int sqlite3_found_count = 0;
     mNever = iSrcLine >> 24;
     assert( (I & mNever)==0 );
     if( sqlite3GlobalConfig.xVdbeBranch==0 ) return;  /*NO_TEST*/
-    /* Invoke the branch coverage callback with three arguments:
-    **    iSrcLine - the line number of the VdbeCoverage() macro, with
-    **               flags removed.
-    **    I        - Mask of bits 0x07 indicating which cases are are
-    **               fulfilled by this instance of the jump.  0x01 means
-    **               fall-thru, 0x02 means taken, 0x04 means NULL.  Any
-    **               impossible cases (ex: if the comparison is never NULL)
-    **               are filled in automatically so that the coverage
-    **               measurement logic does not flag those impossible cases
-    **               as missed coverage.
-    **    M        - Type of jump.  Same as M argument above
-    */
     I |= mNever;
     if( M==2 ) I |= 0x04;
     if( M==4 ){
@@ -1256,7 +1236,10 @@ case OP_Variable: {            /* out2 */
     goto too_big;
   }
   pOut = &aMem[pOp->p2];
-  sqlite3VdbeMemShallowCopy(pOut, pVar, MEM_Static);
+  if( VdbeMemDynamic(pOut) ) sqlite3VdbeMemSetNull(pOut);
+  memcpy(pOut, pVar, MEMCELLSIZE);
+  pOut->flags &= ~(MEM_Dyn|MEM_Ephem);
+  pOut->flags |= MEM_Static|MEM_FromBind;
   UPDATE_MAX_BLOBSIZE(pOut);
   break;
 }
@@ -1754,8 +1737,8 @@ case OP_MustBeInt: {            /* jump, in1 */
   pIn1 = &aMem[pOp->p1];
   if( (pIn1->flags & MEM_Int)==0 ){
     applyAffinity(pIn1, SQLITE_AFF_NUMERIC, encoding);
+    VdbeBranchTaken((pIn1->flags&MEM_Int)==0, 2);
     if( (pIn1->flags & MEM_Int)==0 ){
-      VdbeBranchTaken(1, 2);
       if( pOp->p2==0 ){
         rc = SQLITE_MISMATCH;
         goto abort_due_to_error;
@@ -1764,7 +1747,6 @@ case OP_MustBeInt: {            /* jump, in1 */
       }
     }
   }
-  VdbeBranchTaken(0, 2);
   MemSetTypeFlag(pIn1, MEM_Int);
   break;
 }
@@ -2065,7 +2047,7 @@ compare_op:
     pOut->u.i = res2;
     REGISTER_TRACE(pOp->p2, pOut);
   }else{
-    VdbeBranchTaken(res2!=0, (pOp->p5 & SQLITE_NULLEQ)?2:3);
+    VdbeBranchTaken(res!=0, (pOp->p5 & SQLITE_NULLEQ)?2:3);
     if( res2 ){
       goto jump_to_p2;
     }
@@ -5135,13 +5117,17 @@ case OP_Sort: {        /* jump */
   p->aCounter[SQLITE_STMTSTATUS_SORT]++;
   /* Fall through into OP_Rewind */
 }
-/* Opcode: Rewind P1 P2 * * *
+/* Opcode: Rewind P1 P2 * * P5
 **
 ** The next use of the Rowid or Column or Next instruction for P1 
 ** will refer to the first entry in the database table or index.
 ** If the table or index is empty, jump immediately to P2.
 ** If the table or index is not empty, fall through to the following 
 ** instruction.
+**
+** If P5 is non-zero and the table is not empty, then the "skip-next"
+** flag is set on the cursor so that the next OP_Next instruction 
+** executed on it is a no-op.
 **
 ** This opcode leaves the cursor configured to move in forward order,
 ** from the beginning toward the end.  In other words, the cursor is
@@ -5153,7 +5139,6 @@ case OP_Rewind: {        /* jump */
   int res;
 
   assert( pOp->p1>=0 && pOp->p1<p->nCursor );
-  assert( pOp->p5==0 );
   pC = p->apCsr[pOp->p1];
   assert( pC!=0 );
   assert( isSorter(pC)==(pOp->opcode==OP_SorterSort) );
@@ -5168,6 +5153,9 @@ case OP_Rewind: {        /* jump */
     pCrsr = pC->uc.pCursor;
     assert( pCrsr );
     rc = sqlite3BtreeFirst(pCrsr, &res);
+#ifndef SQLITE_OMIT_WINDOWFUNC
+    if( pOp->p5 ) sqlite3BtreeSkipNext(pCrsr);
+#endif
     pC->deferredMoveto = 0;
     pC->cacheStatus = CACHE_STALE;
   }
