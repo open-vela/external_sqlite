@@ -4398,8 +4398,7 @@ void sqlite3UniqueConstraint(
   StrAccum errMsg;
   Table *pTab = pIdx->pTable;
 
-  sqlite3StrAccumInit(&errMsg, pParse->db, 0, 0, 
-                      pParse->db->aLimit[SQLITE_LIMIT_LENGTH]);
+  sqlite3StrAccumInit(&errMsg, pParse->db, 0, 0, 200);
   if( pIdx->aColExpr ){
     sqlite3_str_appendf(&errMsg, "index '%q'", pIdx->zName);
   }else{
