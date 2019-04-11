@@ -1,5 +1,5 @@
-C Merge\strunk\schanges\sinto\sthis\sbranch.
-D 2019-04-11T19:04:01.007
+C Add\sthe\stest/wapptest.tcl\sscript,\san\salternative\sto\sreleasetest.tcl\sthat\suses\swapp\sto\sprovide\sthe\suser-interface.
+D 2019-04-11T19:07:17.895
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1818,7 +1818,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ec9c4f6d8da25dcc834812c2bb24bda1017833b1c572bdbbf87f0191e1310706 d71f8bbc4efd8af935671c4e7626862d6e5a4c2e51527b9e82b2f0c94ddf6e93
+P d71f8bbc4efd8af935671c4e7626862d6e5a4c2e51527b9e82b2f0c94ddf6e93 d805fc0cf1c4ef07a7bc947f75828931e3788d0e64730caab3b42ae58009a194
 R 3c54551b10c87fc6f05051e8c995cc5e
+T +closed d805fc0cf1c4ef07a7bc947f75828931e3788d0e64730caab3b42ae58009a194
 U dan
-Z 90203c7d6b4495f65199b8125515f7fd
+Z 54f6897aa8412eba0cb13c03efd1a483
