@@ -192,7 +192,10 @@ SQLITE_NOINLINE int sqlite3VdbeMemGrow(Mem *pMem, int n, int bPreserve){
 
   /* If the bPreserve flag is set to true, then the memory cell must already
   ** contain a valid string or blob value.  */
-  assert( bPreserve==0 || pMem->flags&(MEM_Blob|MEM_Str) );
+  assert( bPreserve==0 
+       || pMem->flags&(MEM_Blob|MEM_Str)
+       || MemNullNochng(pMem)
+  );
   testcase( bPreserve && pMem->z==0 );
 
   assert( pMem->szMalloc==0
@@ -306,7 +309,6 @@ int sqlite3VdbeMemExpandBlob(Mem *pMem){
   /* Set nByte to the number of bytes required to store the expanded blob. */
   nByte = pMem->n + pMem->u.nZero;
   if( nByte<=0 ){
-    if( (pMem->flags & MEM_Blob)==0 ) return SQLITE_OK;
     nByte = 1;
   }
   if( sqlite3VdbeMemGrow(pMem, nByte, 1) ){
@@ -1063,7 +1065,7 @@ int sqlite3VdbeMemSetStr(
       nAlloc += (enc==SQLITE_UTF8?1:2);
     }
     if( nByte>iLimit ){
-      return sqlite3ErrorToParser(pMem->db, SQLITE_TOOBIG);
+      return SQLITE_TOOBIG;
     }
     testcase( nAlloc==0 );
     testcase( nAlloc==31 );
