@@ -7699,7 +7699,7 @@ static int SQLITE_TCLAPI test_decode_hexdb(
   int iOffset = 0;
   int j, k;
   int rc;
-  unsigned int x[16];
+  unsigned char x[16];
   if( objc!=2 ){
     Tcl_WrongNumArgs(interp, 1, objv, "HEXDB");
     return TCL_ERROR;
@@ -7731,14 +7731,14 @@ static int SQLITE_TCLAPI test_decode_hexdb(
       iOffset = k;
       continue;
     }
-    rc = sscanf(zIn+i,"| %d: %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
+    rc = sscanf(zIn+i,"| %d: %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx"
+                      "  %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx",
                 &j, &x[0], &x[1], &x[2], &x[3], &x[4], &x[5], &x[6], &x[7],
                 &x[8], &x[9], &x[10], &x[11], &x[12], &x[13], &x[14], &x[15]);
     if( rc==17 ){
       k = iOffset+j;
       if( k+16<=n ){
-        int ii;
-        for(ii=0; ii<16; ii++) a[k+ii] = x[ii]&0xff;
+        memcpy(a+k, x, 16);
       }
       continue;
     }
