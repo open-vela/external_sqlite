@@ -5478,33 +5478,6 @@ static int SQLITE_TCLAPI test_soft_heap_limit(
 }
 
 /*
-** Usage:  sqlite3_hard_heap_limit ?N?
-**
-** Query or set the hard heap limit for the current thread.  The
-** limit is only changed if the N is present.  The previous limit
-** is returned.
-*/
-static int SQLITE_TCLAPI test_hard_heap_limit(
-  void * clientData,
-  Tcl_Interp *interp,
-  int objc,
-  Tcl_Obj *CONST objv[]
-){
-  sqlite3_int64 amt;
-  Tcl_WideInt N = -1;
-  if( objc!=1 && objc!=2 ){
-    Tcl_WrongNumArgs(interp, 1, objv, "?N?");
-    return TCL_ERROR;
-  }
-  if( objc==2 ){
-    if( Tcl_GetWideIntFromObj(interp, objv[1], &N) ) return TCL_ERROR;
-  }
-  amt = sqlite3_hard_heap_limit64(N);
-  Tcl_SetObjResult(interp, Tcl_NewWideIntObj(amt));
-  return TCL_OK;
-}
-
-/*
 ** Usage:   sqlite3_thread_cleanup
 **
 ** Call the sqlite3_thread_cleanup API.
@@ -7726,7 +7699,7 @@ static int SQLITE_TCLAPI test_decode_hexdb(
   int iOffset = 0;
   int j, k;
   int rc;
-  unsigned int x[16];
+  unsigned char x[16];
   if( objc!=2 ){
     Tcl_WrongNumArgs(interp, 1, objv, "HEXDB");
     return TCL_ERROR;
@@ -7758,14 +7731,14 @@ static int SQLITE_TCLAPI test_decode_hexdb(
       iOffset = k;
       continue;
     }
-    rc = sscanf(zIn+i,"| %d: %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
+    rc = sscanf(zIn+i,"| %d: %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx"
+                      "  %hhx %hhx %hhx %hhx %hhx %hhx %hhx %hhx",
                 &j, &x[0], &x[1], &x[2], &x[3], &x[4], &x[5], &x[6], &x[7],
                 &x[8], &x[9], &x[10], &x[11], &x[12], &x[13], &x[14], &x[15]);
     if( rc==17 ){
       k = iOffset+j;
       if( k+16<=n ){
-        int ii;
-        for(ii=0; ii<16; ii++) a[k+ii] = x[ii]&0xff;
+        memcpy(a+k, x, 16);
       }
       continue;
     }
@@ -7907,8 +7880,6 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
      { "sqlite3_db_filename",           test_db_filename,        0},
      { "sqlite3_db_readonly",           test_db_readonly,        0},
      { "sqlite3_soft_heap_limit",       test_soft_heap_limit,    0},
-     { "sqlite3_soft_heap_limit64",     test_soft_heap_limit,    0},
-     { "sqlite3_hard_heap_limit64",     test_hard_heap_limit,    0},
      { "sqlite3_thread_cleanup",        test_thread_cleanup,     0},
      { "sqlite3_pager_refcounts",       test_pager_refcounts,    0},
 
