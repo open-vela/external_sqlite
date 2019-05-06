@@ -1381,7 +1381,8 @@ static int rbuObjIterCacheTableInfo(sqlite3rbu *p, RbuObjIter *pIter){
         }
 
         pIter->azTblType[iOrder] = rbuStrndup(zType, &p->rc);
-        pIter->abTblPk[iOrder] = (iPk!=0);
+        assert( iPk>=0 );
+        pIter->abTblPk[iOrder] = (u8)iPk;
         pIter->abNotNull[iOrder] = (u8)bNotNull || (iPk!=0);
         iOrder++;
       }
@@ -1414,6 +1415,187 @@ static char *rbuObjIterGetCollist(
     zSep = ", ";
   }
   return zList;
+}
+
+static char *rbuObjIterGetPkList(
+  sqlite3rbu *p,                  /* RBU object */
+  RbuObjIter *pIter,              /* Object iterator for column names */
+  const char *zExtra
+){
+  int iPk = 1;
+  char *zRet = 0;
+  const char *zSep = "";
+  while( 1 ){
+    int i;
+    for(i=0; i<pIter->nTblCol; i++){
+      if( (int)pIter->abTblPk[i]==iPk ){
+        const char *zCol = pIter->azTblCol[i];
+        zRet = rbuMPrintf(p, "%z%s\"%w\"%s", zRet, zSep, zCol, zExtra);
+        zSep = ", ";
+      }
+    }
+    if( i==pIter->nTblCol ) break;
+    iPk++;
+  }
+  return zRet;
+}
+
+static char *rbuVacuumTableStart(
+  sqlite3rbu *p, 
+  RbuObjIter *pIter,
+  int bRowid,
+  const char *zWrite
+){
+  sqlite3_stmt *pMax = 0;
+  char *zRet = 0;
+  if( bRowid ){
+    p->rc = prepareFreeAndCollectError(p->dbMain, &pMax, &p->zErrmsg, 
+        sqlite3_mprintf(
+          "SELECT max(_rowid_) FROM \"%s%w\"", zWrite, pIter->zTbl
+        )
+    );
+    if( p->rc==SQLITE_OK && SQLITE_ROW==sqlite3_step(pMax) ){
+      sqlite3_int64 iMax = sqlite3_column_int64(pMax, 0);
+      zRet = rbuMPrintf(p, " WHERE _rowid_ > %lld ", iMax);
+    }
+    rbuFinalize(p, pMax);
+  }else{
+    char *zOrder = 0;
+    char *zSelect = 0;
+    char *zList = 0;
+    int iPk = 1;
+    const char *zSep = "";
+    const char *zSep2 = "";
+    while( 1 ){
+      int i;
+      for(i=0; i<pIter->nTblCol; i++){
+        if( (int)pIter->abTblPk[i]==iPk ){
+          const char *zCol = pIter->azTblCol[i];
+          zOrder = rbuMPrintf(p, "%z%s\"%w\" DESC", zOrder, zSep, zCol);
+          zList = rbuMPrintf(p, "%z%s\"%w\"", zList, zSep, zCol);
+          zSelect = rbuMPrintf(p, "%z%squote(\"%w\")", zSelect, zSep2, zCol);
+          zSep = ", ";
+          zSep2 = "||','||";
+          break;
+        }
+      }
+      if( i==pIter->nTblCol ) break;
+      iPk++;
+    }
+
+    if( p->rc==SQLITE_OK ){
+      p->rc = prepareFreeAndCollectError(p->dbMain, &pMax, &p->zErrmsg, 
+          sqlite3_mprintf(
+            "SELECT %s FROM \"%s%w\" ORDER BY %s LIMIT 1", 
+                zSelect, zWrite, pIter->zTbl, zOrder
+          )
+      );
+      if( p->rc==SQLITE_OK && SQLITE_ROW==sqlite3_step(pMax) ){
+        const char *zVal = (const char*)sqlite3_column_text(pMax, 0);
+        zRet = rbuMPrintf(p, " WHERE (%s) > (%s) ", zList, zVal);
+      }
+      rbuFinalize(p, pMax);
+    }
+
+    sqlite3_free(zOrder);
+    sqlite3_free(zSelect);
+    sqlite3_free(zList);
+  }
+  return zRet;
+}
+
+char *rbuVacuumIndexStart(
+  sqlite3rbu *p, 
+  RbuObjIter *pIter
+){
+  char *zOrder = 0;
+  char *zLhs = 0;
+  char *zSelect = 0;
+  char *zVector = 0;
+  char *zRet = 0;
+  int bFailed = 0;
+
+  if( p->rc==SQLITE_OK ){
+    const char *zSep = "";
+    int iCol = 0;
+    sqlite3_stmt *pXInfo = 0;
+    p->rc = prepareFreeAndCollectError(p->dbMain, &pXInfo, &p->zErrmsg,
+        sqlite3_mprintf("PRAGMA main.index_xinfo = %Q", pIter->zIdx)
+    );
+    while( p->rc==SQLITE_OK && SQLITE_ROW==sqlite3_step(pXInfo) ){
+      int iCid = sqlite3_column_int(pXInfo, 1);
+      const char *zCollate = (const char*)sqlite3_column_text(pXInfo, 4);
+      const char *zCol;
+      if( sqlite3_column_int(pXInfo, 3) ){
+        bFailed = 1;
+        break;
+      }
+
+      if( iCid<0 ){
+        if( pIter->eType==RBU_PK_IPK ){
+          int i;
+          for(i=0; pIter->abTblPk[i]==0; i++);
+          assert( i<pIter->nTblCol );
+          zCol = pIter->azTblCol[i];
+        }else{
+          zCol = "_rowid_";
+        }
+      }else{
+        zCol = pIter->azTblCol[iCid];
+      }
+
+      zLhs = rbuMPrintf(p, "%z%s \"%w\" COLLATE %Q",
+          zLhs, zSep, zCol, zCollate
+      );
+      zOrder = rbuMPrintf(p, "%z%s \"rbu_imp_%d%w\" COLLATE %Q DESC",
+          zOrder, zSep, iCol, zCol, zCollate
+      );
+      zSelect = rbuMPrintf(p, "%z%s quote(\"rbu_imp_%d%w\")",
+          zSelect, zSep, iCol, zCol
+      );
+      zSep = ", ";
+      iCol++;
+    }
+    rbuFinalize(p, pXInfo);
+  }
+  if( bFailed ) goto index_start_out;
+
+  if( p->rc==SQLITE_OK ){
+    int iCol;
+    sqlite3_stmt *pSel = 0;
+
+    if( p->rc==SQLITE_OK ){
+      p->rc = prepareFreeAndCollectError(p->dbMain, &pSel, &p->zErrmsg,
+          sqlite3_mprintf("SELECT %s FROM \"rbu_imp_%w\" ORDER BY %s LIMIT 1",
+            zSelect, pIter->zTbl, zOrder
+          )
+      );
+    }
+    if( p->rc==SQLITE_OK && SQLITE_ROW==sqlite3_step(pSel) ){
+      const char *zSep = "";
+      for(iCol=0; iCol<pIter->nCol; iCol++){
+        const char *zQuoted = (const char*)sqlite3_column_text(pSel, iCol);
+        if( zQuoted[0]=='N' ){
+          bFailed = 1;
+          break;
+        }
+        zVector = rbuMPrintf(p, "%z%s%s", zVector, zSep, zQuoted);
+        zSep = ", ";
+      }
+
+      if( !bFailed ){
+        zRet = rbuMPrintf(p, "(%s) > (%s)", zLhs, zVector);
+      }
+    }
+    rbuFinalize(p, pSel);
+  }
+
+ index_start_out:
+  sqlite3_free(zOrder);
+  sqlite3_free(zSelect);
+  sqlite3_free(zVector);
+  sqlite3_free(zLhs);
+  return zRet;
 }
 
 /*
@@ -2092,12 +2274,24 @@ static int rbuObjIterPrepareAll(
       if( p->rc==SQLITE_OK ){
         char *zSql;
         if( rbuIsVacuum(p) ){
+          const char *zStart = 0;
+          if( nOffset ){
+            zStart = rbuVacuumIndexStart(p, pIter);
+            if( zStart ){
+              sqlite3_free(zLimit);
+              zLimit = 0;
+            }
+          }
+
           zSql = sqlite3_mprintf(
-              "SELECT %s, 0 AS rbu_control FROM '%q' %s ORDER BY %s%s",
+              "SELECT %s, 0 AS rbu_control FROM '%q' %s %s %s ORDER BY %s%s",
               zCollist, 
               pIter->zDataTbl,
-              zPart, zCollist, zLimit
+              zPart, 
+              (zStart ? (zPart ? "AND" : "WHERE") : ""), zStart,
+              zCollist, zLimit
           );
+          sqlite3_free(zStart);
         }else
 
         if( pIter->eType==RBU_PK_EXTERNAL || pIter->eType==RBU_PK_NONE ){
@@ -2120,7 +2314,11 @@ static int rbuObjIterPrepareAll(
               zCollist, zLimit
           );
         }
-        p->rc = prepareFreeAndCollectError(p->dbRbu, &pIter->pSelect, pz, zSql);
+        if( p->rc==SQLITE_OK ){
+          p->rc = prepareFreeAndCollectError(p->dbRbu,&pIter->pSelect,pz,zSql);
+        }else{
+          sqlite3_free(zSql);
+        }
       }
 
       sqlite3_free(zImposterCols);
@@ -2220,18 +2418,42 @@ static int rbuObjIterPrepareAll(
       /* Create the SELECT statement to read keys from data_xxx */
       if( p->rc==SQLITE_OK ){
         const char *zRbuRowid = "";
+        char *zStart = 0;
+        char *zOrder = 0;
         if( bRbuRowid ){
           zRbuRowid = rbuIsVacuum(p) ? ",_rowid_ " : ",rbu_rowid";
         }
-        p->rc = prepareFreeAndCollectError(p->dbRbu, &pIter->pSelect, pz,
-            sqlite3_mprintf(
-              "SELECT %s,%s rbu_control%s FROM '%q'%s", 
-              zCollist, 
-              (rbuIsVacuum(p) ? "0 AS " : ""),
-              zRbuRowid,
-              pIter->zDataTbl, zLimit
-            )
-        );
+
+        if( rbuIsVacuum(p) ){
+          if( nOffset ){
+            zStart = rbuVacuumTableStart(p, pIter, bRbuRowid, zWrite);
+            if( zStart ){
+              sqlite3_free(zLimit);
+              zLimit = 0;
+            }
+          }
+          if( bRbuRowid ){
+            zOrder = rbuMPrintf(p, "_rowid_");
+          }else{
+            zOrder = rbuObjIterGetPkList(p, pIter, "");
+          }
+        }
+
+        if( p->rc==SQLITE_OK ){
+          p->rc = prepareFreeAndCollectError(p->dbRbu, &pIter->pSelect, pz,
+              sqlite3_mprintf(
+                "SELECT %s,%s rbu_control%s FROM '%q'%s %s %s %s",
+                zCollist, 
+                (rbuIsVacuum(p) ? "0 AS " : ""),
+                zRbuRowid,
+                pIter->zDataTbl, (zStart ? zStart : ""), 
+                (zOrder ? "ORDER BY" : ""), zOrder,
+                zLimit
+              )
+          );
+        }
+        sqlite3_free(zStart);
+        sqlite3_free(zOrder);
       }
 
       sqlite3_free(zWhere);
