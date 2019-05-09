@@ -1,5 +1,5 @@
-C Improved\serror\shandling\sfor\sthe\s".open\s--hexdb"\scommand\sof\sthe\sCLI.
-D 2019-05-09T11:18:41.366
+C Fix\sa\sproblem\sin\sthe\snew\scode\sintroduced\sby\s[658b84d7]\scausing\scorruption\sand\sother\serrors\sto\sbe\signored.
+D 2019-05-09T11:19:27.227
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -522,7 +522,7 @@ F src/random.c 80f5d666f23feb3e6665a6ce04c7197212a88384
 F src/resolve.c 408632d9531ca8f1df8591f00530797daaa7bde3fe0d3211de4d431cbb99347e
 F src/rowset.c d977b011993aaea002cab3e0bb2ce50cf346000dff94e944d547b989f4b1fe93
 F src/select.c ef860c7e5882c89c030432a6d2cf13c67d1d51fd511cf45cbdfd5c2faf44d51d
-F src/shell.c.in 5d0e2b03f977a475700c4c535df74e753171d27ec4a50e1a5ec0090357008f05
+F src/shell.c.in 5470f08809ca5d9ac79f782f8f16d96a4299e584dbc456d8ef4aa6ca0824b5b3
 F src/sqlite.h.in 0605c88d98c85fbcba8bbd9716e7cc10b361e7b21cf2375171130f577388c943
 F src/sqlite3.rc 5121c9e10c3964d5755191c80dd1180c122fc3a8
 F src/sqlite3ext.h 9ecc93b8493bd20c0c07d52e2ac0ed8bab9b549c7f7955b59869597b650dd8b5
@@ -593,7 +593,7 @@ F src/upsert.c 0dd81b40206841814d46942a7337786932475f085716042d0cb2fc7791bf8ca4
 F src/utf.c 2f0fac345c7660d5c5bd3df9e9d8d33d4c27f366bcfb09e07443064d751a0507
 F src/util.c 5061987401c2e8003177fa30d73196aa036727c8f04bf36a2df0c82b1904a236
 F src/vacuum.c 82dcec9e7b1afa980288718ad11bc499651c722d7b9f32933c4d694d91cb6ebf
-F src/vdbe.c 02d6df64c03e6c69b94d8e53699b0ab4e4d6bc74ef88484b48970864dbf0cce7
+F src/vdbe.c 5612b064d4c5d59efa0be7209ba8b631a534b16cebc63f2899eb887505dfcf2f
 F src/vdbe.h 712bca562eaed1c25506b9faf9680bdc75fc42e2f4a1cd518d883fa79c7a4237
 F src/vdbeInt.h 3ba14553508d66f58753952d6dd287dce4ec735de02c6440858b4891aed51c17
 F src/vdbeapi.c f9161e5c77f512fbb80091ce8af621d19c9556bda5e734cffaac1198407400da
@@ -765,7 +765,7 @@ F test/corruptH.test 79801d97ec5c2f9f3c87739aa1ec2eb786f96454
 F test/corruptI.test a17bbf54fdde78d43cf3cc34b0057719fd4a173a3d824285b67dc5257c064c7b
 F test/corruptJ.test 4d5ccc4bf959464229a836d60142831ef76a5aa4
 F test/corruptK.test 5b4212fe346699831c5ad559a62c54e11c0611bdde1ea8423a091f9c01aa32af
-F test/corruptL.test 13763e4769eeef308badfcc95dea5d5e00e61a1732a1214a48ff24d3f5db8cbc
+F test/corruptL.test b6ea0f657b26a8fe10405a9f5970f94de47fdfcc02fce2a635954aef13e55a88
 F test/cost.test 51f4fcaae6e78ad5a57096831259ed6c760e2ac6876836e91c00030fad385b34
 F test/count.test cb2e0f934c6eb33670044520748d2ecccd46259c
 F test/countofview.test e3d4cd6900e4e4f074968ab24b8b87d3671cd624961bef40fd3a6b8f574343cf
@@ -1826,6 +1826,6 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P ebe4845cd0ffb96b30be3c69eb399d58e93149886bc2fa60a7ebd7b4fbe447a4
-R 8e29ce757aa66674b46f1ad295c560b5
-U drh
-Z 58b67e014ab5b3e97fafa9cfec65dfaa
+R e44f7e65f3b14237b84a8559c540124d
+U dan
+Z 0f9cf99179363aae6d38e9c8478ef975
