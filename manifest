@@ -1,5 +1,5 @@
-C Avoid\stransforming\sTK_COLLATE\sor\sTK_UNLIKELY\sExpr\snodes\sto\sTK_REFERENCE.\sInstead,\stransform\sthe\suppermost\sExpr\snode\sin\sthe\sexpression\stree\sthat\sis\snot\sof\sthis\stype.
-D 2019-06-16T08:58:14.849
+C Avoid\stransforming\sTK_COLLATE\sor\sTK_UNLIKELY\sExpr\snodes\sto\sTK_REFERENCE.\nInstead,\stransform\sthe\suppermost\sExpr\snode\sin\sthe\sexpression\stree\sthat\nis\snot\sof\sthis\stype.\sFix\sfor\s[e1e07ef2].
+D 2019-06-16T14:56:41.259
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1830,10 +1830,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ca4ddfefc1be1afbf366d87c47f0dd1122350d7ab34ba60020c5babb64a654a4
+P ca4ddfefc1be1afbf366d87c47f0dd1122350d7ab34ba60020c5babb64a654a4 ba7870e292919cf6c2f4b65b63fb0420ba2718eb0a797e0ba5302eec551a4238
 R 18312679532d55fb24bce06818aa1e91
-T *branch * tkt-e1e07ef2
-T *sym-tkt-e1e07ef2 *
-T -sym-trunk *
-U dan
-Z 0c99556d547b90fce21532cb343b5082
+T +closed ba7870e292919cf6c2f4b65b63fb0420ba2718eb0a797e0ba5302eec551a4238
+U drh
+Z f0236900c5824284c0e117fa258f5cb9
