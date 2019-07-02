@@ -849,12 +849,6 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           sqlite3ErrorMsg(pParse, "misuse of %s function %.*s()",zType,nId,zId);
           pNC->nErr++;
           is_agg = 0;
-        }else if( is_agg==0 && ExprHasProperty(pExpr, EP_Filter) ){
-          sqlite3ErrorMsg(pParse, 
-              "filter clause may not be used with non-aggregate %.*s()", 
-              nId, zId
-          );
-          pNC->nErr++;
         }
 #else
         if( (is_agg && (pNC->ncFlags & NC_AllowAgg)==0) ){
@@ -889,7 +883,7 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
       sqlite3WalkExprList(pWalker, pList);
       if( is_agg ){
 #ifndef SQLITE_OMIT_WINDOWFUNC
-        if( ExprHasProperty(pExpr, EP_WinFunc) ){
+        if( pExpr->y.pWin ){
           Select *pSel = pNC->pWinSelect;
           if( IN_RENAME_OBJECT==0 ){
             sqlite3WindowUpdate(pParse, pSel->pWinDefn, pExpr->y.pWin, pDef);
@@ -910,9 +904,6 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           NameContext *pNC2 = pNC;
           pExpr->op = TK_AGG_FUNCTION;
           pExpr->op2 = 0;
-#ifndef SQLITE_OMIT_WINDOWFUNC
-          sqlite3WalkExpr(pWalker, pExpr->y.pFilter);
-#endif
           while( pNC2 && !sqlite3FunctionUsesThisSrc(pExpr, pNC2->pSrcList) ){
             pExpr->op2++;
             pNC2 = pNC2->pNext;
