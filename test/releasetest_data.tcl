@@ -246,7 +246,7 @@ array set ::Platforms [strip_comments {
     "User-Auth"               tcltest
     "Update-Delete-Limit"     test
     "Extra-Robustness"        test
-    "Device-Two"              "threadtest test"
+    "Device-Two"              test
     "No-lookaside"            test
     "Devkit"                  test
     "Apple"                   test
