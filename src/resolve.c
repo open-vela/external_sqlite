@@ -826,23 +826,22 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
 
       if( 0==IN_RENAME_OBJECT ){
 #ifndef SQLITE_OMIT_WINDOWFUNC
-        int is_win = ExprHasProperty(pExpr, EP_WinFunc);
         assert( is_agg==0 || (pDef->funcFlags & SQLITE_FUNC_MINMAX)
           || (pDef->xValue==0 && pDef->xInverse==0)
           || (pDef->xValue && pDef->xInverse && pDef->xSFunc && pDef->xFinalize)
         );
-        if( pDef && pDef->xValue==0 && is_win ){
+        if( pDef && pDef->xValue==0 && ExprHasProperty(pExpr, EP_WinFunc) ){
           sqlite3ErrorMsg(pParse, 
               "%.*s() may not be used as a window function", nId, zId
           );
           pNC->nErr++;
         }else if( 
               (is_agg && (pNC->ncFlags & NC_AllowAgg)==0)
-           || (is_agg && (pDef->funcFlags&SQLITE_FUNC_WINDOW) && !is_win)
-           || (is_agg && is_win && (pNC->ncFlags & NC_AllowWin)==0)
+           || (is_agg && (pDef->funcFlags&SQLITE_FUNC_WINDOW) && !pExpr->y.pWin)
+           || (is_agg && pExpr->y.pWin && (pNC->ncFlags & NC_AllowWin)==0)
         ){
           const char *zType;
-          if( (pDef->funcFlags & SQLITE_FUNC_WINDOW) || is_win ){
+          if( (pDef->funcFlags & SQLITE_FUNC_WINDOW) || pExpr->y.pWin ){
             zType = "window";
           }else{
             zType = "aggregate";
@@ -850,12 +849,6 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           sqlite3ErrorMsg(pParse, "misuse of %s function %.*s()",zType,nId,zId);
           pNC->nErr++;
           is_agg = 0;
-        }else if( is_agg==0 && ExprHasProperty(pExpr, EP_Filter) ){
-          sqlite3ErrorMsg(pParse, 
-              "filter clause may not be used with non-aggregate %.*s()", 
-              nId, zId
-          );
-          pNC->nErr++;
         }
 #else
         if( (is_agg && (pNC->ncFlags & NC_AllowAgg)==0) ){
@@ -881,7 +874,7 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           ** Or arguments of other window functions. But aggregate functions
           ** may be arguments for window functions.  */
 #ifndef SQLITE_OMIT_WINDOWFUNC
-          pNC->ncFlags &= ~(NC_AllowWin | (!is_win ? NC_AllowAgg : 0));
+          pNC->ncFlags &= ~(NC_AllowWin | (!pExpr->y.pWin ? NC_AllowAgg : 0));
 #else
           pNC->ncFlags &= ~NC_AllowAgg;
 #endif
@@ -890,7 +883,7 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
       sqlite3WalkExprList(pWalker, pList);
       if( is_agg ){
 #ifndef SQLITE_OMIT_WINDOWFUNC
-        if( ExprHasProperty(pExpr, EP_WinFunc) ){
+        if( pExpr->y.pWin ){
           Select *pSel = pNC->pWinSelect;
           if( IN_RENAME_OBJECT==0 ){
             sqlite3WindowUpdate(pParse, pSel->pWinDefn, pExpr->y.pWin, pDef);
@@ -911,9 +904,6 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           NameContext *pNC2 = pNC;
           pExpr->op = TK_AGG_FUNCTION;
           pExpr->op2 = 0;
-#ifndef SQLITE_OMIT_WINDOWFUNC
-          sqlite3WalkExpr(pWalker, pExpr->y.pFilter);
-#endif
           while( pNC2 && !sqlite3FunctionUsesThisSrc(pExpr, pNC2->pSrcList) ){
             pExpr->op2++;
             pNC2 = pNC2->pNext;
