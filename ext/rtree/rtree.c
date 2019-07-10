@@ -63,6 +63,10 @@
   #include "sqlite3.h"
 #endif
 
+#include <string.h>
+#include <assert.h>
+#include <stdio.h>
+
 #ifndef SQLITE_AMALGAMATION
 #include "sqlite3rtree.h"
 typedef sqlite3_int64 i64;
@@ -70,17 +74,7 @@ typedef sqlite3_uint64 u64;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-#if !defined(NDEBUG) && !defined(SQLITE_DEBUG)
-# define NDEBUG 1
 #endif
-#if defined(NDEBUG) && defined(SQLITE_DEBUG)
-# undef NDEBUG
-#endif
-#endif
-
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
 
 /*  The following macro is used to suppress compiler warnings.
 */
