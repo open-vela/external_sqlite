@@ -1044,13 +1044,23 @@ expr(A) ::= id(X) LP STAR RP. {
 }
 
 %ifndef SQLITE_OMIT_WINDOWFUNC
-expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP over_clause(Z). {
-  A = sqlite3ExprFunction(pParse, Y, &X, D);
-  sqlite3WindowAttach(pParse, A, Z);
+%type filter_over {
+  struct FunctionTail {
+    Window *pWin;
+    Expr *pFilter;
+  }
 }
-expr(A) ::= id(X) LP STAR RP over_clause(Z). {
+%destructor filter_over {
+  sqlite3WindowDelete(pParse->db, $$.pWin);
+  sqlite3ExprDelete(pParse->db, $$.pFilter);
+}
+expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP filter_over(F). {
+  A = sqlite3ExprFunction(pParse, Y, &X, D);
+  sqlite3WindowAttach(pParse, A, F.pFilter, F.pWin);
+}
+expr(A) ::= id(X) LP STAR RP filter_over(F). {
   A = sqlite3ExprFunction(pParse, 0, &X, 0);
-  sqlite3WindowAttach(pParse, A, Z);
+  sqlite3WindowAttach(pParse, A, F.pFilter, F.pWin);
 }
 %endif
 
@@ -1657,8 +1667,11 @@ windowdefn(A) ::= nm(X) AS LP window(Y) RP. {
 %type part_opt {ExprList*}
 %destructor part_opt {sqlite3ExprListDelete(pParse->db, $$);}
 
-%type filter_opt {Expr*}
-%destructor filter_opt {sqlite3ExprDelete(pParse->db, $$);}
+%type filter_clause {Expr*}
+%destructor filter_clause {sqlite3ExprDelete(pParse->db, $$);}
+
+%type over_clause {Window*}
+%destructor over_clause {sqlite3WindowDelete(pParse->db, $$);}
 
 %type range_or_rows {int}
 
@@ -1724,25 +1737,31 @@ frame_exclude(A) ::= GROUP|TIES(X).  {A = @X; /*A-overwrites-X*/}
 %destructor window_clause {sqlite3WindowListDelete(pParse->db, $$);}
 window_clause(A) ::= WINDOW windowdefn_list(B). { A = B; }
 
-%type over_clause {Window*}
-%destructor over_clause {sqlite3WindowDelete(pParse->db, $$);}
-over_clause(A) ::= filter_opt(W) OVER LP window(Z) RP. {
+filter_over(F) ::= filter_clause(A) over_clause(B). {
+  F.pFilter = A;
+  F.pWin = B;
+}
+filter_over(F) ::= over_clause(B). {
+  F.pFilter = 0;
+  F.pWin = B;
+}
+filter_over(F) ::= filter_clause(A). {
+  F.pFilter = A;
+  F.pWin = 0;
+}
+
+over_clause(A) ::= OVER LP window(Z) RP. {
   A = Z;
   assert( A!=0 );
-  A->pFilter = W;
 }
-over_clause(A) ::= filter_opt(W) OVER nm(Z). {
+over_clause(A) ::= OVER nm(Z). {
   A = (Window*)sqlite3DbMallocZero(pParse->db, sizeof(Window));
   if( A ){
     A->zName = sqlite3DbStrNDup(pParse->db, Z.z, Z.n);
-    A->pFilter = W;
-  }else{
-    sqlite3ExprDelete(pParse->db, W);
   }
 }
 
-filter_opt(A) ::= .                            { A = 0; }
-filter_opt(A) ::= FILTER LP WHERE expr(X) RP.  { A = X; }
+filter_clause(A) ::= FILTER LP WHERE expr(X) RP.  { A = X; }
 %endif /* SQLITE_OMIT_WINDOWFUNC */
 
 /*
