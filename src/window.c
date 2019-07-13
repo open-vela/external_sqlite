@@ -1193,10 +1193,13 @@ void sqlite3WindowChain(Parse *pParse, Window *pWin, Window *pList){
 /*
 ** Attach window object pWin to expression p.
 */
-void sqlite3WindowAttach(Parse *pParse, Expr *p, Expr *pFilter, Window *pWin){
+void sqlite3WindowAttach(Parse *pParse, Expr *p, Window *pWin){
   if( p ){
     assert( p->op==TK_FUNCTION );
-    if( pWin ){
+    /* This routine is only called for the parser.  If pWin was not
+    ** allocated due to an OOM, then the parser would fail before ever
+    ** invoking this routine */
+    if( ALWAYS(pWin) ){
       p->y.pWin = pWin;
       ExprSetProperty(p, EP_WinFunc);
       pWin->pOwner = p;
@@ -1204,14 +1207,9 @@ void sqlite3WindowAttach(Parse *pParse, Expr *p, Expr *pFilter, Window *pWin){
         sqlite3ErrorMsg(pParse,
            "DISTINCT is not supported for window functions");
       }
-      pWin->pFilter = pFilter;
-    }else if( pFilter ){
-      p->y.pFilter = pFilter;
-      ExprSetProperty(p, EP_Filter);
     }
   }else{
     sqlite3WindowDelete(pParse->db, pWin);
-    sqlite3ExprDelete(pParse->db, pFilter);
   }
 }
 
