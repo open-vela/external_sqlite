@@ -2491,7 +2491,7 @@ struct Expr {
   union {
     Table *pTab;           /* TK_COLUMN: Table containing column. Can be NULL
                            ** for a column of an index on an expression */
-    Window *pWin;          /* TK_FUNCTION: Window definition for the func */
+    Window *pWin;          /* EP_WinFunc: Window/Filter defn for a function */
     struct {               /* TK_IN, TK_SELECT, and TK_EXISTS */
       int iAddr;             /* Subroutine entry address */
       int regReturn;         /* Register used to hold return address */
@@ -2578,6 +2578,14 @@ struct Expr {
 ** above sqlite3ExprDup() for details.
 */
 #define EXPRDUP_REDUCE         0x0001  /* Used reduced-size Expr nodes */
+
+/*
+** True if the expression passed as an argument was a function with
+** an OVER() clause (a window function).
+*/
+#define IsWindowFunc(p) ( \
+    ExprHasProperty((p), EP_WinFunc) && p->y.pWin->eFrmType!=TK_FILTER \
+)
 
 /*
 ** A list of expressions.  Each expression may optionally have a
@@ -3603,7 +3611,7 @@ void sqlite3WindowDelete(sqlite3*, Window*);
 void sqlite3WindowListDelete(sqlite3 *db, Window *p);
 Window *sqlite3WindowAlloc(Parse*, int, int, Expr*, int , Expr*, u8);
 void sqlite3WindowAttach(Parse*, Expr*, Window*);
-int sqlite3WindowCompare(Parse*, Window*, Window*);
+int sqlite3WindowCompare(Parse*, Window*, Window*, int);
 void sqlite3WindowCodeInit(Parse*, Window*);
 void sqlite3WindowCodeStep(Parse*, Select*, WhereInfo*, int, int);
 int sqlite3WindowRewrite(Parse*, Select*);
