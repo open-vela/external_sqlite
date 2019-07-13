@@ -7603,7 +7603,7 @@ static int proxyFileControl(sqlite3_file *id, int op, void *pArg){
       assert( 0 );  /* The call assures that only valid opcodes are sent */
     }
   }
-  /*NOTREACHED*/ assert(0);
+  /*NOTREACHED*/
   return SQLITE_ERROR;
 }
 
