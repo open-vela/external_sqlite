@@ -1,5 +1,5 @@
-C Give\sthe\sSQLITE_TESTCTRL_PRNG_SEED\stwo\sarguments.\s\sThe\ssecond\sargument\sif\snot\nNULL\sis\sa\spointer\sto\sa\sdatabase\sconnection\swhich\sseeds\sthe\sconnection\sfrom\nits\sschema\scookie.\s\sIn\sthis\sway,\sfuzzers\scan\scontrol\sthe\sPRNG\sseed.
-D 2019-08-03T01:39:20.466
+C Add\sthe\sSQLITE_TESTCTRL_PRNG_SEED\swhich\scan\scontrol\sthe\sPRNG\sseed\seither\ndirectly\sor\sthrough\sthe\sschema\scookie\sof\sa\ssupplied\sdatabase\sconnection.
+D 2019-08-03T01:40:17.104
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1838,7 +1838,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P c71098409c98af8360f8f28b9238a12ec764018a5782e8ff03fdf5db54031d6e
+P faaaae4940b5f4f70e4988ad5b45582410b381ace0031e6abcde0b9217c06796 49aa34480622cce4d7a72c59d9cfa8336886387acec8ee15b72f295ea1a52d8c
 R 4b4e0ecd3d28a8dbcf6d6e7975ad293a
+T +closed 49aa34480622cce4d7a72c59d9cfa8336886387acec8ee15b72f295ea1a52d8c
 U drh
-Z 66ff94f6273220c1c96ad3fc6404132a
+Z e28a7b4cb873c0c74b6ed34b39f7e4b8
