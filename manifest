@@ -1,5 +1,5 @@
-C Add\stest\scases\sto\sthis\sbranch.
-D 2019-08-05T20:45:53.659
+C Ensure\sthat\scolumns\sof\sviews\sand\ssub-queries\sthat\sare\sexpressions\swith\sno\saffinity\sare\snot\sassigned\sBLOB\saffinity.\sThis\smatches\sthe\sdocumentation.\sFix\sfor\s[61c853857f40da49].
+D 2019-08-05T20:53:19.747
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1838,7 +1838,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 7480db307c39b86bce269583e5917f5e1a3990500552fd98400ef3e7088c0b2a
+P a29f2a7d07beff64e489e8f824babc6228c4a499fadc0ee701caa60a63baadcd f37317d81cc2864ed57c76a7347351310d61c8056a2a0179218530ba60a44986
 R b1f7472fc9b174cc74ba9e00e5ff64d4
+T +closed f37317d81cc2864ed57c76a7347351310d61c8056a2a0179218530ba60a44986
 U dan
-Z ae9b0a58941d32ddda7f9190b5bf51cf
+Z 6f3e4abeb031e13757b5ea5703f23ca4
