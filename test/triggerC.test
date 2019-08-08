@@ -1072,3 +1072,4 @@ do_catchsql_test 17.1 {
 
 
 finish_test
+
