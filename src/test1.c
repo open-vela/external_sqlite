@@ -7173,7 +7173,8 @@ static int SQLITE_TCLAPI optimization_control(
     { "order-by-idx-join",   SQLITE_OrderByIdxJoin },
     { "transitive",          SQLITE_Transitive     },
     { "omit-noop-join",      SQLITE_OmitNoopJoin   },
-    { "stat4",               SQLITE_Stat4          },
+    { "stat3",               SQLITE_Stat34         },
+    { "stat4",               SQLITE_Stat34         },
     { "skip-scan",           SQLITE_SkipScan       },
   };
 

@@ -10,13 +10,13 @@
 #***********************************************************************
 #
 # This file implements tests for SQLite library.  The focus of the tests
-# in this file is testing the capabilities of sqlite_stat4.
+# in this file is testing the capabilities of sqlite_stat3.
 #
 
 set testdir [file dirname $argv0]
 source $testdir/tester.tcl
 
-ifcapable !stat4 {
+ifcapable !stat4&&!stat3 {
   finish_test
   return
 }
