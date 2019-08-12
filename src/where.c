@@ -1031,7 +1031,7 @@ static sqlite3_index_info *allocateIndexInfo(
   for(i=0; i<nOrderBy; i++){
     Expr *pExpr = pOrderBy->a[i].pExpr;
     pIdxOrderBy[i].iColumn = pExpr->iColumn;
-    pIdxOrderBy[i].desc = pOrderBy->a[i].sortFlags & KEYINFO_ORDER_DESC;
+    pIdxOrderBy[i].desc = pOrderBy->a[i].sortOrder;
   }
 
   *pmNoOmit = mNoOmit;
@@ -3836,7 +3836,6 @@ static i8 wherePathSatisfiesOrderBy(
               continue;
             }
           }
-          if( pOrderBy->a[i].sortFlags & KEYINFO_ORDER_BIGNULL ) continue;
           if( iColumn!=XN_ROWID ){
             pColl = sqlite3ExprNNCollSeq(pWInfo->pParse, pOrderBy->a[i].pExpr);
             if( sqlite3StrICmp(pColl->zName, pIndex->azColl[j])!=0 ) continue;
@@ -3850,11 +3849,10 @@ static i8 wherePathSatisfiesOrderBy(
         if( isMatch && (wctrlFlags & WHERE_GROUPBY)==0 ){
           /* Make sure the sort order is compatible in an ORDER BY clause.
           ** Sort order is irrelevant for a GROUP BY clause. */
-          assert( (pOrderBy->a[i].sortFlags & KEYINFO_ORDER_BIGNULL)==0 );
           if( revSet ){
-            if( (rev ^ revIdx)!=pOrderBy->a[i].sortFlags ) isMatch = 0;
+            if( (rev ^ revIdx)!=pOrderBy->a[i].sortOrder ) isMatch = 0;
           }else{
-            rev = revIdx ^ pOrderBy->a[i].sortFlags;
+            rev = revIdx ^ pOrderBy->a[i].sortOrder;
             if( rev ) *pRevMask |= MASKBIT(iLoop);
             revSet = 1;
           }
