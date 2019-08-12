@@ -1404,7 +1404,7 @@ ExprList *sqlite3ExprListDup(sqlite3 *db, ExprList *p, int flags){
     }
     pItem->zName = sqlite3DbStrDup(db, pOldItem->zName);
     pItem->zSpan = sqlite3DbStrDup(db, pOldItem->zSpan);
-    pItem->sortFlags = pOldItem->sortFlags;
+    pItem->sortOrder = pOldItem->sortOrder;
     pItem->done = 0;
     pItem->bSpanIsTab = pOldItem->bSpanIsTab;
     pItem->bSorterRef = pOldItem->bSorterRef;
@@ -1657,25 +1657,15 @@ vector_append_error:
 /*
 ** Set the sort order for the last element on the given ExprList.
 */
-void sqlite3ExprListSetSortOrder(ExprList *p, int iSortOrder, int eNulls){
+void sqlite3ExprListSetSortOrder(ExprList *p, int iSortOrder){
   if( p==0 ) return;
+  assert( SQLITE_SO_UNDEFINED<0 && SQLITE_SO_ASC>=0 && SQLITE_SO_DESC>0 );
   assert( p->nExpr>0 );
-
-  assert( SQLITE_SO_UNDEFINED<0 && SQLITE_SO_ASC==0 && SQLITE_SO_DESC>0 );
-  assert( iSortOrder==SQLITE_SO_UNDEFINED 
-       || iSortOrder==SQLITE_SO_ASC 
-       || iSortOrder==SQLITE_SO_DESC 
-  );
-  assert( eNulls==SQLITE_SO_UNDEFINED 
-       || eNulls==SQLITE_SO_ASC 
-       || eNulls==SQLITE_SO_DESC 
-  );
-
-  if( iSortOrder==SQLITE_SO_UNDEFINED ) iSortOrder = SQLITE_SO_ASC;
-  p->a[p->nExpr-1].sortFlags = (u8)iSortOrder;
-  if( eNulls!=SQLITE_SO_UNDEFINED && iSortOrder!=eNulls ){
-    p->a[p->nExpr-1].sortFlags |= KEYINFO_ORDER_BIGNULL;
+  if( iSortOrder<0 ){
+    assert( p->a[p->nExpr-1].sortOrder==SQLITE_SO_ASC );
+    return;
   }
+  p->a[p->nExpr-1].sortOrder = (u8)iSortOrder;
 }
 
 /*
@@ -4919,7 +4909,7 @@ int sqlite3ExprListCompare(ExprList *pA, ExprList *pB, int iTab){
   for(i=0; i<pA->nExpr; i++){
     Expr *pExprA = pA->a[i].pExpr;
     Expr *pExprB = pB->a[i].pExpr;
-    if( pA->a[i].sortFlags!=pB->a[i].sortFlags ) return 1;
+    if( pA->a[i].sortOrder!=pB->a[i].sortOrder ) return 1;
     if( sqlite3ExprCompare(0, pExprA, pExprB, iTab) ) return 1;
   }
   return 0;
