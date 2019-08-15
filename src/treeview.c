@@ -557,10 +557,10 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
 #endif 
       }
       if( pExpr->op==TK_AGG_FUNCTION ){
-        sqlite3TreeViewLine(pView, "AGG_FUNCTION%d %Q%s",
-                             pExpr->op2, pExpr->u.zToken, zFlgs);
+        sqlite3TreeViewLine(pView, "AGG_FUNCTION%d %Q",
+                             pExpr->op2, pExpr->u.zToken);
       }else{
-        sqlite3TreeViewLine(pView, "FUNCTION %Q%s", pExpr->u.zToken, zFlgs);
+        sqlite3TreeViewLine(pView, "FUNCTION %Q", pExpr->u.zToken);
       }
       if( pFarg ){
         sqlite3TreeViewExprList(pView, pFarg, pWin!=0, 0);
