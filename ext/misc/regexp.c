@@ -610,7 +610,7 @@ static const char *re_subcompile_string(ReCompiled *p){
 ** regular expression.  Applications should invoke this routine once
 ** for every call to re_compile() to avoid memory leaks.
 */
-static void re_free(ReCompiled *pRe){
+void re_free(ReCompiled *pRe){
   if( pRe ){
     sqlite3_free(pRe->aOp);
     sqlite3_free(pRe->aArg);
@@ -624,7 +624,7 @@ static void re_free(ReCompiled *pRe){
 ** compiled regular expression in *ppRe.  Return NULL on success or an
 ** error message if something goes wrong.
 */
-static const char *re_compile(ReCompiled **ppRe, const char *zIn, int noCase){
+const char *re_compile(ReCompiled **ppRe, const char *zIn, int noCase){
   ReCompiled *pRe;
   const char *zErr;
   int i, j;
