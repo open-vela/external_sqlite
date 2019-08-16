@@ -1537,16 +1537,17 @@ struct sqlite3 {
 #define SQLITE_Defensive      0x10000000  /* Input SQL is likely hostile */
 #define SQLITE_DqsDDL         0x20000000  /* dbl-quoted strings allowed in DDL*/
 #define SQLITE_DqsDML         0x40000000  /* dbl-quoted strings allowed in DML*/
+#define SQLITE_EnableView     0x80000000  /* Enable the use of views */
 
 /* Flags used only if debugging */
 #define HI(X)  ((u64)(X)<<32)
 #ifdef SQLITE_DEBUG
-#define SQLITE_SqlTrace       HI(0x0001)  /* Debug print SQL as it executes */
-#define SQLITE_VdbeListing    HI(0x0002)  /* Debug listings of VDBE progs */
-#define SQLITE_VdbeTrace      HI(0x0004)  /* True to trace VDBE execution */
-#define SQLITE_VdbeAddopTrace HI(0x0008)  /* Trace sqlite3VdbeAddOp() calls */
-#define SQLITE_VdbeEQP        HI(0x0010)  /* Debug EXPLAIN QUERY PLAN */
-#define SQLITE_ParserTrace    HI(0x0020)  /* PRAGMA parser_trace=ON */
+#define SQLITE_SqlTrace       HI(0x0100000) /* Debug print SQL as it executes */
+#define SQLITE_VdbeListing    HI(0x0200000) /* Debug listings of VDBE progs */
+#define SQLITE_VdbeTrace      HI(0x0400000) /* True to trace VDBE execution */
+#define SQLITE_VdbeAddopTrace HI(0x0800000) /* Trace sqlite3VdbeAddOp() calls */
+#define SQLITE_VdbeEQP        HI(0x1000000) /* Debug EXPLAIN QUERY PLAN */
+#define SQLITE_ParserTrace    HI(0x2000000) /* PRAGMA parser_trace=ON */
 #endif
 
 /*
@@ -1796,6 +1797,7 @@ struct Savepoint {
 struct Module {
   const sqlite3_module *pModule;       /* Callback pointers */
   const char *zName;                   /* Name passed to create_module() */
+  int nRefModule;                      /* Number of pointers to this object */
   void *pAux;                          /* pAux passed to create_module() */
   void (*xDestroy)(void *);            /* Module destructor function */
   Table *pEpoTab;                      /* Eponymous table for this module */
@@ -2134,12 +2136,9 @@ struct KeyInfo {
   u16 nKeyField;      /* Number of key columns in the index */
   u16 nAllField;      /* Total columns, including key plus others */
   sqlite3 *db;        /* The database connection */
-  u8 *aSortFlags;     /* Sort order for each column. */
+  u8 *aSortOrder;     /* Sort order for each column. */
   CollSeq *aColl[1];  /* Collating sequence for each term of the key */
 };
-
-#define KEYINFO_ORDER_DESC    0x01
-#define KEYINFO_ORDER_BIGNULL 0x02
 
 /*
 ** This object holds a record which has been parsed out into individual
@@ -2600,7 +2599,7 @@ struct ExprList {
     Expr *pExpr;            /* The parse tree for this expression */
     char *zName;            /* Token associated with this expression */
     char *zSpan;            /* Original text of the expression */
-    u8 sortFlags;           /* 1 for DESC or 0 for ASC */
+    u8 sortOrder;           /* 1 for DESC or 0 for ASC */
     unsigned done :1;       /* A flag to indicate when processing is finished */
     unsigned bSpanIsTab :1; /* zSpan holds DB.TABLE.COLUMN */
     unsigned reusable :1;   /* Constant expression is reusable */
@@ -3612,6 +3611,7 @@ void sqlite3WindowUnlinkFromSelect(Window*);
 void sqlite3WindowListDelete(sqlite3 *db, Window *p);
 Window *sqlite3WindowAlloc(Parse*, int, int, Expr*, int , Expr*, u8);
 void sqlite3WindowAttach(Parse*, Expr*, Window*);
+void sqlite3WindowLink(Select *pSel, Window *pWin);
 int sqlite3WindowCompare(Parse*, Window*, Window*, int);
 void sqlite3WindowCodeInit(Parse*, Window*);
 void sqlite3WindowCodeStep(Parse*, Select*, WhereInfo*, int, int);
@@ -3884,7 +3884,7 @@ void sqlite3ExprDelete(sqlite3*, Expr*);
 void sqlite3ExprUnmapAndDelete(Parse*, Expr*);
 ExprList *sqlite3ExprListAppend(Parse*,ExprList*,Expr*);
 ExprList *sqlite3ExprListAppendVector(Parse*,ExprList*,IdList*,Expr*);
-void sqlite3ExprListSetSortOrder(ExprList*,int,int);
+void sqlite3ExprListSetSortOrder(ExprList*,int);
 void sqlite3ExprListSetName(Parse*,ExprList*,Token*,int);
 void sqlite3ExprListSetSpan(Parse*,ExprList*,const char*,const char*);
 void sqlite3ExprListDelete(sqlite3*, ExprList*);
@@ -4439,6 +4439,7 @@ void sqlite3AutoLoadExtensions(sqlite3*);
 #  define sqlite3VtabInSync(db) 0
 #  define sqlite3VtabLock(X)
 #  define sqlite3VtabUnlock(X)
+#  define sqlite3VtabModuleUnref(D,X)
 #  define sqlite3VtabUnlockList(X)
 #  define sqlite3VtabSavepoint(X, Y, Z) SQLITE_OK
 #  define sqlite3GetVTable(X,Y)  ((VTable*)0)
@@ -4450,6 +4451,7 @@ void sqlite3AutoLoadExtensions(sqlite3*);
    int sqlite3VtabCommit(sqlite3 *db);
    void sqlite3VtabLock(VTable *);
    void sqlite3VtabUnlock(VTable *);
+   void sqlite3VtabModuleUnref(sqlite3*,Module*);
    void sqlite3VtabUnlockList(sqlite3*);
    int sqlite3VtabSavepoint(sqlite3 *, int, int);
    void sqlite3VtabImportErrmsg(Vdbe*, sqlite3_vtab*);
