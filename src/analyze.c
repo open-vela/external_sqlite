@@ -1450,9 +1450,7 @@ static void decodeIntArray(
       if( sqlite3_strglob("unordered*", z)==0 ){
         pIndex->bUnordered = 1;
       }else if( sqlite3_strglob("sz=[0-9]*", z)==0 ){
-        int sz = sqlite3Atoi(z+3);
-        if( sz<2 ) sz = 2;
-        pIndex->szIdxRow = sqlite3LogEst(sz);
+        pIndex->szIdxRow = sqlite3LogEst(sqlite3Atoi(z+3));
       }else if( sqlite3_strglob("noskipscan*", z)==0 ){
         pIndex->noSkipScan = 1;
       }

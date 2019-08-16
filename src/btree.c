@@ -4879,7 +4879,6 @@ static int accessPayload(
           assert( aWrite>=pBufStart );                         /* due to (6) */
           memcpy(aSave, aWrite, 4);
           rc = sqlite3OsRead(fd, aWrite, a+4, (i64)pBt->pageSize*(nextPage-1));
-          if( rc && nextPage>pBt->nPage ) rc = SQLITE_CORRUPT_BKPT;
           nextPage = get4byte(aWrite);
           memcpy(aWrite, aSave, 4);
         }else
@@ -7675,7 +7674,7 @@ static int balance_nonroot(
     */
     memset(&b.szCell[b.nCell], 0, sizeof(b.szCell[0])*(limit+pOld->nOverflow));
     if( pOld->nOverflow>0 ){
-      if( NEVER(limit<pOld->aiOvfl[0]) ){
+      if( limit<pOld->aiOvfl[0] ){
         rc = SQLITE_CORRUPT_BKPT;
         goto balance_cleanup;
       }
@@ -8476,9 +8475,7 @@ static int btreeOverwriteCell(BtCursor *pCur, const BtreePayload *pX){
   Pgno ovflPgno;                      /* Next overflow page to write */
   u32 ovflPageSize;                   /* Size to write on overflow page */
 
-  if( pCur->info.pPayload + pCur->info.nLocal > pPage->aDataEnd
-   || pCur->info.pPayload < pPage->aData + pPage->cellOffset
-  ){
+  if( pCur->info.pPayload + pCur->info.nLocal > pPage->aDataEnd ){
     return SQLITE_CORRUPT_BKPT;
   }
   /* Overwrite the local portion first */
@@ -8719,8 +8716,6 @@ int sqlite3BtreeInsert(
       memcpy(newCell, oldCell, 4);
     }
     rc = clearCell(pPage, oldCell, &info);
-    testcase( pCur->curFlags & BTCF_ValidOvfl );
-    invalidateOverflowCache(pCur);
     if( info.nSize==szNew && info.nLocal==info.nPayload 
      && (!ISAUTOVACUUM || szNew<pPage->minLocal)
     ){
