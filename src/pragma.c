@@ -1245,7 +1245,7 @@ void sqlite3Pragma(
   }
   break;
 
-#ifndef SQLITE_OMIT_INTROSPECTION_PRAGMAS
+#ifdef SQLITE_INTROSPECTION_PRAGMAS
   case PragTyp_FUNCTION_LIST: {
     int i;
     HashElem *j;
