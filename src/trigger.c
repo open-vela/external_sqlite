@@ -463,9 +463,6 @@ TriggerStep *sqlite3TriggerInsertStep(
     pTriggerStep->pIdList = pColumn;
     pTriggerStep->pUpsert = pUpsert;
     pTriggerStep->orconf = orconf;
-    if( pUpsert ){
-      sqlite3HasExplicitNulls(pParse, pUpsert->pUpsertTarget);
-    }
   }else{
     testcase( pColumn );
     sqlite3IdListDelete(db, pColumn);
