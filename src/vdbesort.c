@@ -829,8 +829,7 @@ static int vdbeSorterCompareText(
       );
     }
   }else{
-    assert( !(pTask->pSorter->pKeyInfo->aSortFlags[0]&KEYINFO_ORDER_BIGNULL) );
-    if( pTask->pSorter->pKeyInfo->aSortFlags[0] ){
+    if( pTask->pSorter->pKeyInfo->aSortOrder[0] ){
       res = res * -1;
     }
   }
@@ -898,8 +897,7 @@ static int vdbeSorterCompareInt(
           pTask, pbKey2Cached, pKey1, nKey1, pKey2, nKey2
       );
     }
-  }else if( pTask->pSorter->pKeyInfo->aSortFlags[0] ){
-    assert( !(pTask->pSorter->pKeyInfo->aSortFlags[0]&KEYINFO_ORDER_BIGNULL) );
+  }else if( pTask->pSorter->pKeyInfo->aSortOrder[0] ){
     res = res * -1;
   }
 
@@ -1014,7 +1012,6 @@ int sqlite3VdbeSorterInit(
 
     if( pKeyInfo->nAllField<13 
      && (pKeyInfo->aColl[0]==0 || pKeyInfo->aColl[0]==db->pDfltColl)
-     && (pKeyInfo->aSortFlags[0] & KEYINFO_ORDER_BIGNULL)==0
     ){
       pSorter->typeMask = SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;
     }
