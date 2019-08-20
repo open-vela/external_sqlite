@@ -264,19 +264,19 @@ set pragma_def {
   FLAG: Result0
   COLS: name builtin
   IF:   !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
-  IF:   defined(SQLITE_INTROSPECTION_PRAGMAS)
+  IF:   !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
 
   NAME: module_list
   FLAG: Result0
   COLS: name
   IF:   !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
   IF:   !defined(SQLITE_OMIT_VIRTUALTABLE)
-  IF:   defined(SQLITE_INTROSPECTION_PRAGMAS)
+  IF:   !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
 
   NAME: pragma_list
   FLAG: Result0
   COLS: name
-  IF:   defined(SQLITE_INTROSPECTION_PRAGMAS)
+  IF:   !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
 
   NAME: collation_list
   FLAG: Result0
@@ -404,6 +404,9 @@ set pragma_def {
   IF:   defined(SQLITE_HAS_CODEC) || defined(SQLITE_ENABLE_CEROD)
 
   NAME: soft_heap_limit
+  FLAG: Result0
+
+  NAME: hard_heap_limit
   FLAG: Result0
 
   NAME: threads
