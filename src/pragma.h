@@ -21,34 +21,35 @@
 #define PragTyp_FOREIGN_KEY_CHECK             13
 #define PragTyp_FOREIGN_KEY_LIST              14
 #define PragTyp_FUNCTION_LIST                 15
-#define PragTyp_INCREMENTAL_VACUUM            16
-#define PragTyp_INDEX_INFO                    17
-#define PragTyp_INDEX_LIST                    18
-#define PragTyp_INTEGRITY_CHECK               19
-#define PragTyp_JOURNAL_MODE                  20
-#define PragTyp_JOURNAL_SIZE_LIMIT            21
-#define PragTyp_LOCK_PROXY_FILE               22
-#define PragTyp_LOCKING_MODE                  23
-#define PragTyp_PAGE_COUNT                    24
-#define PragTyp_MMAP_SIZE                     25
-#define PragTyp_MODULE_LIST                   26
-#define PragTyp_OPTIMIZE                      27
-#define PragTyp_PAGE_SIZE                     28
-#define PragTyp_PRAGMA_LIST                   29
-#define PragTyp_SECURE_DELETE                 30
-#define PragTyp_SHRINK_MEMORY                 31
-#define PragTyp_SOFT_HEAP_LIMIT               32
-#define PragTyp_SYNCHRONOUS                   33
-#define PragTyp_TABLE_INFO                    34
-#define PragTyp_TEMP_STORE                    35
-#define PragTyp_TEMP_STORE_DIRECTORY          36
-#define PragTyp_THREADS                       37
-#define PragTyp_WAL_AUTOCHECKPOINT            38
-#define PragTyp_WAL_CHECKPOINT                39
-#define PragTyp_ACTIVATE_EXTENSIONS           40
-#define PragTyp_KEY                           41
-#define PragTyp_LOCK_STATUS                   42
-#define PragTyp_STATS                         43
+#define PragTyp_HARD_HEAP_LIMIT               16
+#define PragTyp_INCREMENTAL_VACUUM            17
+#define PragTyp_INDEX_INFO                    18
+#define PragTyp_INDEX_LIST                    19
+#define PragTyp_INTEGRITY_CHECK               20
+#define PragTyp_JOURNAL_MODE                  21
+#define PragTyp_JOURNAL_SIZE_LIMIT            22
+#define PragTyp_LOCK_PROXY_FILE               23
+#define PragTyp_LOCKING_MODE                  24
+#define PragTyp_PAGE_COUNT                    25
+#define PragTyp_MMAP_SIZE                     26
+#define PragTyp_MODULE_LIST                   27
+#define PragTyp_OPTIMIZE                      28
+#define PragTyp_PAGE_SIZE                     29
+#define PragTyp_PRAGMA_LIST                   30
+#define PragTyp_SECURE_DELETE                 31
+#define PragTyp_SHRINK_MEMORY                 32
+#define PragTyp_SOFT_HEAP_LIMIT               33
+#define PragTyp_SYNCHRONOUS                   34
+#define PragTyp_TABLE_INFO                    35
+#define PragTyp_TEMP_STORE                    36
+#define PragTyp_TEMP_STORE_DIRECTORY          37
+#define PragTyp_THREADS                       38
+#define PragTyp_WAL_AUTOCHECKPOINT            39
+#define PragTyp_WAL_CHECKPOINT                40
+#define PragTyp_ACTIVATE_EXTENSIONS           41
+#define PragTyp_KEY                           42
+#define PragTyp_LOCK_STATUS                   43
+#define PragTyp_STATS                         44
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01 /* Force schema load before running */
@@ -311,7 +312,7 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_FullFSync },
 #endif
 #if !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
-#if defined(SQLITE_INTROSPECTION_PRAGMAS)
+#if !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
  {/* zName:     */ "function_list",
   /* ePragTyp:  */ PragTyp_FUNCTION_LIST,
   /* ePragFlg:  */ PragFlg_Result0,
@@ -319,6 +320,11 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ 0 },
 #endif
 #endif
+ {/* zName:     */ "hard_heap_limit",
+  /* ePragTyp:  */ PragTyp_HARD_HEAP_LIMIT,
+  /* ePragFlg:  */ PragFlg_Result0,
+  /* ColNames:  */ 0, 0,
+  /* iArg:      */ 0 },
 #if defined(SQLITE_HAS_CODEC)
  {/* zName:     */ "hexkey",
   /* ePragTyp:  */ PragTyp_KEY,
@@ -435,7 +441,7 @@ static const PragmaName aPragmaName[] = {
 #endif
 #if !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
 #if !defined(SQLITE_OMIT_VIRTUALTABLE)
-#if defined(SQLITE_INTROSPECTION_PRAGMAS)
+#if !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
  {/* zName:     */ "module_list",
   /* ePragTyp:  */ PragTyp_MODULE_LIST,
   /* ePragFlg:  */ PragFlg_Result0,
@@ -470,7 +476,7 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_ParserTrace },
 #endif
 #endif
-#if defined(SQLITE_INTROSPECTION_PRAGMAS)
+#if !defined(SQLITE_OMIT_INTROSPECTION_PRAGMAS)
  {/* zName:     */ "pragma_list",
   /* ePragTyp:  */ PragTyp_PRAGMA_LIST,
   /* ePragFlg:  */ PragFlg_Result0,
@@ -668,4 +674,4 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_WriteSchema|SQLITE_NoSchemaError },
 #endif
 };
-/* Number of pragmas: 62 on by default, 81 total. */
+/* Number of pragmas: 66 on by default, 82 total. */

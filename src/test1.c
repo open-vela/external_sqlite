@@ -1111,6 +1111,31 @@ static int SQLITE_TCLAPI test_create_function(
 }
 
 /*
+** Usage:  sqlite3_drop_modules DB ?NAME ...?
+**
+** Invoke the sqlite3_drop_modules(D,L) interface on database
+** connection DB, in order to drop all modules except those named in
+** the argument.
+*/
+static int SQLITE_TCLAPI test_drop_modules(
+  void *NotUsed,
+  Tcl_Interp *interp,    /* The TCL interpreter that invoked this command */
+  int argc,              /* Number of arguments */
+  char **argv            /* Text of each argument */
+){
+  sqlite3 *db;
+
+  if( argc!=2 ){
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
+       " DB\"", 0);
+    return TCL_ERROR;
+  }
+  if( getDbPointer(interp, argv[1], &db) ) return TCL_ERROR;
+  sqlite3_drop_modules(db, argc>2 ? (const char**)(argv+2) : 0);
+  return TCL_OK;
+}
+
+/*
 ** Routines to implement the x_count() aggregate function.
 **
 ** x_count() counts the number of non-null arguments.  But there are
@@ -5500,6 +5525,33 @@ static int SQLITE_TCLAPI test_soft_heap_limit(
 }
 
 /*
+** Usage:  sqlite3_hard_heap_limit ?N?
+**
+** Query or set the hard heap limit for the current thread.  The
+** limit is only changed if the N is present.  The previous limit
+** is returned.
+*/
+static int SQLITE_TCLAPI test_hard_heap_limit(
+  void * clientData,
+  Tcl_Interp *interp,
+  int objc,
+  Tcl_Obj *CONST objv[]
+){
+  sqlite3_int64 amt;
+  Tcl_WideInt N = -1;
+  if( objc!=1 && objc!=2 ){
+    Tcl_WrongNumArgs(interp, 1, objv, "?N?");
+    return TCL_ERROR;
+  }
+  if( objc==2 ){
+    if( Tcl_GetWideIntFromObj(interp, objv[1], &N) ) return TCL_ERROR;
+  }
+  amt = sqlite3_hard_heap_limit64(N);
+  Tcl_SetObjResult(interp, Tcl_NewWideIntObj(amt));
+  return TCL_OK;
+}
+
+/*
 ** Usage:   sqlite3_thread_cleanup
 **
 ** Call the sqlite3_thread_cleanup API.
@@ -7860,6 +7912,7 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
      { "sqlite3_close_v2",              (Tcl_CmdProc*)sqlite_test_close_v2  },
      { "sqlite3_create_function",       (Tcl_CmdProc*)test_create_function  },
      { "sqlite3_create_aggregate",      (Tcl_CmdProc*)test_create_aggregate },
+     { "sqlite3_drop_modules",          (Tcl_CmdProc*)test_drop_modules     },
      { "sqlite_register_test_function", (Tcl_CmdProc*)test_register_func    },
      { "sqlite_abort",                  (Tcl_CmdProc*)sqlite_abort          },
      { "sqlite_bind",                   (Tcl_CmdProc*)test_bind             },
@@ -7944,6 +7997,8 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
      { "sqlite3_db_filename",           test_db_filename,        0},
      { "sqlite3_db_readonly",           test_db_readonly,        0},
      { "sqlite3_soft_heap_limit",       test_soft_heap_limit,    0},
+     { "sqlite3_soft_heap_limit64",     test_soft_heap_limit,    0},
+     { "sqlite3_hard_heap_limit64",     test_hard_heap_limit,    0},
      { "sqlite3_thread_cleanup",        test_thread_cleanup,     0},
      { "sqlite3_pager_refcounts",       test_pager_refcounts,    0},
 
