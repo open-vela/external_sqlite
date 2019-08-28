@@ -1,5 +1,5 @@
-C Fix\san\sunreachable\sbranch\sin\ssqlite3ParserFallback()
-D 2019-08-28T11:49:45.616
+C Improve\sLemon\sso\sthat\sit\senlarges\ssome\sof\sits\stables\sslightly\sin\sorder\sto\navoid\shaving\sto\sindex\srange\schecks\son\stable\slookups\sfor\sa\sperformance\nincrease.
+D 2019-08-29T00:27:12.377
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1837,7 +1837,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 47d3e091ae49eb7947af5abef9b5b96b16b86d349e51fe0677795649be6db473
+P 94085fb3e756bc984237b74b6e29c68462ad860870c64dcb5124feaeec387660 e059178b47109caee2c2211b2db6e594c014af636677118a64e10edf01ac017d
 R eed84f5af5dd0a6ce743afeb00c4b4e4
+T +closed e059178b47109caee2c2211b2db6e594c014af636677118a64e10edf01ac017d
 U drh
-Z 0c74ffec3ce3109c0e0f66d709525f70
+Z adf3ddab2b496435d84f7dc30e6d3ae7
