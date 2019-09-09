@@ -59,27 +59,27 @@ foreach tn {1 2} {
   do_execsql_test $tn.1.2.6 { SELECT a  < B FROM v5           } 0
 
   #-------------------------------------------------------------------------
-  do_execsql_test 2.0 {
+  do_execsql_test $tn.2.0 {
     CREATE TABLE t5(a, b COLLATE NOCASE);
     INSERT INTO t5 VALUES(1, 'XYZ');
   }
 
   # Result should be 0, as column "xyz" from the sub-query has implicit
   # collation sequence BINARY.
-  do_execsql_test 2.1 {
+  do_execsql_test $tn.2.1 {
     SELECT xyz==b FROM ( SELECT a, 'xyz' AS xyz FROM t5 ), t5;
   } {0}
 
   # Result should be 1, as literal 'xyz' has no collation sequence, so
   # the comparison uses the implicit collation sequence of the RHS - NOCASE.
-  do_execsql_test 2.2 {
+  do_execsql_test $tn.2.2 {
     SELECT 'xyz'==b FROM ( SELECT a, 'xyz' AS xyz FROM t5 ), t5;
   } {1}
 
   #-----------------------------------------------------------------------
   # The test case submitted with the ticket.
   #
-  do_execsql_test 3.0 {
+  do_execsql_test $tn.3.0 {
     DROP TABLE t0;
     DROP VIEW v2;
 
@@ -94,7 +94,7 @@ foreach tn {1 2} {
 
   # The result is 1, as the collation used is the implicit collation sequence
   # of v2.c1 - BINARY.
-  do_execsql_test 3.1 {
+  do_execsql_test $tn.3.1 {
     SELECT v2.c1 BETWEEN v2.c0 AND v2.c1 as count FROM v2;
   } 1
 }
