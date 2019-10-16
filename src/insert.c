@@ -37,7 +37,8 @@ void sqlite3OpenTable(
   sqlite3TableLock(pParse, iDb, pTab->tnum, 
                    (opcode==OP_OpenWrite)?1:0, pTab->zName);
   if( HasRowid(pTab) ){
-    sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, iDb, pTab->nCol);
+    sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, iDb,
+                         pTab->nCol - pTab->nVCol);
     VdbeComment((v, "%s", pTab->zName));
   }else{
     Index *pPk = sqlite3PrimaryKeyIndex(pTab);
@@ -673,6 +674,14 @@ void sqlite3Insert(
           if( j==pTab->iPKey ){
             ipkColumn = i;  assert( !withoutRowid );
           }
+#ifndef SQLITE_OMIT_GENERATED_COLUMNS
+          if( pTab->aCol[j].colFlags & (COLFLAG_STORED|COLFLAG_VIRTUAL) ){
+            sqlite3ErrorMsg(pParse, 
+               "cannot INSERT into generated column \"%s\"",
+               pTab->aCol[j].zName);
+            goto insert_cleanup;
+          }
+#endif
           break;
         }
       }
@@ -788,7 +797,7 @@ void sqlite3Insert(
   ** of columns to be inserted into the table.
   */
   for(i=0; i<pTab->nCol; i++){
-    nHidden += (IsHiddenColumn(&pTab->aCol[i]) ? 1 : 0);
+    if( pTab->aCol[i].colFlags & COLFLAG_NOINSERT ) nHidden++;
   }
   if( pColumn==0 && nColumn && nColumn!=(pTab->nCol-nHidden) ){
     sqlite3ErrorMsg(pParse, 
@@ -1006,9 +1015,12 @@ void sqlite3Insert(
         continue;
       }
       if( pColumn==0 ){
-        if( IsHiddenColumn(&pTab->aCol[i]) ){
+        if( pTab->aCol[i].colFlags & COLFLAG_NOINSERT ){
           j = -1;
           nHidden++;
+          if( pTab->aCol[i].colFlags & COLFLAG_VIRTUAL ){
+            continue;
+          }
         }else{
           j = i - nHidden;
         }
@@ -1582,8 +1594,6 @@ void sqlite3GenerateConstraintChecks(
           sqlite3MultiWrite(pParse);
           sqlite3GenerateRowDelete(pParse, pTab, pTrigger, iDataCur, iIdxCur,
                                    regNewData, 1, 0, OE_Replace, 1, -1);
-          sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur, addrRowidOk, regNewData);
-          sqlite3RowidConstraint(pParse, OE_Abort, pTab);
         }else{
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
           assert( HasRowid(pTab) );
@@ -1831,23 +1841,16 @@ void sqlite3GenerateConstraintChecks(
       }
       default: {
         Trigger *pTrigger = 0;
-        int bRetryConstraintCheck = 0;
         assert( onError==OE_Replace );
         if( db->flags&SQLITE_RecTriggers ){
           pTrigger = sqlite3TriggersExist(pParse, pTab, TK_DELETE, 0, 0);
         }
         if( pTrigger || sqlite3FkRequired(pParse, pTab, 0, 0) ){
           sqlite3MultiWrite(pParse);
-          bRetryConstraintCheck = 1;
         }
         sqlite3GenerateRowDelete(pParse, pTab, pTrigger, iDataCur, iIdxCur,
             regR, nPkField, 0, OE_Replace,
             (pIdx==pPk ? ONEPASS_SINGLE : ONEPASS_OFF), iThisCur);
-        if( bRetryConstraintCheck ){
-          sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
-                               regIdx, pIdx->nKeyCol); VdbeCoverage(v);
-          sqlite3UniqueConstraint(pParse, OE_Abort, pIdx);
-        }
         seenReplace = 1;
         break;
       }
@@ -1871,7 +1874,8 @@ void sqlite3GenerateConstraintChecks(
   /* Generate the table record */
   if( HasRowid(pTab) ){
     int regRec = aRegIdx[ix];
-    sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData+1, pTab->nCol, regRec);
+    sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData+1,
+                      pTab->nCol-pTab->nVCol, regRec);
     sqlite3SetMakeRecordP5(v, pTab);
     if( !bAffinityDone ){
       sqlite3TableAffinity(v, pTab, 0);

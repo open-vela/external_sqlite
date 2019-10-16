@@ -289,10 +289,6 @@ void sqlite3Update(
   sNC.uNC.pUpsert = pUpsert;
   sNC.ncFlags = NC_UUpsert;
 
-  /* Begin generating code. */
-  v = sqlite3GetVdbe(pParse);
-  if( v==0 ) goto update_cleanup;
-
   /* Resolve the column names in all the expressions of the
   ** of the UPDATE statement.  Also find the column index
   ** for each column to be updated in the pChanges array.  For each
@@ -390,6 +386,9 @@ void sqlite3Update(
     memset(aToOpen, 1, nIdx+1);
   }
 
+  /* Begin generating code. */
+  v = sqlite3GetVdbe(pParse);
+  if( v==0 ) goto update_cleanup;
   if( pParse->nested==0 ) sqlite3VdbeCountChanges(v);
   sqlite3BeginWriteOperation(pParse, pTrigger || hasFK, iDb);
 
@@ -543,7 +542,8 @@ void sqlite3Update(
     ** is not required) and leave the PK fields in the array of registers.  */
     for(i=0; i<nPk; i++){
       assert( pPk->aiColumn[i]>=0 );
-      sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur,pPk->aiColumn[i],iPk+i);
+      sqlite3ExprCodeGetColumnOfTable(pParse, pTab, iDataCur,
+                                      pPk->aiColumn[i], iPk+i);
     }
     if( eOnePass ){
       if( addrOpen ) sqlite3VdbeChangeToNoop(v, addrOpen);
@@ -629,7 +629,7 @@ void sqlite3Update(
        || (pTab->aCol[i].colFlags & COLFLAG_PRIMKEY)!=0
       ){
         testcase(  oldmask!=0xffffffff && i==31 );
-        sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, i, regOld+i);
+        sqlite3ExprCodeGetColumnOfTable(pParse, pTab, iDataCur, i, regOld+i);
       }else{
         sqlite3VdbeAddOp2(v, OP_Null, 0, regOld+i);
       }
@@ -670,7 +670,7 @@ void sqlite3Update(
         */
         testcase( i==31 );
         testcase( i==32 );
-        sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, i, regNew+i);
+        sqlite3ExprCodeGetColumnOfTable(pParse, pTab, iDataCur, i, regNew+i);
       }else{
         sqlite3VdbeAddOp2(v, OP_Null, 0, regNew+i);
       }
@@ -710,7 +710,7 @@ void sqlite3Update(
     */
     for(i=0; i<pTab->nCol; i++){
       if( aXRef[i]<0 && i!=pTab->iPKey ){
-        sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, i, regNew+i);
+        sqlite3ExprCodeGetColumnOfTable(pParse, pTab, iDataCur, i, regNew+i);
       }
     }
   }
