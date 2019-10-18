@@ -37,7 +37,7 @@ void sqlite3OpenTable(
   sqlite3TableLock(pParse, iDb, pTab->tnum, 
                    (opcode==OP_OpenWrite)?1:0, pTab->zName);
   if( HasRowid(pTab) ){
-    sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, iDb, pTab->nNVCol);
+    sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, iDb, pTab->nCol);
     VdbeComment((v, "%s", pTab->zName));
   }else{
     Index *pPk = sqlite3PrimaryKeyIndex(pTab);
@@ -129,7 +129,7 @@ const char *sqlite3IndexAffinityStr(sqlite3 *db, Index *pIdx){
 **  'E'            REAL
 */
 void sqlite3TableAffinity(Vdbe *v, Table *pTab, int iReg){
-  int i, j;
+  int i;
   char *zColAff = pTab->zColAff;
   if( zColAff==0 ){
     sqlite3 *db = sqlite3VdbeDb(v);
@@ -139,15 +139,13 @@ void sqlite3TableAffinity(Vdbe *v, Table *pTab, int iReg){
       return;
     }
 
-    for(i=j=0; i<pTab->nCol; i++){
+    for(i=0; i<pTab->nCol; i++){
       assert( pTab->aCol[i].affinity!=0 );
-      if( (pTab->aCol[i].colFlags & COLFLAG_VIRTUAL)==0 ){
-        zColAff[j++] = pTab->aCol[i].affinity;
-      }
+      zColAff[i] = pTab->aCol[i].affinity;
     }
     do{
-      zColAff[j--] = 0;
-    }while( j>=0 && zColAff[j]<=SQLITE_AFF_BLOB );
+      zColAff[i--] = 0;
+    }while( i>=0 && zColAff[i]<=SQLITE_AFF_BLOB );
     pTab->zColAff = zColAff;
   }
   assert( zColAff!=0 );
@@ -200,51 +198,6 @@ static int readsTable(Parse *p, int iDb, Table *pTab){
   }
   return 0;
 }
-
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-/*
-** All regular columns for table pTab have been puts into registers
-** starting with iRegStore.  The registers that correspond to STORED
-** columns have not been initialized.  This routine goes back and computes
-** the values for STORED columns based on the previously computed normal
-** columns.
-*/
-void sqlite3ComputeStoredColumns(
-  Parse *pParse,    /* Parsing context */
-  int iRegStore,    /* Register holding the first column */
-  Table *pTab       /* The table */
-){
-  int i;
-  /* Because there can be multiple STORED columns that refer to one another,
-  ** either directly or through VIRTUAL columns, this is a two pass
-  ** algorithm.  On the first pass, mark all STORED columns as NOT-AVAILABLE.
-  */
-  for(i=0; i<pTab->nCol; i++){
-    if( pTab->aCol[i].colFlags & COLFLAG_STORED ){
-      pTab->aCol[i].colFlags |= COLFLAG_NOTAVAIL;
-    }
-  }
-  /* On the second pass, compute the value of each NOT-AVAILABLE column.
-  ** Companion code in the TK_COLUMN case of sqlite3ExprCodeTarget() will
-  ** compute dependencies and mark remove the COLSPAN_NOTAVAIL mark, as
-  ** they are needed.
-  */
-  pParse->iSelfTab = -iRegStore;
-  for(i=0; i<pTab->nCol; i++, iRegStore++){
-    u32 colFlags = pTab->aCol[i].colFlags;
-    if( (colFlags & COLFLAG_VIRTUAL)!=0 ){
-      /* Virtual columns are not stored */
-      iRegStore--;
-    }else if( (colFlags & COLFLAG_NOTAVAIL)!=0 ){
-      /* Stored columns are handled on the second pass */
-      sqlite3ExprCode(pParse, pTab->aCol[i].pDflt, iRegStore);
-      colFlags &= ~COLFLAG_NOTAVAIL;
-    }
-  }
-  pParse->iSelfTab = 0;
-}
-#endif /* SQLITE_OMIT_GENERATED_COLUMNS */
-
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
 /*
@@ -578,7 +531,6 @@ void sqlite3Insert(
   u8 withoutRowid;      /* 0 for normal table.  1 for WITHOUT ROWID table */
   u8 bIdListInOrder;    /* True if IDLIST is in table order */
   ExprList *pList = 0;  /* List of VALUES() to be inserted  */
-  int iRegStore;        /* Register in which to store next column */
 
   /* Register allocations */
   int regFromSelect = 0;/* Base register for data coming from SELECT */
@@ -708,7 +660,7 @@ void sqlite3Insert(
   ** is appears in the original table.  (The index of the INTEGER
   ** PRIMARY KEY in the original table is pTab->iPKey.)
   */
-  bIdListInOrder = (pTab->tabFlags & (TF_OOOHidden|TF_HasStored))==0;
+  bIdListInOrder = (pTab->tabFlags & TF_OOOHidden)==0;
   if( pColumn ){
     for(i=0; i<pColumn->nId; i++){
       pColumn->a[i].idx = -1;
@@ -721,14 +673,6 @@ void sqlite3Insert(
           if( j==pTab->iPKey ){
             ipkColumn = i;  assert( !withoutRowid );
           }
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-          if( pTab->aCol[j].colFlags & (COLFLAG_STORED|COLFLAG_VIRTUAL) ){
-            sqlite3ErrorMsg(pParse, 
-               "cannot INSERT into generated column \"%s\"",
-               pTab->aCol[j].zName);
-            goto insert_cleanup;
-          }
-#endif
           break;
         }
       }
@@ -844,7 +788,7 @@ void sqlite3Insert(
   ** of columns to be inserted into the table.
   */
   for(i=0; i<pTab->nCol; i++){
-    if( pTab->aCol[i].colFlags & COLFLAG_NOINSERT ) nHidden++;
+    nHidden += (IsHiddenColumn(&pTab->aCol[i]) ? 1 : 0);
   }
   if( pColumn==0 && nColumn && nColumn!=(pTab->nCol-nHidden) ){
     sqlite3ErrorMsg(pParse, 
@@ -1050,12 +994,8 @@ void sqlite3Insert(
     ** with the first column.
     */
     nHidden = 0;
-    iRegStore = regRowid+1;
-    for(i=0; i<pTab->nCol; i++, iRegStore++){
-      int k;
-      u32 colFlags;
-      assert( i>=nHidden );
-      assert( iRegStore==sqlite3ColumnOfTable(pTab,i)+regRowid+1 );
+    for(i=0; i<pTab->nCol; i++){
+      int iRegStore = regRowid+1+i;
       if( i==pTab->iPKey ){
         /* The value of the INTEGER PRIMARY KEY column is always a NULL.
         ** Whenever this column is read, the rowid will be substituted
@@ -1065,55 +1005,30 @@ void sqlite3Insert(
         sqlite3VdbeAddOp1(v, OP_SoftNull, iRegStore);
         continue;
       }
-      if( ((colFlags = pTab->aCol[i].colFlags) & COLFLAG_NOINSERT)!=0 ){
-        nHidden++;
-        if( (colFlags & COLFLAG_VIRTUAL)!=0 ){
-          /* Virtual columns are no stored */
-          iRegStore--;
-          continue;
-        }else if( (colFlags & COLFLAG_STORED)!=0 ){
-          /* Stored columns are handled on the second pass */
-          continue;
-        }else if( pColumn==0 ){
-          /* Hidden columns that are not explicitly named in the INSERT */
-          sqlite3ExprCodeFactorable(pParse, pTab->aCol[i].pDflt, iRegStore);
-          continue;
+      if( pColumn==0 ){
+        if( IsHiddenColumn(&pTab->aCol[i]) ){
+          j = -1;
+          nHidden++;
+        }else{
+          j = i - nHidden;
         }
-      }
-      if( pColumn ){
-        for(j=0; j<pColumn->nId && pColumn->a[j].idx!=i; j++){}
-        if( j>=pColumn->nId ){
-          /* A column not named in the insert column list gets its
-          ** default value */
-          sqlite3ExprCodeFactorable(pParse, pTab->aCol[i].pDflt, iRegStore);
-          continue;
-        }
-        k = j;
-      }else if( nColumn==0 ){
-        sqlite3ExprCodeFactorable(pParse, pTab->aCol[i].pDflt, iRegStore);
-        continue;
       }else{
-        k = i - nHidden;
+        for(j=0; j<pColumn->nId; j++){
+          if( pColumn->a[j].idx==i ) break;
+        }
       }
-
-      if( useTempTable ){
-        sqlite3VdbeAddOp3(v, OP_Column, srcTab, k, iRegStore); 
+      if( j<0 || nColumn==0 || (pColumn && j>=pColumn->nId) ){
+        sqlite3ExprCodeFactorable(pParse, pTab->aCol[i].pDflt, iRegStore);
+      }else if( useTempTable ){
+        sqlite3VdbeAddOp3(v, OP_Column, srcTab, j, iRegStore); 
       }else if( pSelect ){
         if( regFromSelect!=regData ){
-          sqlite3VdbeAddOp2(v, OP_SCopy, regFromSelect+k, iRegStore);
+          sqlite3VdbeAddOp2(v, OP_SCopy, regFromSelect+j, iRegStore);
         }
       }else{
-        sqlite3ExprCode(pParse, pList->a[k].pExpr, iRegStore);
+        sqlite3ExprCode(pParse, pList->a[j].pExpr, iRegStore);
       }
     }
-
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-    /* Compute the new value for STORED columns after all other
-    ** columns have already been computed */
-    if( pTab->tabFlags & TF_HasStored ){
-      sqlite3ComputeStoredColumns(pParse, regRowid+1, pTab);
-    }
-#endif
 
     /* Generate code to check constraints and generate index keys and
     ** do the insertion.
@@ -1667,6 +1582,8 @@ void sqlite3GenerateConstraintChecks(
           sqlite3MultiWrite(pParse);
           sqlite3GenerateRowDelete(pParse, pTab, pTrigger, iDataCur, iIdxCur,
                                    regNewData, 1, 0, OE_Replace, 1, -1);
+          sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur, addrRowidOk, regNewData);
+          sqlite3RowidConstraint(pParse, OE_Abort, pTab);
         }else{
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
           assert( HasRowid(pTab) );
@@ -1755,21 +1672,14 @@ void sqlite3GenerateConstraintChecks(
         sqlite3ExprCodeCopy(pParse, pIdx->aColExpr->a[i].pExpr, regIdx+i);
         pParse->iSelfTab = 0;
         VdbeComment((v, "%s column %d", pIdx->zName, i));
-      }else if( iField==XN_ROWID || iField==pTab->iPKey ){
-        x = regNewData;
-        sqlite3VdbeAddOp2(v, OP_IntCopy, x, regIdx+i);
-        VdbeComment((v, "rowid"));
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-      }else if( pTab->aCol[iField].colFlags & COLFLAG_VIRTUAL ){
-        pParse->iSelfTab = -(regNewData+1);
-        sqlite3ExprCodeCopy(pParse, pTab->aCol[iField].pDflt, regIdx+i);
-        pParse->iSelfTab = 0;
-        VdbeComment((v, "%s column %d", pIdx->zName, i));
-#endif
       }else{
-        x = sqlite3ColumnOfTable(pTab, iField) + regNewData + 1;
-        sqlite3VdbeAddOp2(v, OP_SCopy, x, regIdx+i);
-        VdbeComment((v, "%s", pTab->aCol[iField].zName));
+        if( iField==XN_ROWID || iField==pTab->iPKey ){
+          x = regNewData;
+        }else{
+          x = iField + regNewData + 1;
+        }
+        sqlite3VdbeAddOp2(v, iField<0 ? OP_IntCopy : OP_SCopy, x, regIdx+i);
+        VdbeComment((v, "%s", iField<0 ? "rowid" : pTab->aCol[iField].zName));
       }
     }
     sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx, pIdx->nColumn, aRegIdx[ix]);
@@ -1921,16 +1831,23 @@ void sqlite3GenerateConstraintChecks(
       }
       default: {
         Trigger *pTrigger = 0;
+        int bRetryConstraintCheck = 0;
         assert( onError==OE_Replace );
         if( db->flags&SQLITE_RecTriggers ){
           pTrigger = sqlite3TriggersExist(pParse, pTab, TK_DELETE, 0, 0);
         }
         if( pTrigger || sqlite3FkRequired(pParse, pTab, 0, 0) ){
           sqlite3MultiWrite(pParse);
+          bRetryConstraintCheck = 1;
         }
         sqlite3GenerateRowDelete(pParse, pTab, pTrigger, iDataCur, iIdxCur,
             regR, nPkField, 0, OE_Replace,
             (pIdx==pPk ? ONEPASS_SINGLE : ONEPASS_OFF), iThisCur);
+        if( bRetryConstraintCheck ){
+          sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
+                               regIdx, pIdx->nKeyCol); VdbeCoverage(v);
+          sqlite3UniqueConstraint(pParse, OE_Abort, pIdx);
+        }
         seenReplace = 1;
         break;
       }
@@ -1954,7 +1871,7 @@ void sqlite3GenerateConstraintChecks(
   /* Generate the table record */
   if( HasRowid(pTab) ){
     int regRec = aRegIdx[ix];
-    sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData+1, pTab->nNVCol, regRec);
+    sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData+1, pTab->nCol, regRec);
     sqlite3SetMakeRecordP5(v, pTab);
     if( !bAffinityDone ){
       sqlite3TableAffinity(v, pTab, 0);
@@ -2349,10 +2266,6 @@ static int xferOptimization(
       return 0;    /* Neither table may have __hidden__ columns */
     }
 #endif
-    if( (pDestCol->colFlags & COLFLAG_GENERATED) !=
-        (pSrcCol->colFlags & COLFLAG_GENERATED) ){
-      return 0;    /* Both columns have the same generated type */
-    }
     if( pDestCol->affinity!=pSrcCol->affinity ){
       return 0;    /* Affinity must be the same on all columns */
     }
@@ -2363,7 +2276,7 @@ static int xferOptimization(
       return 0;    /* tab2 must be NOT NULL if tab1 is */
     }
     /* Default values for second and subsequent columns need to match. */
-    if( (pDestCol->colFlags & COLFLAG_GENERATED)==0 && i>0 ){
+    if( i>0 ){
       assert( pDestCol->pDflt==0 || pDestCol->pDflt->op==TK_SPAN );
       assert( pSrcCol->pDflt==0 || pSrcCol->pDflt->op==TK_SPAN );
       if( (pDestCol->pDflt==0)!=(pSrcCol->pDflt==0) 
@@ -2371,12 +2284,6 @@ static int xferOptimization(
                                        pSrcCol->pDflt->u.zToken)!=0)
       ){
         return 0;    /* Default values must be the same for all columns */
-      }
-    }
-    /* Generator expressions for generated columns must match */
-    if( (pDestCol->colFlags & COLFLAG_GENERATED)!=0 ){
-      if( sqlite3ExprCompare(0, pSrcCol->pDflt, pDestCol->pDflt, -1)!=0 ){
-         return 0;  /* Different generator expressions */
       }
     }
   }

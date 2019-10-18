@@ -3374,14 +3374,12 @@ void sqlite3ExprCodeLoadIndexColumn(
 ** Generate code to extract the value of the iCol-th column of a table.
 */
 void sqlite3ExprCodeGetColumnOfTable(
-  Vdbe *v,        /* Parsing context */
+  Vdbe *v,        /* The VDBE under construction */
   Table *pTab,    /* The table containing the value */
   int iTabCur,    /* The table cursor.  Or the PK cursor for WITHOUT ROWID */
   int iCol,       /* Index of the column to extract */
   int regOut      /* Extract the value into this register */
 ){
-  Column *pCol;
-  assert( v!=0 );
   if( pTab==0 ){
     sqlite3VdbeAddOp3(v, OP_Column, iTabCur, iCol, regOut);
     return;
@@ -3389,34 +3387,14 @@ void sqlite3ExprCodeGetColumnOfTable(
   if( iCol<0 || iCol==pTab->iPKey ){
     sqlite3VdbeAddOp2(v, OP_Rowid, iTabCur, regOut);
   }else{
-    int op;
-    int x;
-    if( IsVirtual(pTab) ){
-      op = OP_VColumn;
-      x = iCol;
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-    }else if( (pCol = &pTab->aCol[iCol])->colFlags & COLFLAG_VIRTUAL ){
-      Parse *pParse = sqlite3VdbeParser(v);
-      if( pCol->colFlags & COLFLAG_BUSY ){
-        sqlite3ErrorMsg(pParse, "generated column loop on \"%s\"", pCol->zName);
-      }else{
-        int savedSelfTab = pParse->iSelfTab;
-        pCol->colFlags |= COLFLAG_BUSY;
-        pParse->iSelfTab = iTabCur+1;
-        sqlite3ExprCode(pParse, pTab->aCol[iCol].pDflt, regOut);
-        pParse->iSelfTab = savedSelfTab;
-        pCol->colFlags &= ~COLFLAG_BUSY;
-      }
-      return;
-#endif
-    }else if( !HasRowid(pTab) ){
+    int op = IsVirtual(pTab) ? OP_VColumn : OP_Column;
+    int x = iCol;
+    if( !HasRowid(pTab) && !IsVirtual(pTab) ){
       x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
-      op = OP_Column;
-    }else{
-      x = sqlite3ColumnOfTable(pTab,iCol);
-      op = OP_Column;
     }
     sqlite3VdbeAddOp3(v, op, iTabCur, x, regOut);
+  }
+  if( iCol>=0 ){
     sqlite3ColumnDefault(v, pTab, iCol, regOut);
   }
 }
@@ -3436,10 +3414,11 @@ int sqlite3ExprCodeGetColumn(
   int iReg,        /* Store results here */
   u8 p5            /* P5 value for OP_Column + FLAGS */
 ){
-  assert( pParse->pVdbe!=0 );
-  sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pTab, iTable, iColumn, iReg);
+  Vdbe *v = pParse->pVdbe;
+  assert( v!=0 );
+  sqlite3ExprCodeGetColumnOfTable(v, pTab, iTable, iColumn, iReg);
   if( p5 ){
-    sqlite3VdbeChangeP5(pParse->pVdbe, p5);
+    sqlite3VdbeChangeP5(v, p5);
   }
   return iReg;
 }
@@ -3575,49 +3554,19 @@ expr_code_doover:
       }
       if( iTab<0 ){
         if( pParse->iSelfTab<0 ){
-          /* Other columns in the same row for CHECK constraints or
-          ** generated columns or for inserting into partial index.
-          ** The row is unpacked into registers beginning at
-          ** 0-(pParse->iSelfTab).  The rowid (if any) is in a register
-          ** immediately prior to the first column.
-          */
-          Column *pCol;
-          Table *pTab = pExpr->y.pTab;
-          int iSrc;
-          assert( pTab!=0 );
+          /* Generating CHECK constraints or inserting into partial index */
+          assert( pExpr->y.pTab!=0 );
           assert( pExpr->iColumn>=XN_ROWID );
           assert( pExpr->iColumn<pExpr->y.pTab->nCol );
-          if( pExpr->iColumn<0 ){
-            return -1-pParse->iSelfTab;
-          }
-          pCol = pTab->aCol + pExpr->iColumn;
-          iSrc = sqlite3ColumnOfTable(pTab, pExpr->iColumn) - pParse->iSelfTab;
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-          if( pCol->colFlags & COLFLAG_GENERATED ){
-            if( pCol->colFlags & COLFLAG_BUSY ){
-              sqlite3ErrorMsg(pParse, "generated column loop on \"%s\"",
-                              pCol->zName);
-              return 0;
-            }
-            pCol->colFlags |= COLFLAG_BUSY;
-            if( pCol->colFlags & COLFLAG_VIRTUAL ){
-              target = sqlite3ExprCodeTarget(pParse, pCol->pDflt, target);
-            }else{
-              target = iSrc;
-              if( pCol->colFlags & COLFLAG_NOTAVAIL ){
-                sqlite3ExprCode(pParse, pCol->pDflt, iSrc);
-              }
-            }
-            pCol->colFlags &= ~(COLFLAG_BUSY|COLFLAG_NOTAVAIL);
-            return target;
-          }else
-#endif /* SQLITE_OMIT_GENERATED_COLUMNS */
-          if( pCol->affinity==SQLITE_AFF_REAL ){
-            sqlite3VdbeAddOp2(v, OP_SCopy, iSrc, target);
+          if( pExpr->iColumn>=0
+            && pExpr->y.pTab->aCol[pExpr->iColumn].affinity==SQLITE_AFF_REAL
+          ){
+            sqlite3VdbeAddOp2(v, OP_SCopy, pExpr->iColumn - pParse->iSelfTab,
+                              target);
             sqlite3VdbeAddOp1(v, OP_RealAffinity, target);
             return target;
           }else{
-            return iSrc;
+            return pExpr->iColumn - pParse->iSelfTab;
           }
         }else{
           /* Coding an expression that is part of an index where column names
