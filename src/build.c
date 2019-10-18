@@ -877,8 +877,8 @@ Index *sqlite3PrimaryKeyIndex(Table *pTab){
 }
 
 /*
-** Return the column of index pIdx that corresponds to table
-** column iCol.  Return -1 if not found.
+** Return the true column number of index pIdx that corresponds to table
+** true column iCol.  Return -1 if not found.
 */
 i16 sqlite3ColumnOfIndex(Index *pIdx, i16 iCol){
   int i;
@@ -887,6 +887,54 @@ i16 sqlite3ColumnOfIndex(Index *pIdx, i16 iCol){
   }
   return -1;
 }
+
+#ifndef SQLITE_OMIT_GENERATED_COLUMNS
+/* Convert a storage column number into a true column number.
+**
+** The storage column number (0,1,2,....) is the index of the value
+** as it appears in the record on disk.  The true column number
+** is the index (0,1,2,...) of the column in the CREATE TABLE statement.
+**
+** The storage column number is less than the true column number if
+** and only there are virtual columns to the left.
+**
+** If SQLITE_OMIT_GENERATED_COLUMNS, this routine is a no-op macro.
+**
+** This function is the inverse of sqlite3ColumnOfTable().
+*/
+i16 sqlite3ColumnOfStorage(Table *pTab, i16 iCol){
+  if( pTab->tabFlags & TF_HasVirtual ){
+    int i;
+    for(i=0; i<=iCol; i++){
+      if( pTab->aCol[i].colFlags & COLFLAG_VIRTUAL ) iCol++;
+    }
+  }
+  return iCol;
+}
+#endif
+
+#ifndef SQLITE_OMIT_GENERATED_COLUMNS
+/* Convert a true column number into a storage column number.
+**
+** The storage column number (0,1,2,....) is the index of the value
+** as it appears in the record on disk.  The true column number
+** is the index (0,1,2,...) of the column in the CREATE TABLE statement.
+**
+** If SQLITE_OMIT_GENERATED_COLUMNS, this routine is a no-op macro.
+**
+** This function is the inverse of sqlite3ColumnOfStorage().
+*/
+i16 sqlite3ColumnOfTable(Table *pTab, i16 iCol){
+  int i;
+  i16 n;
+  assert( iCol<pTab->nCol );
+  if( (pTab->tabFlags & TF_HasVirtual)==0 ) return iCol;
+  for(i=0, n=0; i<iCol; i++){
+    if( (pTab->aCol[i].colFlags & COLFLAG_VIRTUAL)==0 ) n++;
+  }
+  return n;    
+}
+#endif
 
 /*
 ** Begin constructing a new table representation in memory.  This is
@@ -1520,6 +1568,49 @@ void sqlite3AddCollateType(Parse *pParse, Token *pToken){
   }
 }
 
+/* Change the most recently parsed column to be a GENERATED ALWAYS AS
+** column.
+*/
+void sqlite3AddGenerated(Parse *pParse, Expr *pExpr, Token *pType){
+#ifndef SQLITE_OMIT_GENERATED_COLUMNS
+  u8 eType = COLFLAG_VIRTUAL;
+  Table *pTab = pParse->pNewTable;
+  Column *pCol;
+  if( IN_RENAME_OBJECT ){
+    sqlite3RenameExprUnmap(pParse, pExpr);
+  }
+  if( pTab==0 ) goto generated_done;
+  pCol = &(pTab->aCol[pTab->nCol-1]);
+  if( pCol->pDflt ) goto generated_error;
+  if( pType ){
+    if( pType->n==7 && sqlite3StrNICmp("virtual",pType->z,7)==0 ){
+      /* no-op */
+    }else if( pType->n==6 && sqlite3StrNICmp("stored",pType->z,6)==0 ){
+      eType = COLFLAG_STORED;
+    }else{
+      goto generated_error;
+    }
+  }
+  pCol->colFlags |= eType;
+  assert( TF_HasVirtual==COLFLAG_VIRTUAL );
+  assert( TF_HasStored==COLFLAG_STORED );
+  pTab->tabFlags |= eType;
+  pCol->pDflt = sqlite3ExprDup(pParse->db, pExpr, 0);
+  goto generated_done;
+
+generated_error:
+  sqlite3ErrorMsg(pParse, "incorrect GENERATED ALWAYS AS on column \"%s\"",
+                  pCol->zName);
+generated_done:
+  sqlite3ExprDelete(pParse->db, pExpr);
+#else
+  /* Throw and error for the GENERATED ALWAYS AS clause if the
+  ** SQLITE_OMIT_GENERATED_COLUMNS compile-time option is used. */
+  sqlite3ErrorMsg(pParse, "GENERATED ALWAYS AS not supported");
+  sqlite3ExprDelete(pParse->db, pExpr);
+#endif
+}
+
 /*
 ** This function returns the collation sequence for database native text
 ** encoding identified by the string zName, length nName.
@@ -1978,11 +2069,14 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
   */
   nExtra = 0;
   for(i=0; i<pTab->nCol; i++){
-    if( !hasColumn(pPk->aiColumn, nPk, i) ) nExtra++;
+    if( !hasColumn(pPk->aiColumn, nPk, i)
+     && (pTab->aCol[i].colFlags & COLFLAG_VIRTUAL)==0 ) nExtra++;
   }
   if( resizeIndexObject(db, pPk, nPk+nExtra) ) return;
   for(i=0, j=nPk; i<pTab->nCol; i++){
-    if( !hasColumn(pPk->aiColumn, j, i) ){
+    if( !hasColumn(pPk->aiColumn, j, i)
+     && (pTab->aCol[i].colFlags & COLFLAG_VIRTUAL)==0
+    ){
       assert( j<pPk->nColumn );
       pPk->aiColumn[j] = i;
       pPk->azColl[j] = sqlite3StrBINARY;
@@ -1990,7 +2084,7 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
     }
   }
   assert( pPk->nColumn==j );
-  assert( pTab->nCol<=j );
+  assert( pTab->nNVCol<=j );
   recomputeColumnsNotIndexed(pPk);
 }
 
@@ -2062,6 +2156,7 @@ void sqlite3EndTable(
   assert( !db->mallocFailed );
   p = pParse->pNewTable;
   if( p==0 ) return;
+  p->nNVCol = p->nCol;
 
   if( pSelect==0 && isShadowTableName(db, p->zName) ){
     p->tabFlags |= TF_Shadow;
@@ -2099,13 +2194,10 @@ void sqlite3EndTable(
     }
     if( (p->tabFlags & TF_HasPrimaryKey)==0 ){
       sqlite3ErrorMsg(pParse, "PRIMARY KEY missing on table %s", p->zName);
-    }else{
-      p->tabFlags |= TF_WithoutRowid | TF_NoVisibleRowid;
-      convertToWithoutRowidTable(pParse, p);
+      return;
     }
+    p->tabFlags |= TF_WithoutRowid | TF_NoVisibleRowid;
   }
-
-  iDb = sqlite3SchemaToIndex(db, p->pSchema);
 
 #ifndef SQLITE_OMIT_CHECK
   /* Resolve names in all CHECK constraint expressions.
@@ -2114,6 +2206,30 @@ void sqlite3EndTable(
     sqlite3ResolveSelfReference(pParse, p, NC_IsCheck, 0, p->pCheck);
   }
 #endif /* !defined(SQLITE_OMIT_CHECK) */
+#ifndef SQLITE_OMIT_GENERATED_COLUMNS
+  if( p->tabFlags & (TF_HasVirtual|TF_HasStored) ){
+    int ii;
+    for(ii=0; ii<p->nCol; ii++){
+      u32 colFlags = p->aCol[ii].colFlags;
+      if( (colFlags & (COLFLAG_STORED|COLFLAG_VIRTUAL))!=0 ){
+        if( colFlags & COLFLAG_VIRTUAL ){
+          p->nNVCol--;
+          assert( p->nNVCol>=0 );
+        }
+        sqlite3ResolveSelfReference(pParse, p, NC_GenCol, 
+                                    p->aCol[ii].pDflt, 0);
+      }
+    }
+  }
+#endif
+
+  /* Special processing for WITHOUT ROWID Tables */
+  if( (tabOpts & TF_WithoutRowid)!=0 ){
+    convertToWithoutRowidTable(pParse, p);
+  }
+
+  iDb = sqlite3SchemaToIndex(db, p->pSchema);
+
 
   /* Estimate the average row size for the table and for all implied indices */
   estimateTableWidth(p);
