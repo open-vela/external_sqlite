@@ -43,6 +43,13 @@ Vdbe *sqlite3VdbeCreate(Parse *pParse){
 }
 
 /*
+** Return the Parse object that owns a Vdbe object.
+*/
+Parse *sqlite3VdbeParser(Vdbe *p){
+  return p->pParse;
+}
+
+/*
 ** Change the error string stored in Vdbe.zErrMsg
 */
 void sqlite3VdbeError(Vdbe *p, const char *zFormat, ...){
@@ -1096,13 +1103,6 @@ static void vdbeFreeOpArray(sqlite3 *db, Op *aOp, int nOp){
 void sqlite3VdbeLinkSubProgram(Vdbe *pVdbe, SubProgram *p){
   p->pNext = pVdbe->pProgram;
   pVdbe->pProgram = p;
-}
-
-/*
-** Return true if the given Vdbe has any SubPrograms.
-*/
-int sqlite3VdbeHasSubProgram(Vdbe *pVdbe){
-  return pVdbe->pProgram!=0;
 }
 
 /*
