@@ -239,6 +239,11 @@
 #define FTS5_SEGMENT_ROWID(segid, pgno)       fts5_dri(segid, 0, 0, pgno)
 #define FTS5_DLIDX_ROWID(segid, height, pgno) fts5_dri(segid, 1, height, pgno)
 
+/*
+** Maximum segments permitted in a single index 
+*/
+#define FTS5_MAX_SEGMENT 2000
+
 #ifdef SQLITE_DEBUG
 int sqlite3Fts5Corrupt() { return SQLITE_CORRUPT_VTAB; }
 #endif
@@ -614,7 +619,7 @@ static int fts5LeafFirstTermOff(Fts5Data *pLeaf){
 /*
 ** Close the read-only blob handle, if it is open.
 */
-void sqlite3Fts5IndexCloseReader(Fts5Index *p){
+static void fts5CloseReader(Fts5Index *p){
   if( p->pReader ){
     sqlite3_blob *pReader = p->pReader;
     p->pReader = 0;
@@ -643,7 +648,7 @@ static Fts5Data *fts5DataRead(Fts5Index *p, i64 iRowid){
       assert( p->pReader==0 );
       p->pReader = pBlob;
       if( rc!=SQLITE_OK ){
-        sqlite3Fts5IndexCloseReader(p);
+        fts5CloseReader(p);
       }
       if( rc==SQLITE_ABORT ) rc = SQLITE_OK;
     }
@@ -708,7 +713,7 @@ static void fts5DataRelease(Fts5Data *pData){
 static Fts5Data *fts5LeafRead(Fts5Index *p, i64 iRowid){
   Fts5Data *pRet = fts5DataRead(p, iRowid);
   if( pRet ){
-    if( pRet->nn<4 || pRet->szLeaf>pRet->nn ){
+    if( pRet->szLeaf>pRet->nn ){
       p->rc = FTS5_CORRUPT;
       fts5DataRelease(pRet);
       pRet = 0;
@@ -4992,12 +4997,9 @@ static void fts5MergePrefixLists(
         Fts5PoslistWriter writer;
         memset(&writer, 0, sizeof(writer));
 
-        /* See the earlier comment in this function for an explanation of why
-        ** corrupt input position lists might cause the output to consume
-        ** at most 20 bytes of unexpected space. */
         fts5MergeAppendDocid(&out, iLastRowid, i2.iRowid);
         fts5BufferZero(&tmp);
-        sqlite3Fts5BufferSize(&p->rc, &tmp, i1.nPoslist + i2.nPoslist + 10 + 10);
+        sqlite3Fts5BufferSize(&p->rc, &tmp, i1.nPoslist + i2.nPoslist);
         if( p->rc ) break;
 
         sqlite3Fts5PoslistNext64(a1, i1.nPoslist, &iOff1, &iPos1);
@@ -5045,12 +5047,6 @@ static void fts5MergePrefixLists(
         }
 
         /* WRITEPOSLISTSIZE */
-        assert_nc( tmp.n<=i1.nPoslist+i2.nPoslist );
-        assert( tmp.n<=i1.nPoslist+i2.nPoslist+10+10 );
-        if( tmp.n>i1.nPoslist+i2.nPoslist ){
-          if( p->rc==SQLITE_OK ) p->rc = FTS5_CORRUPT;
-          break;
-        }
         fts5BufferSafeAppendVarint(&out, tmp.n * 2);
         fts5BufferSafeAppendBlob(&out, tmp.p, tmp.n);
         fts5DoclistIterNext(&i1);
@@ -5204,7 +5200,7 @@ int sqlite3Fts5IndexBeginWrite(Fts5Index *p, int bDelete, i64 iRowid){
 int sqlite3Fts5IndexSync(Fts5Index *p){
   assert( p->rc==SQLITE_OK );
   fts5IndexFlush(p);
-  sqlite3Fts5IndexCloseReader(p);
+  fts5CloseReader(p);
   return fts5IndexReturn(p);
 }
 
@@ -5215,7 +5211,7 @@ int sqlite3Fts5IndexSync(Fts5Index *p){
 ** records must be invalidated.
 */
 int sqlite3Fts5IndexRollback(Fts5Index *p){
-  sqlite3Fts5IndexCloseReader(p);
+  fts5CloseReader(p);
   fts5IndexDiscardData(p);
   fts5StructureInvalidate(p);
   /* assert( p->rc==SQLITE_OK ); */
@@ -5230,7 +5226,6 @@ int sqlite3Fts5IndexRollback(Fts5Index *p){
 int sqlite3Fts5IndexReinit(Fts5Index *p){
   Fts5Structure s;
   fts5StructureInvalidate(p);
-  fts5IndexDiscardData(p);
   memset(&s, 0, sizeof(Fts5Structure));
   fts5DataWrite(p, FTS5_AVERAGES_ROWID, (const u8*)"", 0);
   fts5StructureWrite(p, &s);
@@ -5318,7 +5313,6 @@ int sqlite3Fts5IndexCharlenToBytelen(
   for(i=0; i<nChar; i++){
     if( n>=nByte ) return 0;      /* Input contains fewer than nChar chars */
     if( (unsigned char)p[n++]>=0xc0 ){
-      if( n>=nByte ) break;
       while( (p[n] & 0xc0)==0x80 ){
         n++;
         if( n>=nByte ) break;
@@ -5457,7 +5451,7 @@ int sqlite3Fts5IndexQuery(
     if( p->rc ){
       sqlite3Fts5IterClose((Fts5IndexIter*)pRet);
       pRet = 0;
-      sqlite3Fts5IndexCloseReader(p);
+      fts5CloseReader(p);
     }
 
     *ppIter = (Fts5IndexIter*)pRet;
@@ -5530,7 +5524,7 @@ void sqlite3Fts5IterClose(Fts5IndexIter *pIndexIter){
     Fts5Iter *pIter = (Fts5Iter*)pIndexIter;
     Fts5Index *pIndex = pIter->pIndex;
     fts5MultiIterFree(pIter);
-    sqlite3Fts5IndexCloseReader(pIndex);
+    fts5CloseReader(pIndex);
   }
 }
 
@@ -5887,8 +5881,7 @@ static void fts5IndexIntegrityCheckSegment(
   if( pSeg->pgnoFirst==0 ) return;
 
   fts5IndexPrepareStmt(p, &pStmt, sqlite3_mprintf(
-      "SELECT segid, term, (pgno>>1), (pgno&1) FROM %Q.'%q_idx' WHERE segid=%d "
-      "ORDER BY 1, 2",
+      "SELECT segid, term, (pgno>>1), (pgno&1) FROM %Q.'%q_idx' WHERE segid=%d",
       pConfig->zDb, pConfig->zName, pSeg->iSegid
   ));
 

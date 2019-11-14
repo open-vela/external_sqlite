@@ -41,6 +41,11 @@ set pragma_def {
   ARG:  SQLITE_NullCallback
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 
+  NAME: legacy_file_format
+  TYPE: FLAG
+  ARG:  SQLITE_LegacyFileFmt
+  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
+
   NAME: fullfsync
   TYPE: FLAG
   ARG:  SQLITE_FullFSync
@@ -399,6 +404,9 @@ set pragma_def {
   IF:   defined(SQLITE_HAS_CODEC) || defined(SQLITE_ENABLE_CEROD)
 
   NAME: soft_heap_limit
+  FLAG: Result0
+
+  NAME: hard_heap_limit
   FLAG: Result0
 
   NAME: threads

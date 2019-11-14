@@ -1100,19 +1100,10 @@ void sqlite3Pragma(
       sqlite3CodeVerifySchema(pParse, iTabDb);
       sqlite3ViewGetColumnNames(pParse, pTab);
       for(i=0, pCol=pTab->aCol; i<pTab->nCol; i++, pCol++){
-        int isHidden = 0;
-        if( pCol->colFlags & COLFLAG_NOINSERT ){
-          if( pPragma->iArg==0 ){
-            nHidden++;
-            continue;
-          }
-          if( pCol->colFlags & COLFLAG_VIRTUAL ){
-            isHidden = 2;  /* GENERATED ALWAYS AS ... VIRTUAL */
-          }else if( pCol->colFlags & COLFLAG_STORED ){
-            isHidden = 3;  /* GENERATED ALWAYS AS ... STORED */
-          }else{ assert( pCol->colFlags & COLFLAG_HIDDEN );
-            isHidden = 1;  /* HIDDEN */
-          }
+        int isHidden = IsHiddenColumn(pCol);
+        if( isHidden && pPragma->iArg==0 ){
+          nHidden++;
+          continue;
         }
         if( (pCol->colFlags & COLFLAG_PRIMKEY)==0 ){
           k = 0;
@@ -1121,13 +1112,13 @@ void sqlite3Pragma(
         }else{
           for(k=1; k<=pTab->nCol && pPk->aiColumn[k-1]!=i; k++){}
         }
-        assert( pCol->pDflt==0 || pCol->pDflt->op==TK_SPAN || isHidden>=2 );
+        assert( pCol->pDflt==0 || pCol->pDflt->op==TK_SPAN );
         sqlite3VdbeMultiLoad(v, 1, pPragma->iArg ? "issisii" : "issisi",
                i-nHidden,
                pCol->zName,
                sqlite3ColumnType(pCol,""),
                pCol->notNull ? 1 : 0,
-               pCol->pDflt && isHidden<2 ? pCol->pDflt->u.zToken : 0,
+               pCol->pDflt ? pCol->pDflt->u.zToken : 0,
                k,
                isHidden);
       }
@@ -1586,7 +1577,7 @@ void sqlite3Pragma(
         loopTop = sqlite3VdbeAddOp2(v, OP_AddImm, 7, 1);
         if( !isQuick ){
           /* Sanity check on record header decoding */
-          sqlite3VdbeAddOp3(v, OP_Column, iDataCur, pTab->nNVCol-1,3);
+          sqlite3VdbeAddOp3(v, OP_Column, iDataCur, pTab->nCol-1, 3);
           sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
         }
         /* Verify that all NOT NULL columns really are NOT NULL */
@@ -2084,6 +2075,27 @@ void sqlite3Pragma(
     sqlite3_int64 N;
     if( zRight && sqlite3DecOrHexToI64(zRight, &N)==SQLITE_OK ){
       sqlite3_soft_heap_limit64(N);
+    }
+    returnSingleInt(v, sqlite3_soft_heap_limit64(-1));
+    break;
+  }
+
+  /*
+  **   PRAGMA hard_heap_limit
+  **   PRAGMA hard_heap_limit = N
+  **
+  ** Invoke sqlite3_hard_heap_limit64() to query or set the hard heap
+  ** limit.  The hard heap limit can be activated or lowered by this
+  ** pragma, but not raised or deactivated.  Only the
+  ** sqlite3_hard_heap_limit64() C-language API can raise or deactivate
+  ** the hard heap limit.  This allows an application to set a heap limit
+  ** constraint that cannot be relaxed by an untrusted SQL script.
+  */
+  case PragTyp_HARD_HEAP_LIMIT: {
+    sqlite3_int64 N;
+    if( zRight && sqlite3DecOrHexToI64(zRight, &N)==SQLITE_OK ){
+      sqlite3_int64 iPrior = sqlite3_hard_heap_limit64(-1);
+      if( N>0 && (iPrior==0 || iPrior>N) ) sqlite3_hard_heap_limit64(N);
     }
     returnSingleInt(v, sqlite3_soft_heap_limit64(-1));
     break;

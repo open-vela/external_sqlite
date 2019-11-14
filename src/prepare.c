@@ -57,18 +57,6 @@ int sqlite3IndexHasDuplicateRootPage(Index *pIndex){
   return 0;
 }
 
-/* forward declaration */
-static int sqlite3Prepare(
-  sqlite3 *db,              /* Database handle. */
-  const char *zSql,         /* UTF-8 encoded SQL statement. */
-  int nBytes,               /* Length of zSql in bytes. */
-  u32 prepFlags,            /* Zero or more SQLITE_PREPARE_* flags */
-  Vdbe *pReprepare,         /* VM being reprepared */
-  sqlite3_stmt **ppStmt,    /* OUT: A pointer to the prepared statement */
-  const char **pzTail       /* OUT: End of parsed string */
-);
-
-
 /*
 ** This is the callback routine for the code that initializes the
 ** database.  See sqlite3Init() below for additional information.
@@ -118,8 +106,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     db->init.newTnum = sqlite3Atoi(argv[3]);
     db->init.orphanTrigger = 0;
     db->init.azInit = argv;
-    pStmt = 0;
-    TESTONLY(rcp = ) sqlite3Prepare(db, argv[4], -1, 0, 0, &pStmt, 0);
+    TESTONLY(rcp = ) sqlite3_prepare(db, argv[4], -1, &pStmt, 0);
     rc = db->errCode;
     assert( (rc&0xFF)==(rcp&0xFF) );
     db->init.iDb = saved_iDb;
@@ -540,7 +527,6 @@ void sqlite3ParserReset(Parse *pParse){
   if( db ){
     assert( db->lookaside.bDisable >= pParse->disableLookaside );
     db->lookaside.bDisable -= pParse->disableLookaside;
-    db->lookaside.sz = db->lookaside.bDisable ? 0 : db->lookaside.szTrue;
   }
   pParse->disableLookaside = 0;
 }
@@ -574,7 +560,7 @@ static int sqlite3Prepare(
   */
   if( prepFlags & SQLITE_PREPARE_PERSISTENT ){
     sParse.disableLookaside++;
-    DisableLookaside;
+    db->lookaside.bDisable++;
   }
   sParse.disableVtab = (prepFlags & SQLITE_PREPARE_NO_VTAB)!=0;
 
@@ -601,18 +587,16 @@ static int sqlite3Prepare(
   ** but it does *not* override schema lock detection, so this all still
   ** works even if READ_UNCOMMITTED is set.
   */
-  if( !db->noSharedCache ){
-    for(i=0; i<db->nDb; i++) {
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        assert( sqlite3BtreeHoldsMutex(pBt) );
-        rc = sqlite3BtreeSchemaLocked(pBt);
-        if( rc ){
-          const char *zDb = db->aDb[i].zDbSName;
-          sqlite3ErrorWithMsg(db, rc, "database schema is locked: %s", zDb);
-          testcase( db->flags & SQLITE_ReadUncommit );
-          goto end_prepare;
-        }
+  for(i=0; i<db->nDb; i++) {
+    Btree *pBt = db->aDb[i].pBt;
+    if( pBt ){
+      assert( sqlite3BtreeHoldsMutex(pBt) );
+      rc = sqlite3BtreeSchemaLocked(pBt);
+      if( rc ){
+        const char *zDb = db->aDb[i].zDbSName;
+        sqlite3ErrorWithMsg(db, rc, "database schema is locked: %s", zDb);
+        testcase( db->flags & SQLITE_ReadUncommit );
+        goto end_prepare;
       }
     }
   }
@@ -643,24 +627,48 @@ static int sqlite3Prepare(
   }
   assert( 0==sParse.nQueryLoop );
 
-  if( sParse.rc==SQLITE_DONE ){
-    sParse.rc = SQLITE_OK;
-  }
+  if( sParse.rc==SQLITE_DONE ) sParse.rc = SQLITE_OK;
   if( sParse.checkSchema ){
     schemaIsValid(&sParse);
-  }
-  if( pzTail ){
-    *pzTail = sParse.zTail;
-  }
-
-  if( db->init.busy==0 ){
-    sqlite3VdbeSetSql(sParse.pVdbe, zSql, (int)(sParse.zTail-zSql), prepFlags);
   }
   if( db->mallocFailed ){
     sParse.rc = SQLITE_NOMEM_BKPT;
   }
+  if( pzTail ){
+    *pzTail = sParse.zTail;
+  }
   rc = sParse.rc;
-  if( rc!=SQLITE_OK ){
+
+#ifndef SQLITE_OMIT_EXPLAIN
+  /* Justification for the ALWAYS(): The only way for rc to be SQLITE_OK and
+  ** sParse.pVdbe to be NULL is if the input SQL is an empty string, but in
+  ** that case, sParse.explain will be false. */
+  if( sParse.explain && rc==SQLITE_OK && ALWAYS(sParse.pVdbe) ){
+    static const char * const azColName[] = {
+       "addr", "opcode", "p1", "p2", "p3", "p4", "p5", "comment",
+       "id", "parent", "notused", "detail"
+    };
+    int iFirst, mx;
+    if( sParse.explain==2 ){
+      sqlite3VdbeSetNumCols(sParse.pVdbe, 4);
+      iFirst = 8;
+      mx = 12;
+    }else{
+      sqlite3VdbeSetNumCols(sParse.pVdbe, 8);
+      iFirst = 0;
+      mx = 8;
+    }
+    for(i=iFirst; i<mx; i++){
+      sqlite3VdbeSetColName(sParse.pVdbe, i-iFirst, COLNAME_NAME,
+                            azColName[i], SQLITE_STATIC);
+    }
+  }
+#endif
+
+  if( db->init.busy==0 ){
+    sqlite3VdbeSetSql(sParse.pVdbe, zSql, (int)(sParse.zTail-zSql), prepFlags);
+  }
+  if( rc!=SQLITE_OK || db->mallocFailed ){
     if( sParse.pVdbe ) sqlite3VdbeFinalize(sParse.pVdbe);
     assert(!(*ppStmt));
   }else{

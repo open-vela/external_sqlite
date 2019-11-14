@@ -66,7 +66,7 @@ static void sqlite3TreeViewLine(TreeView *p, const char *zFormat, ...){
     va_start(ap, zFormat);
     sqlite3_str_vappendf(&acc, zFormat, ap);
     va_end(ap);
-    assert( acc.nChar>0 );
+    assert( acc.nChar>0 || acc.accError );
     sqlite3_str_append(&acc, "\n", 1);
   }
   sqlite3StrAccumFinish(&acc);
@@ -131,7 +131,7 @@ void sqlite3TreeViewSrcList(TreeView *pView, const SrcList *pSrc){
     StrAccum x;
     char zLine[100];
     sqlite3StrAccumInit(&x, 0, zLine, sizeof(zLine), 0);
-    sqlite3_str_appendf(&x, "{%d:*}", pItem->iCursor);
+    sqlite3_str_appendf(&x, "{%d,*}", pItem->iCursor);
     if( pItem->zDatabase ){
       sqlite3_str_appendf(&x, " %s.%s", pItem->zDatabase, pItem->zName);
     }else if( pItem->zName ){
@@ -423,14 +423,7 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
     case TK_COLUMN: {
       if( pExpr->iTable<0 ){
         /* This only happens when coding check constraints */
-        char zOp2[16];
-        if( pExpr->op2 ){
-          sqlite3_snprintf(sizeof(zOp2),zOp2," op2=0x%02x",pExpr->op2);
-        }else{
-          zOp2[0] = 0;
-        }
-        sqlite3TreeViewLine(pView, "COLUMN(%d)%s%s",
-                                    pExpr->iColumn, zFlgs, zOp2);
+        sqlite3TreeViewLine(pView, "COLUMN(%d)%s", pExpr->iColumn, zFlgs);
       }else{
         sqlite3TreeViewLine(pView, "{%d:%d}%s",
                              pExpr->iTable, pExpr->iColumn, zFlgs);
@@ -543,14 +536,7 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
     }
 
     case TK_COLLATE: {
-      /* COLLATE operators without the EP_Collate flag are intended to
-      ** emulate collation associated with a table column.  These show
-      ** up in the treeview output as "SOFT-COLLATE".  Explicit COLLATE
-      ** operators that appear in the original SQL always have the
-      ** EP_Collate bit set and appear in treeview output as just "COLLATE" */
-      sqlite3TreeViewLine(pView, "%sCOLLATE %Q%s",
-        !ExprHasProperty(pExpr, EP_Collate) ? "SOFT-" : "",
-        pExpr->u.zToken, zFlgs);
+      sqlite3TreeViewLine(pView, "COLLATE %Q", pExpr->u.zToken);
       sqlite3TreeViewExpr(pView, pExpr->pLeft, 0);
       break;
     }
@@ -573,17 +559,6 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
       if( pExpr->op==TK_AGG_FUNCTION ){
         sqlite3TreeViewLine(pView, "AGG_FUNCTION%d %Q%s",
                              pExpr->op2, pExpr->u.zToken, zFlgs);
-      }else if( pExpr->op2!=0 ){
-        const char *zOp2;
-        char zBuf[8];
-        sqlite3_snprintf(sizeof(zBuf),zBuf,"0x%02x",pExpr->op2);
-        zOp2 = zBuf;
-        if( pExpr->op2==NC_IsCheck ) zOp2 = "NC_IsCheck";
-        if( pExpr->op2==NC_IdxExpr ) zOp2 = "NC_IdxExpr";
-        if( pExpr->op2==NC_PartIdx ) zOp2 = "NC_PartIdx";
-        if( pExpr->op2==NC_GenCol ) zOp2 = "NC_GenCol";
-        sqlite3TreeViewLine(pView, "FUNCTION %Q%s op2=%s",
-                            pExpr->u.zToken, zFlgs, zOp2);
       }else{
         sqlite3TreeViewLine(pView, "FUNCTION %Q%s", pExpr->u.zToken, zFlgs);
       }
@@ -679,9 +654,7 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
       break;
     }
     case TK_VECTOR: {
-      char *z = sqlite3_mprintf("VECTOR%s",zFlgs);
-      sqlite3TreeViewBareExprList(pView, pExpr->x.pList, z);
-      sqlite3_free(z);
+      sqlite3TreeViewBareExprList(pView, pExpr->x.pList, "VECTOR");
       break;
     }
     case TK_SELECT_COLUMN: {

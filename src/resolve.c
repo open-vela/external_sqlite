@@ -96,13 +96,6 @@ static void resolveAlias(
       pExpr->u.zToken = sqlite3DbStrDup(db, pExpr->u.zToken);
       pExpr->flags |= EP_MemToken;
     }
-    if( ExprHasProperty(pExpr, EP_WinFunc) ){
-      if( pExpr->y.pWin!=0 ){
-        pExpr->y.pWin->pOwner = pExpr;
-      }else{
-        assert( db->mallocFailed );
-      }
-    }
     sqlite3DbFree(db, pDup);
   }
   ExprSetProperty(pExpr, EP_Alias);
@@ -414,7 +407,7 @@ static int lookupName(
     if( cnt==0
      && cntTab==1
      && pMatch
-     && (pNC->ncFlags & (NC_IdxExpr|NC_GenCol))==0
+     && (pNC->ncFlags & NC_IdxExpr)==0
      && sqlite3IsRowid(zCol)
      && VisibleRowid(pMatch->pTab)
     ){
@@ -625,15 +618,12 @@ static void notValid(
   const char *zMsg,    /* Type of error */
   int validMask        /* Set of contexts for which prohibited */
 ){
-  assert( (validMask&~(NC_IsCheck|NC_PartIdx|NC_IdxExpr|NC_GenCol))==0 );
+  assert( (validMask&~(NC_IsCheck|NC_PartIdx|NC_IdxExpr))==0 );
   if( (pNC->ncFlags & validMask)!=0 ){
     const char *zIn = "partial index WHERE clauses";
     if( pNC->ncFlags & NC_IdxExpr )      zIn = "index expressions";
 #ifndef SQLITE_OMIT_CHECK
     else if( pNC->ncFlags & NC_IsCheck ) zIn = "CHECK constraints";
-#endif
-#ifndef SQLITE_OMIT_GENERATED_COLUMNS
-    else if( pNC->ncFlags & NC_GenCol ) zIn = "generated columns";
 #endif
     sqlite3ErrorMsg(pParse, "%s prohibited in %s", zMsg, zIn);
   }
@@ -726,7 +716,7 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
         zColumn = pExpr->u.zToken;
       }else{
         Expr *pLeft = pExpr->pLeft;
-        notValid(pParse, pNC, "the \".\" operator", NC_IdxExpr|NC_GenCol);
+        notValid(pParse, pNC, "the \".\" operator", NC_IdxExpr);
         pRight = pExpr->pRight;
         if( pRight->op==TK_ID ){
           zDb = 0;
@@ -815,18 +805,15 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
         if( pDef->funcFlags & (SQLITE_FUNC_CONSTANT|SQLITE_FUNC_SLOCHNG) ){
           /* For the purposes of the EP_ConstFunc flag, date and time
           ** functions and other functions that change slowly are considered
-          ** constant because they are constant for the duration of one query.
-          ** This allows them to be factored out of inner loops. */
+          ** constant because they are constant for the duration of one query */
           ExprSetProperty(pExpr,EP_ConstFunc);
         }
         if( (pDef->funcFlags & SQLITE_FUNC_CONSTANT)==0 ){
           /* Date/time functions that use 'now', and other functions like
           ** sqlite_version() that might change over time cannot be used
           ** in an index. */
-          notValid(pParse, pNC, "non-deterministic functions", NC_SelfRef);
-        }else{
-          assert( (NC_SelfRef & 0xff)==NC_SelfRef ); /* Must fit in 8 bits */
-          pExpr->op2 = pNC->ncFlags & NC_SelfRef;
+          notValid(pParse, pNC, "non-deterministic functions",
+                   NC_IdxExpr|NC_PartIdx);
         }
         if( (pDef->funcFlags & SQLITE_FUNC_INTERNAL)!=0
          && pParse->nested==0
@@ -970,8 +957,7 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
       testcase( pExpr->op==TK_IN );
       if( ExprHasProperty(pExpr, EP_xIsSelect) ){
         int nRef = pNC->nRef;
-        notValid(pParse, pNC, "subqueries", 
-                 NC_IsCheck|NC_PartIdx|NC_IdxExpr|NC_GenCol);
+        notValid(pParse, pNC, "subqueries", NC_IsCheck|NC_PartIdx|NC_IdxExpr);
         sqlite3WalkSelect(pWalker, pExpr->x.pSelect);
         assert( pNC->nRef>=nRef );
         if( nRef!=pNC->nRef ){
@@ -982,13 +968,12 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
       break;
     }
     case TK_VARIABLE: {
-      notValid(pParse, pNC, "parameters",
-               NC_IsCheck|NC_PartIdx|NC_IdxExpr|NC_GenCol);
+      notValid(pParse, pNC, "parameters", NC_IsCheck|NC_PartIdx|NC_IdxExpr);
       break;
     }
     case TK_IS:
     case TK_ISNOT: {
-      Expr *pRight = sqlite3ExprSkipCollateAndLikely(pExpr->pRight);
+      Expr *pRight = sqlite3ExprSkipCollate(pExpr->pRight);
       assert( !ExprHasProperty(pExpr, EP_Reduced) );
       /* Handle special cases of "x IS TRUE", "x IS FALSE", "x IS NOT TRUE",
       ** and "x IS NOT FALSE". */
@@ -1199,7 +1184,7 @@ static int resolveCompoundOrderBy(
       int iCol = -1;
       Expr *pE, *pDup;
       if( pItem->done ) continue;
-      pE = sqlite3ExprSkipCollateAndLikely(pItem->pExpr);
+      pE = sqlite3ExprSkipCollate(pItem->pExpr);
       if( sqlite3ExprIsInteger(pE, &iCol) ){
         if( iCol<=0 || iCol>pEList->nExpr ){
           resolveOutOfRangeError(pParse, "ORDER", i+1, pEList->nExpr);
@@ -1378,7 +1363,7 @@ static int resolveOrderGroupBy(
   pParse = pNC->pParse;
   for(i=0, pItem=pOrderBy->a; i<pOrderBy->nExpr; i++, pItem++){
     Expr *pE = pItem->pExpr;
-    Expr *pE2 = sqlite3ExprSkipCollateAndLikely(pE);
+    Expr *pE2 = sqlite3ExprSkipCollate(pE);
     if( zType[0]!='G' ){
       iCol = resolveAsName(pParse, pSelect->pEList, pE2);
       if( iCol>0 ){
@@ -1792,13 +1777,10 @@ void sqlite3ResolveSelectNames(
 ** Resolve names in expressions that can only reference a single table
 ** or which cannot reference any tables at all.  Examples:
 **
-**                                                    "type" flag
-**                                                    ------------
-**    (1)   CHECK constraints                         NC_IsCheck
-**    (2)   WHERE clauses on partial indices          NC_PartIdx
-**    (3)   Expressions in indexes on expressions     NC_IdxExpr
-**    (4)   Expression arguments to VACUUM INTO.      0
-**    (5)   GENERATED ALWAYS as expressions           NC_GenCol
+**    (1)   CHECK constraints
+**    (2)   WHERE clauses on partial indices
+**    (3)   Expressions in indexes on expressions
+**    (4)   Expression arguments to VACUUM INTO.
 **
 ** In all cases except (4), the Expr.iTable value for Expr.op==TK_COLUMN
 ** nodes of the expression is set to -1 and the Expr.iColumn value is
@@ -1807,19 +1789,18 @@ void sqlite3ResolveSelectNames(
 ** Any errors cause an error message to be set in pParse.
 */
 int sqlite3ResolveSelfReference(
-  Parse *pParse,   /* Parsing context */
-  Table *pTab,     /* The table being referenced, or NULL */
-  int type,        /* NC_IsCheck, NC_PartIdx, NC_IdxExpr, NC_GenCol, or 0 */
-  Expr *pExpr,     /* Expression to resolve.  May be NULL. */
-  ExprList *pList  /* Expression list to resolve.  May be NULL. */
+  Parse *pParse,      /* Parsing context */
+  Table *pTab,        /* The table being referenced, or NULL */
+  int type,           /* NC_IsCheck or NC_PartIdx or NC_IdxExpr, or 0 */
+  Expr *pExpr,        /* Expression to resolve.  May be NULL. */
+  ExprList *pList     /* Expression list to resolve.  May be NULL. */
 ){
   SrcList sSrc;                   /* Fake SrcList for pParse->pNewTable */
   NameContext sNC;                /* Name context for pParse->pNewTable */
   int rc;
 
   assert( type==0 || pTab!=0 );
-  assert( type==NC_IsCheck || type==NC_PartIdx || type==NC_IdxExpr
-          || type==NC_GenCol || pTab==0 );
+  assert( type==NC_IsCheck || type==NC_PartIdx || type==NC_IdxExpr || pTab==0 );
   memset(&sNC, 0, sizeof(sNC));
   memset(&sSrc, 0, sizeof(sSrc));
   if( pTab ){

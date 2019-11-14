@@ -1131,9 +1131,7 @@ static int SQLITE_TCLAPI test_drop_modules(
     return TCL_ERROR;
   }
   if( getDbPointer(interp, argv[1], &db) ) return TCL_ERROR;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
   sqlite3_drop_modules(db, argc>2 ? (const char**)(argv+2) : 0);
-#endif
   return TCL_OK;
 }
 
@@ -5527,6 +5525,33 @@ static int SQLITE_TCLAPI test_soft_heap_limit(
 }
 
 /*
+** Usage:  sqlite3_hard_heap_limit ?N?
+**
+** Query or set the hard heap limit for the current thread.  The
+** limit is only changed if the N is present.  The previous limit
+** is returned.
+*/
+static int SQLITE_TCLAPI test_hard_heap_limit(
+  void * clientData,
+  Tcl_Interp *interp,
+  int objc,
+  Tcl_Obj *CONST objv[]
+){
+  sqlite3_int64 amt;
+  Tcl_WideInt N = -1;
+  if( objc!=1 && objc!=2 ){
+    Tcl_WrongNumArgs(interp, 1, objv, "?N?");
+    return TCL_ERROR;
+  }
+  if( objc==2 ){
+    if( Tcl_GetWideIntFromObj(interp, objv[1], &N) ) return TCL_ERROR;
+  }
+  amt = sqlite3_hard_heap_limit64(N);
+  Tcl_SetObjResult(interp, Tcl_NewWideIntObj(amt));
+  return TCL_OK;
+}
+
+/*
 ** Usage:   sqlite3_thread_cleanup
 **
 ** Call the sqlite3_thread_cleanup API.
@@ -7202,7 +7227,6 @@ static int SQLITE_TCLAPI optimization_control(
     { "omit-noop-join",      SQLITE_OmitNoopJoin   },
     { "stat4",               SQLITE_Stat4          },
     { "skip-scan",           SQLITE_SkipScan       },
-    { "push-down",           SQLITE_PushDown       },
   };
 
   if( objc!=4 ){
@@ -7682,15 +7706,14 @@ static int SQLITE_TCLAPI test_sqlite3_db_config(
     { "LEGACY_ALTER_TABLE", SQLITE_DBCONFIG_LEGACY_ALTER_TABLE },
     { "DQS_DML",            SQLITE_DBCONFIG_DQS_DML },
     { "DQS_DDL",            SQLITE_DBCONFIG_DQS_DDL },
-    { "LEGACY_FILE_FORMAT", SQLITE_DBCONFIG_LEGACY_FILE_FORMAT },
   };
   int i;
-  int v = 0;
+  int v;
   const char *zSetting;
   sqlite3 *db;
 
-  if( objc!=4 && objc!=3 ){
-    Tcl_WrongNumArgs(interp, 1, objv, "DB SETTING [VALUE]");
+  if( objc!=4 ){
+    Tcl_WrongNumArgs(interp, 1, objv, "DB SETTING VALUE");
     return TCL_ERROR;
   }
   if( getDbPointer(interp, Tcl_GetString(objv[1]), &db) ) return TCL_ERROR;
@@ -7706,11 +7729,7 @@ static int SQLITE_TCLAPI test_sqlite3_db_config(
       Tcl_NewStringObj("unknown sqlite3_db_config setting", -1));
     return TCL_ERROR;
   }
-  if( objc==4 ){
-    if( Tcl_GetIntFromObj(interp, objv[3], &v) ) return TCL_ERROR;
-  }else{
-    v = -1;
-  }
+  if( Tcl_GetIntFromObj(interp, objv[3], &v) ) return TCL_ERROR;
   sqlite3_db_config(db, aSetting[i].eVal, v, &v);
   Tcl_SetObjResult(interp, Tcl_NewIntObj(v));
   return TCL_OK;
@@ -7978,6 +7997,8 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
      { "sqlite3_db_filename",           test_db_filename,        0},
      { "sqlite3_db_readonly",           test_db_readonly,        0},
      { "sqlite3_soft_heap_limit",       test_soft_heap_limit,    0},
+     { "sqlite3_soft_heap_limit64",     test_soft_heap_limit,    0},
+     { "sqlite3_hard_heap_limit64",     test_hard_heap_limit,    0},
      { "sqlite3_thread_cleanup",        test_thread_cleanup,     0},
      { "sqlite3_pager_refcounts",       test_pager_refcounts,    0},
 

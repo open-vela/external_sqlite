@@ -67,5 +67,4 @@
 #define MUTEX_LOGIC(X)
 #else
 #define MUTEX_LOGIC(X)            X
-int sqlite3_mutex_held(sqlite3_mutex*);
 #endif /* defined(SQLITE_MUTEX_OMIT) */
