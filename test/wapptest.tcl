@@ -825,13 +825,8 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   }
 }
 
-wapptest_init
 for {set i 0} {$i < [llength $lTestArg]} {incr i} {
-  set opt [lindex $lTestArg $i]
-  if {[string range $opt 0 1]=="--"} {
-    set opt [string range $opt 1 end]
-  }
-  switch -- $opt {
+  switch -- [lindex $lTestArg $i] {
     -platform {
       if {$i==[llength $lTestArg]-1} { wapptest_usage }
       incr i
@@ -887,6 +882,7 @@ for {set i 0} {$i < [llength $lTestArg]} {incr i} {
   }
 }
 
+wapptest_init
 if {$G(noui)==0} {
   wapp-start $lWappArg
 } else {

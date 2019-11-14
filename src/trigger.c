@@ -463,9 +463,6 @@ TriggerStep *sqlite3TriggerInsertStep(
     pTriggerStep->pIdList = pColumn;
     pTriggerStep->pUpsert = pUpsert;
     pTriggerStep->orconf = orconf;
-    if( pUpsert ){
-      sqlite3HasExplicitNulls(pParse, pUpsert->pUpsertTarget);
-    }
   }else{
     testcase( pColumn );
     sqlite3IdListDelete(db, pColumn);
@@ -621,9 +618,10 @@ void sqlite3DropTriggerPtr(Parse *pParse, Trigger *pTrigger){
   iDb = sqlite3SchemaToIndex(pParse->db, pTrigger->pSchema);
   assert( iDb>=0 && iDb<db->nDb );
   pTable = tableOfTrigger(pTrigger);
-  assert( (pTable && pTable->pSchema==pTrigger->pSchema) || iDb==1 );
+  assert( pTable );
+  assert( pTable->pSchema==pTrigger->pSchema || iDb==1 );
 #ifndef SQLITE_OMIT_AUTHORIZATION
-  if( pTable ){
+  {
     int code = SQLITE_DROP_TRIGGER;
     const char *zDb = db->aDb[iDb].zDbSName;
     const char *zTab = SCHEMA_TABLE(iDb);
@@ -637,6 +635,7 @@ void sqlite3DropTriggerPtr(Parse *pParse, Trigger *pTrigger){
 
   /* Generate code to destroy the database record of the trigger.
   */
+  assert( pTable!=0 );
   if( (v = sqlite3GetVdbe(pParse))!=0 ){
     sqlite3NestedParse(pParse,
        "DELETE FROM %Q.%s WHERE name=%Q AND type='trigger'",
@@ -660,11 +659,9 @@ void sqlite3UnlinkAndDeleteTrigger(sqlite3 *db, int iDb, const char *zName){
   if( ALWAYS(pTrigger) ){
     if( pTrigger->pSchema==pTrigger->pTabSchema ){
       Table *pTab = tableOfTrigger(pTrigger);
-      if( pTab ){
-        Trigger **pp;
-        for(pp=&pTab->pTrigger; *pp!=pTrigger; pp=&((*pp)->pNext));
-        *pp = (*pp)->pNext;
-      }
+      Trigger **pp;
+      for(pp=&pTab->pTrigger; *pp!=pTrigger; pp=&((*pp)->pNext));
+      *pp = (*pp)->pNext;
     }
     sqlite3DeleteTrigger(db, pTrigger);
     db->mDbFlags |= DBFLAG_SchemaChange;

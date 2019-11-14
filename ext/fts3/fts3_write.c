@@ -2966,12 +2966,14 @@ int sqlite3Fts3SegReaderStep(
           ** doclist. */
           sqlite3_int64 iDelta;
           if( p->bDescIdx && nDoclist>0 ){
-            if( iPrev<=iDocid ) return FTS_CORRUPT_VTAB;
             iDelta = iPrev - iDocid;
           }else{
-            if( nDoclist>0 && iPrev>=iDocid ) return FTS_CORRUPT_VTAB;
             iDelta = iDocid - iPrev;
           }
+          if( iDelta<=0 && (nDoclist>0 || iDelta!=iDocid) ){
+            return FTS_CORRUPT_VTAB;
+          }
+          assert( nDoclist>0 || iDelta==iDocid );
 
           nByte = sqlite3Fts3VarintLen(iDelta) + (isRequirePos?nList+1:0);
           if( nDoclist+nByte>pCsr->nBuffer ){
@@ -3480,10 +3482,7 @@ static int fts3DoOptimize(Fts3Table *p, int bReturnDone){
   int rc;
   sqlite3_stmt *pAllLangid = 0;
 
-  rc = sqlite3Fts3PendingTermsFlush(p);
-  if( rc==SQLITE_OK ){
-    rc = fts3SqlStmt(p, SQL_SELECT_ALL_LANGID, &pAllLangid, 0);
-  }
+  rc = fts3SqlStmt(p, SQL_SELECT_ALL_LANGID, &pAllLangid, 0);
   if( rc==SQLITE_OK ){
     int rc2;
     sqlite3_bind_int(pAllLangid, 1, p->iPrevLangid);
@@ -3504,6 +3503,7 @@ static int fts3DoOptimize(Fts3Table *p, int bReturnDone){
   }
 
   sqlite3Fts3SegmentsClose(p);
+  sqlite3Fts3PendingTermsClear(p);
 
   return (rc==SQLITE_OK && bReturnDone && bSeenDone) ? SQLITE_DONE : rc;
 }
@@ -3797,14 +3797,14 @@ static int nodeReaderInit(NodeReader *p, const char *aNode, int nNode){
   p->nNode = nNode;
 
   /* Figure out if this is a leaf or an internal node. */
-  if( aNode && aNode[0] ){
+  if( p->aNode[0] ){
     /* An internal node. */
     p->iOff = 1 + sqlite3Fts3GetVarint(&p->aNode[1], &p->iChild);
   }else{
     p->iOff = 1;
   }
 
-  return aNode ? nodeReaderNext(p) : SQLITE_OK;
+  return nodeReaderNext(p);
 }
 
 /*
@@ -4296,8 +4296,8 @@ static int fts3IncrmergeLoad(
         NodeReader reader;
         pNode = &pWriter->aNodeWriter[i];
 
-        if( pNode->block.a){
-          rc = nodeReaderInit(&reader, pNode->block.a, pNode->block.n);
+        rc = nodeReaderInit(&reader, pNode->block.a, pNode->block.n);
+        if( reader.aNode ){
           while( reader.aNode && rc==SQLITE_OK ) rc = nodeReaderNext(&reader);
           blobGrowBuffer(&pNode->key, reader.term.n, &rc);
           if( rc==SQLITE_OK ){
@@ -4948,15 +4948,8 @@ int sqlite3Fts3Incrmerge(Fts3Table *p, int nMerge, int nMin){
     }
     if( SQLITE_OK==rc && pCsr->nSegment==nSeg
      && SQLITE_OK==(rc = sqlite3Fts3SegReaderStart(p, pCsr, pFilter))
+     && SQLITE_ROW==(rc = sqlite3Fts3SegReaderStep(p, pCsr))
     ){
-      int bEmpty = 0;
-      rc = sqlite3Fts3SegReaderStep(p, pCsr);
-      if( rc==SQLITE_OK ){
-        bEmpty = 1;
-      }else if( rc!=SQLITE_ROW ){
-        sqlite3Fts3SegReaderFinish(pCsr);
-        break;
-      }
       if( bUseHint && iIdx>0 ){
         const char *zKey = pCsr->zTerm;
         int nKey = pCsr->nTerm;
@@ -4967,13 +4960,11 @@ int sqlite3Fts3Incrmerge(Fts3Table *p, int nMerge, int nMin){
 
       if( rc==SQLITE_OK && pWriter->nLeafEst ){
         fts3LogMerge(nSeg, iAbsLevel);
-        if( bEmpty==0 ){
-          do {
-            rc = fts3IncrmergeAppend(p, pWriter, pCsr);
-            if( rc==SQLITE_OK ) rc = sqlite3Fts3SegReaderStep(p, pCsr);
-            if( pWriter->nWork>=nRem && rc==SQLITE_ROW ) rc = SQLITE_OK;
-          }while( rc==SQLITE_ROW );
-        }
+        do {
+          rc = fts3IncrmergeAppend(p, pWriter, pCsr);
+          if( rc==SQLITE_OK ) rc = sqlite3Fts3SegReaderStep(p, pCsr);
+          if( pWriter->nWork>=nRem && rc==SQLITE_ROW ) rc = SQLITE_OK;
+        }while( rc==SQLITE_ROW );
 
         /* Update or delete the input segments */
         if( rc==SQLITE_OK ){
@@ -5180,11 +5171,7 @@ static u64 fts3ChecksumIndex(
               pCsr += sqlite3Fts3GetVarint(pCsr, &iCol);
             }else{
               pCsr += sqlite3Fts3GetVarint(pCsr, &iVal);
-              if( p->bDescIdx ){
-                iDocid -= iVal;
-              }else{
-                iDocid += iVal;
-              }
+              iDocid += iVal;
             }
           }else{
             iPos += (iVal - 2);
@@ -5257,9 +5244,10 @@ static int fts3IntegrityCheck(Fts3Table *p, int *pbOk){
       for(iCol=0; rc==SQLITE_OK && iCol<p->nColumn; iCol++){
         if( p->abNotindexed[iCol]==0 ){
           const char *zText = (const char *)sqlite3_column_text(pStmt, iCol+1);
+          int nText = sqlite3_column_bytes(pStmt, iCol+1);
           sqlite3_tokenizer_cursor *pT = 0;
 
-          rc = sqlite3Fts3OpenTokenizer(p->pTokenizer, iLang, zText, -1, &pT);
+          rc = sqlite3Fts3OpenTokenizer(p->pTokenizer, iLang, zText, nText,&pT);
           while( rc==SQLITE_OK ){
             char const *zToken;       /* Buffer containing token */
             int nToken = 0;           /* Number of bytes in token */
