@@ -1,5 +1,5 @@
-C Fix\sa\sbug\sin\sthe\shard_heap_limit\spragma\sso\sthat\sit\sreturns\sthe\snew\svalue\sof\nthe\shard_heap_limit,\snot\sthe\ssoft_heap_limit.\s\sChange\sSQLITE_MAX_MEMORY\sso\nthat\sit\sworks\sby\ssetting\sthe\sdefault\shard_heap_limit\svalue.
-D 2019-11-14T17:46:32.327
+C Add\ssupport\sfor\sthe\ssqlite3_hard_heap_limit64()\sinterface\sand\sthe\nhard_heap_limit\spragma.
+D 2019-11-14T18:07:28.161
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1849,7 +1849,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P b8a631fd30d0732505679230684b3362c965438197a2b11518f01a77599c9202
+P 5baffcda7d5a42a99fa905faa834f14b94b1e2a26b5221f15d8ae8f1f5e3236a 33fd0c3abcad5555a150990a22d9c1bab99e79be01143fccb9fafc9b52cf92c8
 R 4e80a787b37e9567df232e950e42c798
+T +closed 33fd0c3abcad5555a150990a22d9c1bab99e79be01143fccb9fafc9b52cf92c8
 U drh
-Z aa6d0feee69df1227a085bd7741cd7c1
+Z e24996a01ae32dd885b41938acef0f5f
