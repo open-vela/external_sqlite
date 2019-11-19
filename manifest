@@ -1,5 +1,5 @@
-C Get\sthe\saggregate=TRUE\sfeature\sworking\son\sthe\sDBSTAT\svirtual\s\stable.
-D 2019-11-19T18:48:11.254
+C Enhancements\sto\sDBSTAT:\s\s(1)\sMake\sname=?\squeries\sefficient.\s\s(2)\sAdd\sthe\nability\sto\saggregate\sresults\sacross\seach\sindividual\sbtree\susing\sthe\naggregate=TRUE\sconstraint\sin\sthe\sWHERE\sclause.
+D 2019-11-19T21:22:16.359
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1850,7 +1850,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 9b5722f0fe666b99677e5f333dd8413aefb9ace7a461d74f6558f0ac53768719
+P 4330f0795dbc2ab41dddd41d5979331fb9b78c477c66367c4be52f929531a45f 16fef3db063830884de46d53a289f637a7204fe84fcdee7ea81dbb8bca578952
 R 021ee7df1dd822f13f493e93c0d0159d
+T +closed 16fef3db063830884de46d53a289f637a7204fe84fcdee7ea81dbb8bca578952
 U drh
-Z 75520593b5d5b7a30bf9bf33072d0e93
+Z 0ac7770b122892497299e1307cf84ac5
