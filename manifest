@@ -1,5 +1,5 @@
-C Extend\sthe\sjson-path\smechanism\swith\sarray\sindexes\sof\sthe\sform\s"#"\sor\s"#-n"\sfor\nsome\spositive\snumber\s"n",\sto\sreference\sthe\send\sof\san\sarray.
-D 2019-11-22T17:37:56.495
+C Fix\sa\smemory\sleak\sin\sfts5\serror\shandling\scode.
+D 2019-11-23T08:36:35.474
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -117,7 +117,7 @@ F ext/fts5/fts5_config.c aab6117f8f85933e051c66f227414fdcaf7f2313688e16276b895f9
 F ext/fts5/fts5_expr.c 5661fe64f4f5a499710df9561075de84b743f01e808af46df4130a9ec343a0fd
 F ext/fts5/fts5_hash.c 1cc0095646f5f3b46721aa112fb4f9bf29ae175cb5338f89dcec66ed97acfe75
 F ext/fts5/fts5_index.c 99b77ae1f503978ca76985bcfff7345c822aed8bbaa8edb3747f804f614685b5
-F ext/fts5/fts5_main.c dad126d1dede87df748c65b389ec67edcc803d939980b55a0280386b54fd7e7b
+F ext/fts5/fts5_main.c 9db1f173d299466aeff89bd949fb1eb0a181265726fb56f11e07ea292dcc9a73
 F ext/fts5/fts5_storage.c 167e3d8f8052a71032d498e32a2f2ed5ffe489e5d4d47e298adfa02ed55c7882
 F ext/fts5/fts5_tcl.c 39bcbae507f594aad778172fa914cad0f585bf92fd3b078c686e249282db0d95
 F ext/fts5/fts5_test_mi.c 08c11ec968148d4cb4119d96d819f8c1f329812c568bac3684f5464be177d3ee
@@ -157,7 +157,7 @@ F ext/fts5/test/fts5connect.test 08030168fc96fc278fa81f28654fb7e90566f33aff269c0
 F ext/fts5/test/fts5content.test 213506436fb2c87567b8e31f6d43ab30aab99354cec74ed679f22aad0cdbf283
 F ext/fts5/test/fts5corrupt.test 77ae6f41a7eba10620efb921cf7dbe218b0ef232b04519deb43581cb17a57ebe
 F ext/fts5/test/fts5corrupt2.test 7453752ba12ce91690c469a6449d412561cc604b1dec994e16ab132952e7805f
-F ext/fts5/test/fts5corrupt3.test 4100ac398eefbf033ebdf5a5a9399b37b4f8e1285fa35ab9d0119d4c7f21dc0c
+F ext/fts5/test/fts5corrupt3.test 5aaa2f8b44a85246a2ea76db1695bde38a75802979f3961702afa8f322d331c8
 F ext/fts5/test/fts5corrupt4.test ea805c4d7c68b5f185b9db5d2060a7ae5875339738dd48203c92162f41e7ca91
 F ext/fts5/test/fts5delete.test cbf87e3b8867c4d5cfcaed975c7475fd3f99d072bce2075fcedf43d1f82af775
 F ext/fts5/test/fts5detail.test 31b240dbf6d44ac3507e2f8b65f29fdc12465ffd531212378c7ce1066766f54e
@@ -295,7 +295,7 @@ F ext/misc/fileio.c 288e7230e0fe464d71b0694e2d8bdd3a353118ac2e31da3964b95f460f09
 F ext/misc/fossildelta.c 7708651072eb5620ab21bbfb518d184f27b2c29c0131b09b9a2d8852a8016430
 F ext/misc/fuzzer.c c4e27daf41433a64cad5265cd27dbcb891147e9994d0422200ce81ce9a54b625
 F ext/misc/ieee754.c f190d0cc5182529acb15babd177781be1ac1718c
-F ext/misc/json1.c 760107d0b97ab422952591b0d7519327dcb482954a7706ee387a54c135f8aabf
+F ext/misc/json1.c b4a8074e5a126379dd3af81b8595118c9c472b06f3fd508bd2ea579a75e3a1b1
 F ext/misc/memstat.c 3017a0832c645c0f8c773435620d663855f04690172316bd127270d1a7523d4d
 F ext/misc/memtrace.c 7c0d115d2ef716ad0ba632c91e05bd119cb16c1aedf3bec9f06196ead2d5537b
 F ext/misc/memvfs.c ab36f49e02ebcdf85a1e08dc4d8599ea8f343e073ac9e0bca18a98b7e1ec9567
@@ -1099,7 +1099,6 @@ F test/json101.test bb71538005f2d9e18620bdd3b76839a93ca0be61903eb8d751a64e78cf99
 F test/json102.test eeb54efa221e50b74a2d6fb9259963b48d7414dca3ce2fdfdeed45cb28487bc1
 F test/json103.test aff6b7a4c17d5a20b487a7bc1a274bfdc63b829413bdfb83bedac42ec7f67e3b
 F test/json104.test 317f4ec4b2d87afbba4d2460cf5be297aea76f2285eb618d276dbcd40a50950f
-F test/json105.test 45f7d6a9a54c85f8a9589b68d3e7a1f42d02f2359911a8cdbad1f9988f571173
 F test/keyword1.test 37ef6bba5d2ed5b07ecdd6810571de2956599dff
 F test/kvtest.c 94da54bb66aae7a54e47cf7e4ea4acecc0f217560f79ad3abfcc0361d6d557ba
 F test/lastinsert.test 42e948fd6442f07d60acbd15d33fb86473e0ef63
@@ -1852,9 +1851,6 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P 34343c4b0657767f2676a2a9feb670cf000824e3eadfb1a6d87b57404191d8f9
-R c6da582f868a5f82d03ec9634a7b8150
-T *branch * json-path-enhancement
-T *sym-json-path-enhancement *
-T -sym-trunk *
-U drh
-Z 4a48cd4a80fd585147d8b1e47ef59f7e
+R 647490f9972b5ad6b10dfe256dcbb8a2
+U dan
+Z 1cb9b1e092594c250aea1afbf779c5a9
