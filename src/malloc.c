@@ -578,11 +578,10 @@ void *sqlite3DbMallocRawNN(sqlite3 *db, u64 n){
   assert( sqlite3_mutex_held(db->mutex) );
   assert( db->pnBytesFreed==0 );
   if( n>db->lookaside.sz ){
-    if( !db->lookaside.bDisable ){
-      db->lookaside.anStat[1]++;      
-    }else if( db->mallocFailed ){
-      return 0;
+    if( db->lookaside.bDisable ){
+      return db->mallocFailed ? 0 : dbMallocRawFinish(db, n);
     }
+    db->lookaside.anStat[1]++;
     return dbMallocRawFinish(db, n);
   }
 # ifndef SQLITE_OMIT_MINI_LOOKASIDE
