@@ -683,7 +683,6 @@ int sqlite3_config(int op, ...){
 static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
 #ifndef SQLITE_OMIT_LOOKASIDE
   void *pStart;
-  sqlite3_int64 szAlloc = sz*(sqlite3_int64)cnt;
   
   if( sqlite3LookasideUsed(db,0)>0 ){
     return SQLITE_BUSY;
@@ -706,7 +705,7 @@ static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
     pStart = 0;
   }else if( pBuf==0 ){
     sqlite3BeginBenignMalloc();
-    pStart = sqlite3Malloc( szAlloc );  /* IMP: R-61949-35727 */
+    pStart = sqlite3Malloc( sz*(sqlite3_int64)cnt );  /* IMP: R-61949-35727 */
     sqlite3EndBenignMalloc();
     if( pStart ) cnt = sqlite3MallocSize(pStart)/sz;
   }else{
@@ -715,15 +714,6 @@ static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
   db->lookaside.pStart = pStart;
   db->lookaside.pInit = 0;
   db->lookaside.pFree = 0;
-#ifndef SQLITE_OMIT_MINI_LOOKASIDE
-  db->lookaside.pMiniInit = 0;
-  db->lookaside.pMiniFree = 0;
-  /* The arithmetic below causes the number of large lookaside slots to be 1/3
-  ** the number of mini slots, based on the observation that 75% of allocations
-  ** are <= MINI_SZ bytes.
-  */
-  cnt = szAlloc/(3*MINI_SZ+sz);
-#endif
   db->lookaside.sz = (u16)sz;
   db->lookaside.szTrue = (u16)sz;
   if( pStart ){
@@ -737,16 +727,6 @@ static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
       db->lookaside.pInit = p;
       p = (LookasideSlot*)&((u8*)p)[sz];
     }
-#ifndef SQLITE_OMIT_MINI_LOOKASIDE
-    db->lookaside.pMiddle = p;
-    /* Fill the remainder of the buffer with mini slots */
-    while(p<=(LookasideSlot*)&((u8*)pStart)[szAlloc-MINI_SZ]){
-      p->pNext = db->lookaside.pMiniInit;
-      db->lookaside.pMiniInit = p;
-      db->lookaside.nSlot++;
-      p = (LookasideSlot*)&((u8*)p)[MINI_SZ];
-    }
-#endif
     db->lookaside.pEnd = p;
     db->lookaside.bDisable = 0;
     db->lookaside.bMalloced = pBuf==0 ?1:0;
