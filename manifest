@@ -1,5 +1,5 @@
-C NEVER()\sand\sALWAYS()\smacros\stagging\sunreachable\sbranches.
-D 2020-01-02T22:23:01.861
+C Add\sthe\stwo-size\slookaside\smemory\sallocator.\s\sAlso,\sreduce\sthe\sper-entry\nsize\sof\sthe\sExprList\sobject.
+D 2020-01-02T22:28:47.433
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1853,7 +1853,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P bd57e6d923d3b04f0a07aaf18bf389d2b2b7efc7c57e8cb37e6ef910662d8397
+P 7405e982257611803792617f5d8142c54f9831b4a030f4de8607888c525e6289 34b877742ef78e9bb3f16815180f4ad9cd722beb1d610f713400a3b25d68aa9b
 R 896a86b40586a93b7de7ff4de391d81d
+T +closed 34b877742ef78e9bb3f16815180f4ad9cd722beb1d610f713400a3b25d68aa9b
 U drh
-Z b012354b66730a3de909478223de72aa
+Z 486c5971cb86c4301cea954c124cc71f
