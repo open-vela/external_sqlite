@@ -1142,6 +1142,7 @@ typedef struct With With;
 ** A bit in a Bitmask
 */
 #define MASKBIT(n)   (((Bitmask)1)<<(n))
+#define MASKBIT64(n) (((u64)1)<<(n))
 #define MASKBIT32(n) (((unsigned int)1)<<(n))
 #define ALLBITS      ((Bitmask)-1)
 
@@ -1559,6 +1560,13 @@ struct sqlite3 {
 #define ENC(db)        ((db)->enc)
 
 /*
+** A u64 constant where the lower 32 bits are all zeros.  Only the
+** upper 32 bits are included in the argument.  Necessary because some
+** C-compilers still do not accept LL integer literals.
+*/
+#define HI(X)  ((u64)(X)<<32)
+
+/*
 ** Possible values for the sqlite3.flags.
 **
 ** Value constraints (enforced via assert()):
@@ -1573,11 +1581,10 @@ struct sqlite3 {
 #define SQLITE_CkptFullFSync  0x00000010  /* Use full fsync for checkpoint */
 #define SQLITE_CacheSpill     0x00000020  /* OK to spill pager cache */
 #define SQLITE_ShortColNames  0x00000040  /* Show short columns names */
-#define SQLITE_CountRows      0x00000080  /* Count rows changed by INSERT, */
-                                          /*   DELETE, or UPDATE and return */
-                                          /*   the count using a callback. */
-#define SQLITE_NullCallback   0x00000100  /* Invoke the callback once if the */
-                                          /*   result set is empty */
+#define SQLITE_UnsafeInView   0x00000080  /* Allow functions with side-effect
+                                          ** in triggers and views */
+#define SQLITE_VtabInView     0x00000100  /* Allow views and triggers to access
+                                          ** virtual tables */
 #define SQLITE_IgnoreChecks   0x00000200  /* Do not enforce check constraints */
 #define SQLITE_ReadUncommit   0x00000400  /* READ UNCOMMITTED in shared-cache */
 #define SQLITE_NoCkptOnClose  0x00000800  /* No checkpoint on close()/DETACH */
@@ -1601,9 +1608,13 @@ struct sqlite3 {
 #define SQLITE_DqsDDL         0x20000000  /* dbl-quoted strings allowed in DDL*/
 #define SQLITE_DqsDML         0x40000000  /* dbl-quoted strings allowed in DML*/
 #define SQLITE_EnableView     0x80000000  /* Enable the use of views */
+#define SQLITE_CountRows      HI(0x00001) /* Count rows changed by INSERT, */
+                                          /*   DELETE, or UPDATE and return */
+                                          /*   the count using a callback. */
+#define SQLITE_NullCallback   HI(0000002) /* Invoke the callback once if the */
+                                          /*   result set is empty */
 
 /* Flags used only if debugging */
-#define HI(X)  ((u64)(X)<<32)
 #ifdef SQLITE_DEBUG
 #define SQLITE_SqlTrace       HI(0x0100000) /* Debug print SQL as it executes */
 #define SQLITE_VdbeListing    HI(0x0200000) /* Debug listings of VDBE progs */
@@ -1729,6 +1740,7 @@ struct FuncDestructor {
 **     SQLITE_FUNC_TYPEOF    ==  OPFLAG_TYPEOFARG
 **     SQLITE_FUNC_CONSTANT  ==  SQLITE_DETERMINISTIC from the API
 **     SQLITE_FUNC_DIRECT    ==  SQLITE_DIRECTONLY from the API
+**     SQLITE_FUNC_SAFE      ==  SQLITE_INNOCUOUS
 **     SQLITE_FUNC_ENCMASK   depends on SQLITE_UTF* macros in the API
 */
 #define SQLITE_FUNC_ENCMASK  0x0003 /* SQLITE_UTF8, SQLITE_UTF16BE or UTF16LE */
@@ -1751,7 +1763,11 @@ struct FuncDestructor {
 #define SQLITE_FUNC_INTERNAL 0x00040000 /* For use by NestedParse() only */
 #define SQLITE_FUNC_DIRECT   0x00080000 /* Not for use in TRIGGERs or VIEWs */
 #define SQLITE_FUNC_SUBTYPE  0x00100000 /* Result likely to have sub-type */
-#define SQLITE_FUNC_INLINE   0x00200000 /* Functions implemented in-line */
+#define SQLITE_FUNC_SAFE     0x00200000 /* Function has no side effects */
+#define SQLITE_FUNC_INLINE   0x00400000 /* Functions implemented in-line */
+
+/* Combination flags */
+#define SQLITE_FUNC_PURE     (SQLITE_FUNC_CONSTANT|SQLITE_FUNC_SAFE)
 
 /* Identifier numbers for each in-line function */
 #define INLINEFUNC_coalesce             0
@@ -1825,7 +1841,7 @@ struct FuncDestructor {
 **     parameter.
 */
 #define FUNCTION(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_CONSTANT|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, SQLITE_FUNC_PURE|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, 0, 0, #zName, {0} }
 #define VFUNCTION(zName, nArg, iArg, bNC, xFunc) \
   {nArg, SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
@@ -1834,26 +1850,27 @@ struct FuncDestructor {
   {nArg, SQLITE_UTF8|SQLITE_DIRECTONLY, \
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, 0, 0, #zName, {0} }
 #define INLINE_FUNC(zName, nArg, iArg, mFlags) \
-  {nArg, SQLITE_UTF8|SQLITE_FUNC_INLINE|SQLITE_FUNC_CONSTANT|(mFlags), \
+  {nArg, SQLITE_UTF8|SQLITE_FUNC_INLINE|SQLITE_FUNC_PURE|(mFlags), \
    SQLITE_INT_TO_PTR(iArg), 0, noopFunc, 0, 0, 0, #zName, {0} }
 #define TEST_FUNC(zName, nArg, iArg, mFlags) \
   {nArg, SQLITE_UTF8|SQLITE_FUNC_INTERNAL|SQLITE_FUNC_TEST| \
-         SQLITE_FUNC_INLINE|SQLITE_FUNC_CONSTANT|(mFlags), \
+         SQLITE_FUNC_INLINE|(mFlags), \
    SQLITE_INT_TO_PTR(iArg), 0, noopFunc, 0, 0, 0, #zName, {0} }
 #define DFUNCTION(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8, \
+  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_FUNC_SAFE|SQLITE_UTF8, \
    0, 0, xFunc, 0, 0, 0, #zName, {0} }
 #define PURE_DATE(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8|SQLITE_FUNC_CONSTANT, \
+  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8|SQLITE_FUNC_PURE, \
    (void*)&sqlite3Config, 0, xFunc, 0, 0, 0, #zName, {0} }
 #define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags) \
-  {nArg,SQLITE_FUNC_CONSTANT|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL)|extraFlags,\
+  {nArg,SQLITE_FUNC_PURE|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL)|extraFlags,\
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, 0, 0, #zName, {0} }
 #define STR_FUNCTION(zName, nArg, pArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_FUNC_SAFE| \
+           SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
    pArg, 0, xFunc, 0, 0, 0, #zName, }
 #define LIKEFUNC(zName, nArg, arg, flags) \
-  {nArg, SQLITE_FUNC_CONSTANT|SQLITE_UTF8|flags, \
+  {nArg, SQLITE_FUNC_PURE|SQLITE_UTF8|flags, \
    (void *)arg, 0, likeFunc, 0, 0, 0, #zName, {0} }
 #define WAGGREGATE(zName, nArg, arg, nc, xStep, xFinal, xValue, xInverse, f) \
   {nArg, SQLITE_UTF8|(nc*SQLITE_FUNC_NEEDCOLL)|f, \
