@@ -2265,21 +2265,6 @@ struct sqlite3_mem_methods {
 ** compile-time option.
 ** </dd>
 **
-** [[SQLITE_DBCONFIG_INDIRECT_UNSAFE]]
-** <dt>SQLITE_DBCONFIG_INDIRECT_UNSAFE</td>
-** <dd>The SQLITE_DBCONFIG_INDIRECT_UNSAFE option activates or deactivates
-** the ability to use "unsafe" SQL functions and virtual tables in the
-** schema of the database.  Using an SQL function or virtual table "in the
-** schema" means using the rsource in a
-** trigger, view, CHECK constraint, INDEX definition, generated column,
-** default value, or in any other context that is part of the DDL for the
-** database file.  "Unsafe" SQL functions are SQL functions that are not
-** tagged with [SQLITE_INNOCUOUS]. 
-** <p>For legacy compatibility, the SQLITE_DBCONFIG_INDIRECT_UNSAFE setting
-** defaults to "on". Applications that are operating on untrusted database
-** files are advised to change this setting to "off".
-** </dd>
-**
 ** [[SQLITE_DBCONFIG_LEGACY_FILE_FORMAT]]
 ** <dt>SQLITE_DBCONFIG_LEGACY_FILE_FORMAT</td>
 ** <dd>The SQLITE_DBCONFIG_LEGACY_FILE_FORMAT option activates or deactivates
@@ -2320,8 +2305,7 @@ struct sqlite3_mem_methods {
 #define SQLITE_DBCONFIG_DQS_DDL               1014 /* int int* */
 #define SQLITE_DBCONFIG_ENABLE_VIEW           1015 /* int int* */
 #define SQLITE_DBCONFIG_LEGACY_FILE_FORMAT    1016 /* int int* */
-#define SQLITE_DBCONFIG_ENABLE_UNSAFE_DDL     1017 /* int int* */
-#define SQLITE_DBCONFIG_MAX                   1017 /* Largest DBCONFIG */
+#define SQLITE_DBCONFIG_MAX                   1016 /* Largest DBCONFIG */
 
 /*
 ** CAPI3REF: Enable Or Disable Extended Result Codes
@@ -5012,25 +4996,11 @@ int sqlite3_create_window_function(
 ** [sqlite3_create_function_v2()].
 **
 ** The SQLITE_DETERMINISTIC flag means that the new function always gives
-** the same output when the input parameters are the same.
-** The [abs|abs() function] is deterministic, for example, but
-** [randomblob|randomblob()] is not.  Functions must
+** the same output when the input parameters are the same. The abs() function
+** is deterministic, for example, but randomblob() is not.  Functions must
 ** be deterministic in order to be used in certain contexts such as
 ** [CHECK constraints] or [generated columns].  SQLite might also optimize
 ** deterministic functions by factoring them out of inner loops.
-**
-** The SQLITE_INNOCUOUS flag means that the new function is unlikely
-** to cause problems even if misused.  An innocuous function should have
-** no side effects and consume few resources. The [abs|abs() function] 
-** is an example of an innocuous function.
-** The [load_extension() SQL function] is not innocuous because of its
-** side effects.  Some heightened security settings
-** ([SQLITE_DBCONFIG_UNSAFE_FUNC_IN_VIEW])
-** disable the use of SQLlfunctions inside views and triggers unless
-** the function is tagged with SQLITE_INNOCUOUS.  Most built-in functions
-** are innocuous.  Developers are advised to avoid using the
-** SQLITE_INNOCUOUS flag for application-defined functions unless the
-** function is specifically intended for use inside of views and triggers.
 **
 ** The SQLITE_DIRECTONLY flag means that the function may only be invoked
 ** from top-level SQL, and cannot be used in VIEWs or TRIGGERs.  This is
@@ -5051,7 +5021,6 @@ int sqlite3_create_window_function(
 #define SQLITE_DETERMINISTIC    0x000000800
 #define SQLITE_DIRECTONLY       0x000080000
 #define SQLITE_SUBTYPE          0x000100000
-#define SQLITE_INNOCUOUS        0x000200000
 
 /*
 ** CAPI3REF: Deprecated Functions
