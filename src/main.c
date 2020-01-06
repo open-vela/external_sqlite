@@ -887,7 +887,6 @@ int sqlite3_db_config(sqlite3 *db, int op, ...){
         { SQLITE_DBCONFIG_DQS_DDL,               SQLITE_DqsDDL         },
         { SQLITE_DBCONFIG_DQS_DML,               SQLITE_DqsDML         },
         { SQLITE_DBCONFIG_LEGACY_FILE_FORMAT,    SQLITE_LegacyFileFmt  },
-        { SQLITE_DBCONFIG_UNTRUSTED_SCHEMA,      SQLITE_UnsafeSchema   },
       };
       unsigned int i;
       rc = SQLITE_ERROR; /* IMP: R-42790-23372 */
@@ -1759,15 +1758,8 @@ int sqlite3CreateFunc(
 
   assert( SQLITE_FUNC_CONSTANT==SQLITE_DETERMINISTIC );
   assert( SQLITE_FUNC_DIRECT==SQLITE_DIRECTONLY );
-  extraFlags = enc &  (SQLITE_DETERMINISTIC|SQLITE_DIRECTONLY|
-                       SQLITE_SUBTYPE|SQLITE_INNOCUOUS);
+  extraFlags = enc &  (SQLITE_DETERMINISTIC|SQLITE_DIRECTONLY|SQLITE_SUBTYPE);
   enc &= (SQLITE_FUNC_ENCMASK|SQLITE_ANY);
-
-  /* The SQLITE_INNOCUOUS flag is the same bit as SQLITE_FUNC_UNSAFE.  But
-  ** the meaning is inverted.  So flip the bit. */
-  assert( SQLITE_FUNC_UNSAFE==SQLITE_INNOCUOUS );
-  extraFlags ^= SQLITE_FUNC_UNSAFE;
-
   
 #ifndef SQLITE_OMIT_UTF16
   /* If SQLITE_UTF16 is specified as the encoding type, transform this
@@ -1781,13 +1773,11 @@ int sqlite3CreateFunc(
     enc = SQLITE_UTF16NATIVE;
   }else if( enc==SQLITE_ANY ){
     int rc;
-    rc = sqlite3CreateFunc(db, zFunctionName, nArg,
-         (SQLITE_UTF8|extraFlags)^SQLITE_FUNC_UNSAFE,
+    rc = sqlite3CreateFunc(db, zFunctionName, nArg, SQLITE_UTF8|extraFlags,
          pUserData, xSFunc, xStep, xFinal, xValue, xInverse, pDestructor);
     if( rc==SQLITE_OK ){
-      rc = sqlite3CreateFunc(db, zFunctionName, nArg,
-           (SQLITE_UTF16LE|extraFlags)^SQLITE_FUNC_UNSAFE,
-           pUserData, xSFunc, xStep, xFinal, xValue, xInverse, pDestructor);
+      rc = sqlite3CreateFunc(db, zFunctionName, nArg, SQLITE_UTF16LE|extraFlags,
+          pUserData, xSFunc, xStep, xFinal, xValue, xInverse, pDestructor);
     }
     if( rc!=SQLITE_OK ){
       return rc;
