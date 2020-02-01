@@ -23,7 +23,7 @@
 **    rootpage INT,                -- The root page of the btree
 **    sql TEXT,                    -- SQL for this btree - from sqlite_master
 **    hasRowid BOOLEAN,            -- True if the btree has a rowid
-**    nEntry INT,                  -- Estimated number of entries
+**    nEntry INT,                  -- Estimated number of enteries
 **    nPage INT,                   -- Estimated number of pages
 **    depth INT,                   -- Depth of the btree
 **    szPage INT,                  -- Size of each page in bytes
