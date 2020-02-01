@@ -254,7 +254,6 @@ int sqlite3MutexInit(void){
   GLOBAL(int, mutexIsInit) = 1;
 #endif
 
-  sqlite3MemoryBarrier();
   return rc;
 }
 

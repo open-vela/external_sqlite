@@ -530,7 +530,7 @@ static int multiplexOpen(
         pGroup->szChunk += 65536;
       }
     }
-    pGroup->flags = (flags & ~SQLITE_OPEN_URI);
+    pGroup->flags = flags;
     rc = multiplexSubFilename(pGroup, 1);
     if( rc==SQLITE_OK ){
       pSubOpen = multiplexSubOpen(pGroup, 0, &rc, pOutFlags, 0);
