@@ -4503,7 +4503,7 @@ int sqlite3VdbeRecordCompareWithSkip(
 
     /* RHS is a string */
     else if( pRhs->flags & MEM_Str ){
-      getVarint32(&aKey1[idx1], serial_type);
+      getVarint32NR(&aKey1[idx1], serial_type);
       testcase( serial_type==12 );
       if( serial_type<12 ){
         rc = -1;
@@ -4537,7 +4537,7 @@ int sqlite3VdbeRecordCompareWithSkip(
     /* RHS is a blob */
     else if( pRhs->flags & MEM_Blob ){
       assert( (pRhs->flags & MEM_Zero)==0 || pRhs->n==0 );
-      getVarint32(&aKey1[idx1], serial_type);
+      getVarint32NR(&aKey1[idx1], serial_type);
       testcase( serial_type==12 );
       if( serial_type<12 || (serial_type & 0x01) ){
         rc = -1;
@@ -4726,7 +4726,10 @@ static int vdbeRecordCompareString(
 
   assert( pPKey2->aMem[0].flags & MEM_Str );
   vdbeAssertFieldCountWithinLimits(nKey1, pKey1, pPKey2->pKeyInfo);
-  getVarint32(&aKey1[1], serial_type);
+  serial_type = (u8)(aKey1[1]);
+  if( serial_type >= 0x80 ){
+    sqlite3GetVarint32(&aKey1[1], (u32*)&serial_type);
+  }
   if( serial_type<12 ){
     res = pPKey2->r1;      /* (pKey1/nKey1) is a number or a null */
   }else if( !(serial_type & 0x01) ){ 
@@ -4853,7 +4856,7 @@ int sqlite3VdbeIdxRowid(sqlite3 *db, BtCursor *pCur, i64 *rowid){
   }
 
   /* The index entry must begin with a header size */
-  (void)getVarint32((u8*)m.z, szHdr);
+  getVarint32NR((u8*)m.z, szHdr);
   testcase( szHdr==3 );
   testcase( szHdr==m.n );
   testcase( szHdr>0x7fffffff );
@@ -4864,7 +4867,7 @@ int sqlite3VdbeIdxRowid(sqlite3 *db, BtCursor *pCur, i64 *rowid){
 
   /* The last field of the index should be an integer - the ROWID.
   ** Verify that the last entry really is an integer. */
-  (void)getVarint32((u8*)&m.z[szHdr-1], typeRowid);
+  getVarint32NR((u8*)&m.z[szHdr-1], typeRowid);
   testcase( typeRowid==1 );
   testcase( typeRowid==2 );
   testcase( typeRowid==3 );
