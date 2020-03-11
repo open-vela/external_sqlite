@@ -1,5 +1,5 @@
-C Rename\ssqlite3ExprCodeAtInit()\sto\ssqlite3ExprCodeRunJustOnce().\nOther\schanges\sto\smake\sthe\snew\scode\scleaner.\s\sTest\scases\sadded.
-D 2020-03-11T19:41:49.390
+C Do\snot\sfactor\sout\sconstant\sfunctions\sinto\sthe\sinitialization\ssection\sof\sa\nprepared\sstatement,\sbecause\seven\sthough\sthey\sare\sconstant,\sthey\scan\sstill\nthrow\sexceptions.\s\sInstead,\sput\ssuch\sfunctions\sin\san\sOP_Once\sblock.\s\sThis\nfixes\sticket\s[3c9eadd2a6ba0aa5]\sand\scauses\sCOALESCE()\sand\sCASE...END\sto\nbe\sshort-circuit.
+D 2020-03-11T19:56:26.290
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1860,7 +1860,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 97a18a5cd701848a9660385e31bffe2c397e3cfe57ccdb876f44d08c00d1d39a
+P fb5a8a9edd0a4f979d6c30278d4ddc73c651f56ae989b4e5983fca36887c5ceb d7f18489978fdbbe3ab317485518cac91a75416ccef55898301afdd76d3b415b
 R bb18f5b4c4c1d8067c8d33e0ad339acb
+T +closed d7f18489978fdbbe3ab317485518cac91a75416ccef55898301afdd76d3b415b
 U drh
-Z 791b16818e473b4676673e9f9494706b
+Z 0612eee0f98137a25a8377c8a68a78fc
