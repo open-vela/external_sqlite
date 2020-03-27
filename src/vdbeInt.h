@@ -31,8 +31,7 @@
 ** "explain" P4 display logic is enabled.
 */
 #if !defined(SQLITE_OMIT_EXPLAIN) || !defined(NDEBUG) \
-     || defined(VDBE_PROFILE) || defined(SQLITE_DEBUG) \
-     || defined(SQLITE_ENABLE_BYTECODE_VTAB)
+     || defined(VDBE_PROFILE) || defined(SQLITE_DEBUG)
 # define VDBE_DISPLAY_P4 1
 #else
 # define VDBE_DISPLAY_P4 0
@@ -497,12 +496,7 @@ int sqlite2BtreeKeyCompare(BtCursor *, const void *, int, int, int *);
 int sqlite3VdbeIdxKeyCompare(sqlite3*,VdbeCursor*,UnpackedRecord*,int*);
 int sqlite3VdbeIdxRowid(sqlite3*, BtCursor*, i64*);
 int sqlite3VdbeExec(Vdbe*);
-#if !defined(SQLITE_OMIT_EXPLAIN) || defined(SQLITE_ENABLE_BYTECODE_VTAB)
-int sqlite3VdbeNextOpcode(Vdbe*,Mem*,int,int*,int*,Op**);
-char *sqlite3VdbeDisplayP4(sqlite3*,Op*);
-char *sqlite3VdbeDisplayComment(sqlite3*,const Op*,const char*);
-#endif
-#if !defined(SQLITE_OMIT_EXPLAIN)
+#ifndef SQLITE_OMIT_EXPLAIN
 int sqlite3VdbeList(Vdbe*);
 #endif
 int sqlite3VdbeHalt(Vdbe*);
@@ -544,7 +538,7 @@ int sqlite3VdbeMemFinalize(Mem*, FuncDef*);
 #ifndef SQLITE_OMIT_WINDOWFUNC
 int sqlite3VdbeMemAggValue(Mem*, Mem*, FuncDef*);
 #endif
-#if !defined(SQLITE_OMIT_EXPLAIN) || defined(SQLITE_ENABLE_BYTECODE_VTAB)
+#ifndef SQLITE_OMIT_EXPLAIN
 const char *sqlite3OpcodeName(int);
 #endif
 int sqlite3VdbeMemGrow(Mem *pMem, int n, int preserve);
