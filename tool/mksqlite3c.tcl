@@ -341,7 +341,6 @@ foreach file {
    vdbe.c
    vdbeblob.c
    vdbesort.c
-   vdbevtab.c
    memjournal.c
 
    walker.c
