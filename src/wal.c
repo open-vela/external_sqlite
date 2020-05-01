@@ -1868,7 +1868,6 @@ static int walCheckpoint(
       if( rc==SQLITE_OK ){
         i64 nReq = ((i64)mxPage * szPage);
         i64 nSize;                    /* Current size of database file */
-        sqlite3OsFileControl(pWal->pDbFd, SQLITE_FCNTL_CKPT_START, 0);
         rc = sqlite3OsFileSize(pWal->pDbFd, &nSize);
         if( rc==SQLITE_OK && nSize<nReq ){
           sqlite3OsFileControlHint(pWal->pDbFd, SQLITE_FCNTL_SIZE_HINT, &nReq);
@@ -1896,7 +1895,6 @@ static int walCheckpoint(
         rc = sqlite3OsWrite(pWal->pDbFd, zBuf, szPage, iOffset);
         if( rc!=SQLITE_OK ) break;
       }
-      sqlite3OsFileControl(pWal->pDbFd, SQLITE_FCNTL_CKPT_DONE, 0);
 
       /* If work was actually accomplished... */
       if( rc==SQLITE_OK ){
@@ -1907,6 +1905,10 @@ static int walCheckpoint(
           if( rc==SQLITE_OK ){
             rc = sqlite3OsSync(pWal->pDbFd, CKPT_SYNC_FLAGS(sync_flags));
           }
+        }
+        if( rc==SQLITE_OK ){
+          rc = sqlite3OsFileControl(pWal->pDbFd, SQLITE_FCNTL_CKPT_DONE, 0);
+          if( rc==SQLITE_NOTFOUND ) rc = SQLITE_OK;
         }
         if( rc==SQLITE_OK ){
           pInfo->nBackfill = mxSafeFrame;
