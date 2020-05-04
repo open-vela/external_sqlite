@@ -25,15 +25,78 @@
 #if defined(SQLITE_ENABLE_ICU) || defined(SQLITE_ENABLE_ICU_COLLATIONS)
 # include "sqliteicu.h"
 #endif
+
+/*
+** This is an extension initializer that is a no-op and always
+** succeeds, except that it fails if the fault-simulation is set
+** to 500.
+*/
+static int sqlite3TestExtInit(sqlite3 *db){
+  (void)db;
+  return sqlite3FaultSim(500);
+}
+
+
+/*
+** Forward declarations of external module initializer functions
+** for modules that need them.
+*/
+#ifdef SQLITE_ENABLE_FTS1
+int sqlite3Fts1Init(sqlite3*);
+#endif
+#ifdef SQLITE_ENABLE_FTS2
+int sqlite3Fts2Init(sqlite3*);
+#endif
+#ifdef SQLITE_ENABLE_FTS5
+int sqlite3Fts5Init(sqlite3*);
+#endif
 #ifdef SQLITE_ENABLE_JSON1
 int sqlite3Json1Init(sqlite3*);
 #endif
 #ifdef SQLITE_ENABLE_STMTVTAB
 int sqlite3StmtVtabInit(sqlite3*);
 #endif
-#ifdef SQLITE_ENABLE_FTS5
-int sqlite3Fts5Init(sqlite3*);
+
+/*
+** An array of pointers to extension initializer functions for
+** built-in extensions.
+*/
+static int (*const sqlite3BuiltinExtensions[])(sqlite3*) = {
+#ifdef SQLITE_ENABLE_FTS1
+  sqlite3Fts1Init,
 #endif
+#ifdef SQLITE_ENABLE_FTS2
+  sqlite3Fts2Init,
+#endif
+#ifdef SQLITE_ENABLE_FTS3
+  sqlite3Fts3Init,
+#endif
+#ifdef SQLITE_ENABLE_FTS5
+  sqlite3Fts5Init,
+#endif
+#if defined(SQLITE_ENABLE_ICU) || defined(SQLITE_ENABLE_ICU_COLLATIONS)
+  sqlite3IcuInit,
+#endif
+#ifdef SQLITE_ENABLE_RTREE
+  sqlite3RtreeInit,
+#endif
+#ifdef SQLITE_ENABLE_DBPAGE_VTAB
+  sqlite3DbpageRegister,
+#endif
+#ifdef SQLITE_ENABLE_DBSTAT_VTAB
+  sqlite3DbstatRegister,
+#endif
+  sqlite3TestExtInit,
+#ifdef SQLITE_ENABLE_JSON1
+  sqlite3Json1Init,
+#endif
+#ifdef SQLITE_ENABLE_STMTVTAB
+  sqlite3StmtVtabInit,
+#endif
+#ifdef SQLITE_ENABLE_BYTECODE_VTAB
+  sqlite3VdbeBytecodeVtabInit,
+#endif
+};
 
 #ifndef SQLITE_AMALGAMATION
 /* IMPLEMENTATION-OF: R-46656-45156 The sqlite3_version[] string constant
@@ -1551,7 +1614,8 @@ const char *sqlite3ErrStr(int rc){
 */
 static int sqliteDefaultBusyCallback(
   void *ptr,               /* Database connection */
-  int count                /* Number of times table has been busy */
+  int count,               /* Number of times table has been busy */
+  sqlite3_file *pFile      /* The file on which the lock occurred */
 ){
 #if SQLITE_OS_WIN || HAVE_USLEEP
   /* This case is for systems that have support for sleeping for fractions of
@@ -1565,6 +1629,31 @@ static int sqliteDefaultBusyCallback(
   int tmout = db->busyTimeout;
   int delay, prior;
 
+#ifdef SQLITE_ENABLE_SETLK_TIMEOUT
+  if( sqlite3OsFileControl(pFile,SQLITE_FCNTL_LOCK_TIMEOUT,&tmout)==SQLITE_OK ){
+    if( count ){
+      /* If this is the second or later invocation of the busy-handler,
+      ** but tmout==0, then code in wal.c must have disabled the blocking
+      ** lock before the SQLITE_BUSY error was hit. In this case, no delay
+      ** occurred while waiting for the lock, so fall through to the xSleep()
+      ** code below to delay a while before retrying the lock.  
+      **
+      ** Alternatively, if tmout!=0, then SQLite has already waited 
+      ** sqlite3.busyTimeout ms for a lock. In this case, return 0 to 
+      ** indicate that the lock should not be retried and the SQLITE_BUSY 
+      ** error returned to the application.  */
+      if( tmout ){
+        tmout = 0;
+        sqlite3OsFileControl(pFile, SQLITE_FCNTL_LOCK_TIMEOUT, &tmout);
+        return 0;
+      }
+    }else{
+      return 1;
+    }
+  }
+#else
+  UNUSED_PARAMETER(pFile);
+#endif
   assert( count>=0 );
   if( count < NDELAY ){
     delay = delays[count];
@@ -1584,6 +1673,7 @@ static int sqliteDefaultBusyCallback(
   ** must be done in increments of whole seconds */
   sqlite3 *db = (sqlite3 *)ptr;
   int tmout = ((sqlite3 *)ptr)->busyTimeout;
+  UNUSED_PARAMETER(pFile);
   if( (count+1)*1000 > tmout ){
     return 0;
   }
@@ -1604,7 +1694,16 @@ static int sqliteDefaultBusyCallback(
 int sqlite3InvokeBusyHandler(BusyHandler *p, sqlite3_file *pFile){
   int rc;
   if( p->xBusyHandler==0 || p->nBusy<0 ) return 0;
-  rc = p->xBusyHandler(p->pBusyArg, p->nBusy);
+  if( p->bExtraFileArg ){
+    /* Add an extra parameter with the pFile pointer to the end of the
+    ** callback argument list */
+    int (*xTra)(void*,int,sqlite3_file*);
+    xTra = (int(*)(void*,int,sqlite3_file*))p->xBusyHandler;
+    rc = xTra(p->pBusyArg, p->nBusy, pFile);
+  }else{
+    /* Legacy style busy handler callback */
+    rc = p->xBusyHandler(p->pBusyArg, p->nBusy);
+  }
   if( rc==0 ){
     p->nBusy = -1;
   }else{
@@ -1629,6 +1728,7 @@ int sqlite3_busy_handler(
   db->busyHandler.xBusyHandler = xBusy;
   db->busyHandler.pBusyArg = pArg;
   db->busyHandler.nBusy = 0;
+  db->busyHandler.bExtraFileArg = 0;
   db->busyTimeout = 0;
   sqlite3_mutex_leave(db->mutex);
   return SQLITE_OK;
@@ -1679,6 +1779,7 @@ int sqlite3_busy_timeout(sqlite3 *db, int ms){
     sqlite3_busy_handler(db, (int(*)(void*,int))sqliteDefaultBusyCallback,
                              (void*)db);
     db->busyTimeout = ms;
+    db->busyHandler.bExtraFileArg = 1;
   }else{
     sqlite3_busy_handler(db, 0, 0);
   }
@@ -3004,6 +3105,7 @@ static int openDatabase(
   int isThreadsafe;               /* True for threadsafe connections */
   char *zOpen = 0;                /* Filename argument to pass to BtreeOpen() */
   char *zErrMsg = 0;              /* Error message from sqlite3ParseUri() */
+  int i;                          /* Loop counter */
 
 #ifdef SQLITE_ENABLE_API_ARMOR
   if( ppDb==0 ) return SQLITE_MISUSE_BKPT;
@@ -3244,14 +3346,11 @@ static int openDatabase(
   sqlite3RegisterPerConnectionBuiltinFunctions(db);
   rc = sqlite3_errcode(db);
 
-#ifdef SQLITE_ENABLE_FTS5
-  /* Register any built-in FTS5 module before loading the automatic
-  ** extensions. This allows automatic extensions to register FTS5 
-  ** tokenizers and auxiliary functions.  */
-  if( !db->mallocFailed && rc==SQLITE_OK ){
-    rc = sqlite3Fts5Init(db);
+
+  /* Load compiled-in extensions */
+  for(i=0; rc==SQLITE_OK && i<ArraySize(sqlite3BuiltinExtensions); i++){
+    rc = sqlite3BuiltinExtensions[i](db);
   }
-#endif
 
   /* Load automatic extensions - extensions that have been registered
   ** using the sqlite3_automatic_extension() API.
@@ -3263,68 +3362,6 @@ static int openDatabase(
       goto opendb_out;
     }
   }
-
-#ifdef SQLITE_ENABLE_FTS1
-  if( !db->mallocFailed ){
-    extern int sqlite3Fts1Init(sqlite3*);
-    rc = sqlite3Fts1Init(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_FTS2
-  if( !db->mallocFailed && rc==SQLITE_OK ){
-    extern int sqlite3Fts2Init(sqlite3*);
-    rc = sqlite3Fts2Init(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_FTS3 /* automatically defined by SQLITE_ENABLE_FTS4 */
-  if( !db->mallocFailed && rc==SQLITE_OK ){
-    rc = sqlite3Fts3Init(db);
-  }
-#endif
-
-#if defined(SQLITE_ENABLE_ICU) || defined(SQLITE_ENABLE_ICU_COLLATIONS)
-  if( !db->mallocFailed && rc==SQLITE_OK ){
-    rc = sqlite3IcuInit(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_RTREE
-  if( !db->mallocFailed && rc==SQLITE_OK){
-    rc = sqlite3RtreeInit(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_DBPAGE_VTAB
-  if( !db->mallocFailed && rc==SQLITE_OK){
-    rc = sqlite3DbpageRegister(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_DBSTAT_VTAB
-  if( !db->mallocFailed && rc==SQLITE_OK){
-    rc = sqlite3DbstatRegister(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_JSON1
-  if( !db->mallocFailed && rc==SQLITE_OK){
-    rc = sqlite3Json1Init(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_STMTVTAB
-  if( !db->mallocFailed && rc==SQLITE_OK){
-    rc = sqlite3StmtVtabInit(db);
-  }
-#endif
-
-#ifdef SQLITE_ENABLE_BYTECODE_VTAB
-  if( !db->mallocFailed && rc==SQLITE_OK ){
-    rc = sqlite3VdbeBytecodeVtabInit(db);
-  }
-#endif
 
 #ifdef SQLITE_ENABLE_INTERNAL_FUNCTIONS
   /* Testing use only!!! The -DSQLITE_ENABLE_INTERNAL_FUNCTIONS=1 compile-time
@@ -4482,11 +4519,11 @@ int sqlite3_snapshot_open(
           rc = SQLITE_OK;
         }
         if( rc==SQLITE_OK ){
-          rc = sqlite3PagerSnapshotOpen(pPager, db, pSnapshot);
+          rc = sqlite3PagerSnapshotOpen(pPager, pSnapshot);
         }
         if( rc==SQLITE_OK ){
           rc = sqlite3BtreeBeginTrans(pBt, 0, 0);
-          sqlite3PagerSnapshotOpen(pPager, 0, 0);
+          sqlite3PagerSnapshotOpen(pPager, 0);
         }
         if( bUnlock ){
           sqlite3PagerSnapshotUnlock(pPager);
