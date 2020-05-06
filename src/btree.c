@@ -3437,6 +3437,19 @@ int sqlite3BtreeBeginTrans(Btree *p, int wrflag, int *pSchemaVersion){
   pBt->btsFlags &= ~BTS_INITIALLY_EMPTY;
   if( pBt->nPage==0 ) pBt->btsFlags |= BTS_INITIALLY_EMPTY;
   do {
+    Pager *pPager = pBt->pPager;
+
+#ifdef SQLITE_ENABLE_SETLK_TIMEOUT
+    /* If transitioning from no transaction directly to a write transaction,
+    ** block for the WRITER lock first if possible. */
+    sqlite3PagerWalDb(pPager, p->db);
+    if( pBt->pPage1==0 && wrflag ){
+      assert( pBt->inTransaction==TRANS_NONE );
+      rc = sqlite3PagerWalWriteLock(pPager, 1);
+      if( rc!=SQLITE_OK ) break;
+    }
+#endif
+
     /* Call lockBtree() until either pBt->pPage1 is populated or
     ** lockBtree() returns something other than SQLITE_OK. lockBtree()
     ** may return SQLITE_OK but leave pBt->pPage1 set to 0 if after
@@ -3450,7 +3463,7 @@ int sqlite3BtreeBeginTrans(Btree *p, int wrflag, int *pSchemaVersion){
       if( (pBt->btsFlags & BTS_READ_ONLY)!=0 ){
         rc = SQLITE_READONLY;
       }else{
-        rc = sqlite3PagerBegin(pBt->pPager,wrflag>1,sqlite3TempInMemory(p->db));
+        rc = sqlite3PagerBegin(pPager, wrflag>1, sqlite3TempInMemory(p->db));
         if( rc==SQLITE_OK ){
           rc = newDatabase(pBt);
         }else if( rc==SQLITE_BUSY_SNAPSHOT && pBt->inTransaction==TRANS_NONE ){
@@ -3463,11 +3476,12 @@ int sqlite3BtreeBeginTrans(Btree *p, int wrflag, int *pSchemaVersion){
     }
   
     if( rc!=SQLITE_OK ){
+      sqlite3PagerWalWriteLock(pPager, 0);
       unlockBtreeIfUnused(pBt);
     }
+    sqlite3PagerWalDb(pPager, 0);
   }while( (rc&0xFF)==SQLITE_BUSY && pBt->inTransaction==TRANS_NONE &&
           btreeInvokeBusyHandler(pBt) );
-  sqlite3PagerResetLockTimeout(pBt->pPager);
 
   if( rc==SQLITE_OK ){
     if( p->inTrans==TRANS_NONE ){
