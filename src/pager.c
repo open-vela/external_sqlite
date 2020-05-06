@@ -5705,6 +5705,7 @@ void sqlite3PagerUnrefPageOne(DbPage *pPg){
   assert( pPg->pgno==1 );
   assert( (pPg->flags & PGHDR_MMAP)==0 ); /* Page1 is never memory mapped */
   pPager = pPg->pPager;
+  sqlite3PagerResetLockTimeout(pPager);
   sqlite3PcacheRelease(pPg);
   pagerUnlockIfUnused(pPager);
 }
@@ -6997,6 +6998,16 @@ sqlite3_file *sqlite3PagerFile(Pager *pPager){
   return pPager->fd;
 }
 
+#ifdef SQLITE_ENABLE_SETLK_TIMEOUT
+/*
+** Reset the lock timeout for pager.
+*/
+void sqlite3PagerResetLockTimeout(Pager *pPager){
+  int x = 0;
+  sqlite3OsFileControl(pPager->fd, SQLITE_FCNTL_LOCK_TIMEOUT, &x);
+}
+#endif
+
 /*
 ** Return the file handle for the journal file (if it exists).
 ** This will be either the rollback journal or the WAL file.
@@ -7410,6 +7421,7 @@ int sqlite3PagerCheckpoint(
         pPager->walSyncFlags, pPager->pageSize, (u8 *)pPager->pTmpSpace,
         pnLog, pnCkpt
     );
+    sqlite3PagerResetLockTimeout(pPager);
   }
   return rc;
 }
@@ -7574,21 +7586,7 @@ int sqlite3PagerCloseWal(Pager *pPager, sqlite3 *db){
   return rc;
 }
 
-#ifdef SQLITE_ENABLE_SETLK_TIMEOUT
-/*
-** If pager pPager is a wal-mode database not in exclusive locking mode,
-** invoke the sqlite3WalWriteLock() function on the associated Wal object 
-** with the same db and bLock parameters as were passed to this function.
-** Return an SQLite error code if an error occurs, or SQLITE_OK otherwise.
-*/
-int sqlite3PagerWalWriteLock(sqlite3 *db, Pager *pPager, int bLock){
-  int rc = SQLITE_OK;
-  if( pagerUseWal(pPager) && pPager->exclusiveMode==0 ){
-    rc = sqlite3WalWriteLock(db, pPager->pWal, bLock);
-  }
-  return rc;
-}
-#endif
+
 
 #ifdef SQLITE_ENABLE_SNAPSHOT
 /*
@@ -7608,14 +7606,10 @@ int sqlite3PagerSnapshotGet(Pager *pPager, sqlite3_snapshot **ppSnapshot){
 ** read transaction is opened, attempt to read from the snapshot it 
 ** identifies. If this is not a WAL database, return an error.
 */
-int sqlite3PagerSnapshotOpen(
-  Pager *pPager, 
-  sqlite3 *db, 
-  sqlite3_snapshot *pSnapshot
-){
+int sqlite3PagerSnapshotOpen(Pager *pPager, sqlite3_snapshot *pSnapshot){
   int rc = SQLITE_OK;
   if( pPager->pWal ){
-    sqlite3WalSnapshotOpen(pPager->pWal, db, pSnapshot);
+    sqlite3WalSnapshotOpen(pPager->pWal, pSnapshot);
   }else{
     rc = SQLITE_ERROR;
   }
