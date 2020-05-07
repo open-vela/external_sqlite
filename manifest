@@ -1,5 +1,5 @@
-C Fix\san\serror\sthat\scould\soccur\sif\sthe\sfirst\stransaction\sexecuted\sby\sa\sconnection\sconfigured\sto\suse\sblocking\slocks\sis\sa\swrite-transaction\sfor\swhich\sthe\sWRITER\slock\scannot\sbe\sobtained.
-D 2020-05-07T14:26:40.925
+C Changes\sto\savoid\sdeadlock\sin\sSQLITE_ENABLE_SETLK_TIMEOUT\sbuilds.
+D 2020-05-07T14:39:56.994
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1864,7 +1864,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ac4ee69664278a828e0a64c5be3b96fdb6eb6acc95646a9425c667aea328791c
+P 99749d4fd4930ccf15227f67c732266af9e09dd3cabdc0834fb450ef98196441 49e4dc72f7a4b28e4b49d7b91030bc986aea3ff44dac38cb6e68305800cd1de5
 R 22b4478e3cf3c244a4ab3e6943ce3c12
 U dan
-Z e85493d3ac63dab3b3e9ea5cdd9d6a6e
+Z cc31196848103ce16439278453597677
