@@ -1,5 +1,5 @@
-C Attempt\sto\swork\saround\sa\sfalse-positive\swarning\sin\sthe\sCGo\scompiler.
-D 2020-05-25T01:31:09.337
+C Make\ssure\svariable\sdeclarations\sare\sat\sstart\sof\sscope\seven\swhen\nSQLITE_ENABLE_SNAPSHOT\sis\sused.
+D 2020-05-25T12:02:12.498
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -533,7 +533,7 @@ F src/printf.c c558075d06f0c83b0471499cebd30ef979e600709cde1e2b744abadcf52c7ba2
 F src/random.c 80f5d666f23feb3e6665a6ce04c7197212a88384
 F src/resolve.c c2008519a0654f1e7490e9281ed0397d0f14bb840d81f0b96946248afcbdb25d
 F src/rowset.c ba9515a922af32abe1f7d39406b9d35730ed65efab9443dc5702693b60854c92
-F src/select.c 39a00a8bc89596dfb37c16afcbb1d33de5085b9963564b58aafe1566d08c0881
+F src/select.c e2a59548681bf1c407132863ae87bf2444aca5543867c21d9d09aa07f44aef5d
 F src/shell.c.in cf2d24f54412c06e5fb34af7fabc748651125e1dceac29b740e91f06d23447b6
 F src/sqlite.h.in 74342b41e9d68ff9e56b192009046f8dd0aa2bd76ce1a588f330de614ba61de7
 F src/sqlite3.rc 5121c9e10c3964d5755191c80dd1180c122fc3a8
@@ -617,7 +617,7 @@ F src/vdbetrace.c fa3bf238002f0bbbdfb66cc8afb0cea284ff9f148d6439bc1f6f2b4c3b7143
 F src/vdbevtab.c ee5b4c902fdda2230f9503ac7b84c6d614c91e8f6f4dc1633e2e8dfef8ffb144
 F src/vtab.c 7b452592ed2ee95dedb1f323d557cebede5a6f3b4558b21a5dca527e6ae9b12c
 F src/vxworks.h d2988f4e5a61a4dfe82c6524dd3d6e4f2ce3cdb9
-F src/wal.c 17ea0a319d3ead17ef3b16aa30f10f2626056893effea7e609a20a6661ffec1b
+F src/wal.c 04c3d2a673192016a671eb051a1900945a8c7331f4378636a8bfb70e8e596c84
 F src/wal.h c3aa7825bfa2fe0d85bef2db94655f99870a285778baa36307c0a16da32b226a
 F src/walker.c 3df26a33dc4f54e8771600fb7fdebe1ece0896c2ad68c30ab40b017aa4395049
 F src/where.c 9546c82056e8cdb27291f98cf1adca5d271240b399bb97b32f77fc2bea6146c9
@@ -1867,9 +1867,6 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P 56e5063c326ffbfd3e3cb6f2b05718412aca2cb183274bfe11f5666effdd04b9
-R 8b82e85659228458f67d774145dc6d1d
-T *branch * cgo-warning-workaround
-T *sym-cgo-warning-workaround *
-T -sym-trunk *
+R 01324a5a46d5370d11de237fae1d2b79
 U drh
-Z 9456cb6ba774169f54e2af5894cea4a0
+Z 4612882d193bb7431c4c9f4670ae6370

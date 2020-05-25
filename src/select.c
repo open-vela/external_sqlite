@@ -138,9 +138,9 @@ Select *sqlite3SelectNew(
   u32 selFlags,         /* Flag parameters, such as SF_Distinct */
   Expr *pLimit          /* LIMIT value.  NULL means not used */
 ){
-  Select *pNew, *pAllocated;
+  Select *pNew;
   Select standin;
-  pAllocated = pNew = sqlite3DbMallocRawNN(pParse->db, sizeof(*pNew) );
+  pNew = sqlite3DbMallocRawNN(pParse->db, sizeof(*pNew) );
   if( pNew==0 ){
     assert( pParse->db->mallocFailed );
     pNew = &standin;
@@ -174,11 +174,12 @@ Select *sqlite3SelectNew(
 #endif
   if( pParse->db->mallocFailed ) {
     clearSelect(pParse->db, pNew, pNew!=&standin);
-    pAllocated = 0;
+    pNew = 0;
   }else{
     assert( pNew->pSrc!=0 || pParse->nErr>0 );
   }
-  return pAllocated;
+  assert( pNew!=&standin );
+  return pNew;
 }
 
 
