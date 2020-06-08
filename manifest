@@ -1,5 +1,5 @@
-C Fix\sminor\sOOM\sproblems.
-D 2020-06-07T22:44:23.371
+C When\san\sExpr\sobject\sis\schanged\sand\sthat\sExpr\sis\sreferenced\sby\san\sAggInfo,\sthen\nalso\supdate\sthe\sAggInfo.\s\sAlso,\spersist\sall\sAggInfo\sobjects\suntil\sthe\sParse\nobject\sis\sdestroyed.\s\sThis\sis\sa\snew\sfix\sfor\sticket\s[c8d3b9f0a750a529]\sthat\navoids\sthe\sfollow-on\sproblems\sidentified\sby\stickets\n[0899cf62f597d7e7],\s[1f6f353b684fc708],\s[e5504e987e419fb0],\sand\n[f7d890858f361402].
+D 2020-06-08T11:34:40.204
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1866,7 +1866,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 3c840b4df306e2db1da08673e9ede973b4cb6d2b3f9eeeab5835e39452ee3056
+P c1c8937a30feff6aa4385b0c264fd8e70d54422a0629c2ce38082d85d3334a57 8b23d80271aab38abe42ee8b3ca4b746572ecef26c2a37b094b01560e6be9d45
 R 5a67d9ba1d91119ad620e46132adbad1
+T +closed 8b23d80271aab38abe42ee8b3ca4b746572ecef26c2a37b094b01560e6be9d45
 U drh
-Z 23a540eb57cb09221e33c4eabdced32a
+Z 6f53567ca5c0a8bbc47fb39a7dc9415b
