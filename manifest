@@ -1,5 +1,5 @@
-C Mark\san\salways-true\sconditional\swith\sALWAYS().
-D 2020-06-09T22:11:06.772
+C Ensure\sthat\saggregate\sfunctions\sthat\s(a)\sare\spart\sof\sSELECT\sstatements\swith\s\nno\sFROM\sclause\sand\s(b)\shave\sone\sor\smore\sscalar\ssub-selects\sas\sarguments\sare\nassigned\sto\sthe\scorrect\saggregate\scontext.\nFix\sfor\sticket\s[7c6d876f84e6e7e2]
+D 2020-06-09T23:50:13.182
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1867,7 +1867,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 16a41fa8c4c74bba4e908a9c19e6cf5a927cac140e2070c9abf303158be7257b
+P 232431f32ef77a9dfc4eeb7765dca24af72051fd5460f648d0c5ba318c8a01fc 35a236841764a10cdcda63f34e1a8e7ffa43933bc89cb32f675454327834d7bf
 R c0708f727fdcc95b477a18221a965825
+T +closed 35a236841764a10cdcda63f34e1a8e7ffa43933bc89cb32f675454327834d7bf
 U drh
-Z f79254b70a5e081e8abefb3c222e5de7
+Z ee07ca7203f666ac689e6e704d547cda
