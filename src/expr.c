@@ -4270,9 +4270,7 @@ expr_code_doover:
       int nCol;
       testcase( op==TK_EXISTS );
       testcase( op==TK_SELECT );
-      if( pParse->db->mallocFailed ){
-        return 0;
-      }else if( op==TK_SELECT && (nCol = pExpr->x.pSelect->pEList->nExpr)!=1 ){
+      if( op==TK_SELECT && (nCol = pExpr->x.pSelect->pEList->nExpr)!=1 ){
         sqlite3SubselectError(pParse, nCol, 1);
       }else{
         return sqlite3CodeSubselect(pParse, pExpr);
