@@ -3886,7 +3886,7 @@ int sqlite3BtreeIncrVacuum(Btree *p){
     Pgno nFree = get4byte(&pBt->pPage1->aData[36]);
     Pgno nFin = finalDbSize(pBt, nOrig, nFree);
 
-    if( nOrig<nFin || nFree>=nOrig ){
+    if( nOrig<nFin ){
       rc = SQLITE_CORRUPT_BKPT;
     }else if( nFree>0 ){
       rc = saveAllCursors(pBt, 0, 0);
