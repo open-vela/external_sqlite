@@ -18,8 +18,6 @@ sqlite3 sqlite ""
 
 proc execsql {sql} {
 
-  set sql [string map {{WITHOUT ROWID} {}} $sql]
-
   set lSql [list]
   set frag ""
   while {[string length $sql]>0} {
