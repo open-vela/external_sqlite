@@ -1191,22 +1191,17 @@ static int renameResolveTrigger(Parse *pParse, const char *zDb){
       if( pParse->nErr ) rc = pParse->rc;
     }
     if( rc==SQLITE_OK && pStep->zTarget ){
-      SrcList *pSrc = sqlite3TriggerStepSrc(pParse, pStep);
-      if( pSrc ){
-        int i;
-        for(i=0; i<pSrc->nSrc; i++){
-          struct SrcList_item *p = &pSrc->a[i];
-          p->pTab = sqlite3LocateTableItem(pParse, 0, p);
-          p->iCursor = pParse->nTab++;
-          if( p->pTab==0 ){
-            rc = SQLITE_ERROR;
-          }else{
-            p->pTab->nTabRef++;
-            rc = sqlite3ViewGetColumnNames(pParse, p->pTab);
-          }
-        }
-        sNC.pSrcList = pSrc;
-        if( rc==SQLITE_OK && pStep->pWhere ){
+      Table *pTarget = sqlite3LocateTable(pParse, 0, pStep->zTarget, zDb);
+      if( pTarget==0 ){
+        rc = SQLITE_ERROR;
+      }else if( SQLITE_OK==(rc = sqlite3ViewGetColumnNames(pParse, pTarget)) ){
+        SrcList sSrc;
+        memset(&sSrc, 0, sizeof(sSrc));
+        sSrc.nSrc = 1;
+        sSrc.a[0].zName = pStep->zTarget;
+        sSrc.a[0].pTab = pTarget;
+        sNC.pSrcList = &sSrc;
+        if( pStep->pWhere ){
           rc = sqlite3ResolveExprNames(&sNC, pStep->pWhere);
         }
         if( rc==SQLITE_OK ){
@@ -1216,7 +1211,7 @@ static int renameResolveTrigger(Parse *pParse, const char *zDb){
         if( pStep->pUpsert ){
           Upsert *pUpsert = pStep->pUpsert;
           assert( rc==SQLITE_OK );
-          pUpsert->pUpsertSrc = pSrc;
+          pUpsert->pUpsertSrc = &sSrc;
           sNC.uNC.pUpsert = pUpsert;
           sNC.ncFlags = NC_UUpsert;
           rc = sqlite3ResolveExprListNames(&sNC, pUpsert->pUpsertTarget);
@@ -1233,9 +1228,6 @@ static int renameResolveTrigger(Parse *pParse, const char *zDb){
           sNC.ncFlags = 0;
         }
         sNC.pSrcList = 0;
-        sqlite3SrcListDelete(db, pSrc);
-      }else{
-        rc = SQLITE_NOMEM;
       }
     }
   }
