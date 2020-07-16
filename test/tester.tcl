@@ -129,7 +129,6 @@ if {[info command sqlite_orig]==""} {
         set ::dbhandle [lindex $args 0]
         uplevel #0 $::G(perm:dbconfig)
       }
-      [lindex $args 0] cache size 3
       set res
     } else {
       # This command is not opening a new database connection. Pass the
