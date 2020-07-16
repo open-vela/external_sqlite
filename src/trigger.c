@@ -26,7 +26,6 @@ void sqlite3DeleteTriggerStep(sqlite3 *db, TriggerStep *pTriggerStep){
     sqlite3SelectDelete(db, pTmp->pSelect);
     sqlite3IdListDelete(db, pTmp->pIdList);
     sqlite3UpsertDelete(db, pTmp->pUpsert);
-    sqlite3SrcListDelete(db, pTmp->pFrom);
     sqlite3DbFree(db, pTmp->zSpan);
 
     sqlite3DbFree(db, pTmp);
@@ -487,7 +486,6 @@ TriggerStep *sqlite3TriggerInsertStep(
 TriggerStep *sqlite3TriggerUpdateStep(
   Parse *pParse,          /* Parser */
   Token *pTableName,   /* Name of the table to be updated */
-  SrcList *pFrom,
   ExprList *pEList,    /* The SET clause: list of column and new values */
   Expr *pWhere,        /* The WHERE clause */
   u8 orconf,           /* The conflict algorithm. (OE_Abort, OE_Ignore, etc) */
@@ -502,20 +500,16 @@ TriggerStep *sqlite3TriggerUpdateStep(
     if( IN_RENAME_OBJECT ){
       pTriggerStep->pExprList = pEList;
       pTriggerStep->pWhere = pWhere;
-      pTriggerStep->pFrom = pFrom;
       pEList = 0;
       pWhere = 0;
-      pFrom = 0;
     }else{
       pTriggerStep->pExprList = sqlite3ExprListDup(db, pEList, EXPRDUP_REDUCE);
       pTriggerStep->pWhere = sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
-      pTriggerStep->pFrom = sqlite3SrcListDup(db, pFrom, EXPRDUP_REDUCE);
     }
     pTriggerStep->orconf = orconf;
   }
   sqlite3ExprListDelete(db, pEList);
   sqlite3ExprDelete(db, pWhere);
-  sqlite3SrcListDelete(db, pFrom);
   return pTriggerStep;
 }
 
@@ -742,28 +736,25 @@ Trigger *sqlite3TriggersExist(
 ** trigger is in TEMP in which case it can refer to any other database it
 ** wants.
 */
-SrcList *sqlite3TriggerStepSrc(
+static SrcList *targetSrcList(
   Parse *pParse,       /* The parsing context */
   TriggerStep *pStep   /* The trigger containing the target token */
 ){
   sqlite3 *db = pParse->db;
-  SrcList *pSrc;                  /* SrcList to be returned */
-  char *zName = sqlite3DbStrDup(db, pStep->zTarget);
+  int iDb;             /* Index of the database to use */
+  SrcList *pSrc;       /* SrcList to be returned */
+
   pSrc = sqlite3SrcListAppend(pParse, 0, 0, 0);
-  assert( pSrc==0 || pSrc->nSrc==1 );
-  assert( zName || pSrc==0 );
   if( pSrc ){
-    Schema *pSchema = pStep->pTrig->pSchema;
-    pSrc->a[0].zName = zName;
-    if( pSchema!=db->aDb[1].pSchema ){
-      pSrc->a[0].pSchema = pSchema;
+    assert( pSrc->nSrc>0 );
+    pSrc->a[pSrc->nSrc-1].zName = sqlite3DbStrDup(db, pStep->zTarget);
+    iDb = sqlite3SchemaToIndex(db, pStep->pTrig->pSchema);
+    if( iDb==0 || iDb>=2 ){
+      const char *zDb;
+      assert( iDb<db->nDb );
+      zDb = db->aDb[iDb].zDbSName;
+      pSrc->a[pSrc->nSrc-1].zDatabase =  sqlite3DbStrDup(db, zDb);
     }
-    if( pStep->pFrom ){
-      SrcList *pDup = sqlite3SrcListDup(db, pStep->pFrom, 0);
-      pSrc = sqlite3SrcListAppendList(pParse, pSrc, pDup);
-    }
-  }else{
-    sqlite3DbFree(db, zName);
   }
   return pSrc;
 }
@@ -812,7 +803,7 @@ static int codeTriggerProgram(
     switch( pStep->op ){
       case TK_UPDATE: {
         sqlite3Update(pParse, 
-          sqlite3TriggerStepSrc(pParse, pStep),
+          targetSrcList(pParse, pStep),
           sqlite3ExprListDup(db, pStep->pExprList, 0), 
           sqlite3ExprDup(db, pStep->pWhere, 0), 
           pParse->eOrconf, 0, 0, 0
@@ -821,7 +812,7 @@ static int codeTriggerProgram(
       }
       case TK_INSERT: {
         sqlite3Insert(pParse, 
-          sqlite3TriggerStepSrc(pParse, pStep),
+          targetSrcList(pParse, pStep),
           sqlite3SelectDup(db, pStep->pSelect, 0), 
           sqlite3IdListDup(db, pStep->pIdList), 
           pParse->eOrconf,
@@ -831,7 +822,7 @@ static int codeTriggerProgram(
       }
       case TK_DELETE: {
         sqlite3DeleteFrom(pParse, 
-          sqlite3TriggerStepSrc(pParse, pStep),
+          targetSrcList(pParse, pStep),
           sqlite3ExprDup(db, pStep->pWhere, 0), 0, 0
         );
         break;
