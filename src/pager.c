@@ -3763,7 +3763,7 @@ void *sqlite3PagerTempSpace(Pager *pPager){
 **
 ** Regardless of mxPage, return the current maximum page count.
 */
-Pgno sqlite3PagerMaxPageCount(Pager *pPager, Pgno mxPage){
+int sqlite3PagerMaxPageCount(Pager *pPager, int mxPage){
   if( mxPage>0 ){
     pPager->mxPgno = mxPage;
   }
