@@ -1,6 +1,6 @@
 B d2aac001204621062e6cb3230ce2ac1b4545cb83b3ebb6bfebccee4d51162e97
-C Disable\srootpage\sbounds\schecking\swhen\sthe\sSQLITE_TESTCTRL_EXTRA_SCHEMA_CHECKS\nsetting\sis\soff,\sto\sfacilitate\sreaching\sobscure\serror\sstates\sduring\stesting.
-D 2020-07-22T21:05:23.775
+C Detect\sout-of-bounds\srootpage\svalues\sin\sthe\sschema.
+D 2020-07-22T21:11:10.066
 F src/analyze.c 5cffff3d355858cd22bfc6e20ac7203510d2e1cc935086eb06f4abb2f579f628
 F src/btree.c a4720f51945a86379ecd962a715d6fe9de08651a67d1e6f7b4884612da83ceb5
 F src/btree.h 7af72bbb4863c331c8f6753277ab40ee67d2a2125a63256d5c25489722ec162b
@@ -25,7 +25,8 @@ F test/fts3corrupt4.test b352268a7092e5581b1c3fb29b7f19b424fefbc1edfd3bb9ee4eeb0
 F test/pager1.test 4fba160bf450cea19f6bf1d6483ef467545bac6405570e176c83c2c4b5d6d0d5
 F test/tester.tcl 6417cbb60c4169804e2e1b36ce1a840c9f33d0b0d97956e058f3cc49ed3904f0
 F tool/showdb.c 49e810f5c414c792b5bf38cd5557ca9639713ebfef32aaff32faf7cb7ccce513
-P 75599a9731be19e213a8ae174b038a43381bc6883a6b7f4058c2c1625fdea432
+P 4c5f3c6cacf84a36d0347790d98d82d1f584cd1537a13a2736348405c4d20367 d7dd4fc464c791915f646b1ad228697d1fa16f530fc7d0e9aa702c8df3068c65
 R 9f768fbf5ac24d5cfc1f04bde3af2863
+T +closed d7dd4fc464c791915f646b1ad228697d1fa16f530fc7d0e9aa702c8df3068c65
 U drh
-Z 56035c31aed5e13e385f056a7e4f58ad
+Z 1b7e8560967702c3a371d0209708674f
