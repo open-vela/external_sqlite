@@ -57,7 +57,7 @@ struct VdbeOp {
     Mem *pMem;             /* Used when p4type is P4_MEM */
     VTable *pVtab;         /* Used when p4type is P4_VTAB */
     KeyInfo *pKeyInfo;     /* Used when p4type is P4_KEYINFO */
-    u32 *ai;               /* Used when p4type is P4_INTARRAY */
+    int *ai;               /* Used when p4type is P4_INTARRAY */
     SubProgram *pProgram;  /* Used when p4type is P4_SUBPROGRAM */
     Table *pTab;           /* Used when p4type is P4_TABLE */
 #ifdef SQLITE_ENABLE_CURSOR_HINTS
