@@ -1,5 +1,5 @@
-C Add\san\ssqlite3FaultSim()\sto\smake\san\sOOM\scase\smore\saccessible\sand\sremove\nthe\sALWAYS()\son\sthe\sconditional\sthat\sis\sfalse\swhen\sthe\sOOM\sactually\soccurs.
-D 2020-07-28T17:17:36.521
+C If\sa\swriter\scrashes\sin\sWAL\smode\sand\sleave\sthe\sSHM\sfile\sin\san\sinconsistent\sstate,\nsubsequent\stransactions\sare\snow\sable\sto\srecover\sthe\sSHM\sfile\seven\sif\sthere\sare\nactive\sread\stransactions.
+D 2020-07-28T17:29:13.292
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1878,7 +1878,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 7052cf1d533f6404d0f45cf0b3e8a11c1ee27eccb64680a7fd308c8da7cbd544
+P 73fecc688ab5c459245c9bb89432139a083ef378404b4dae3397a7f4e253f72a 2a251af84ff1f5ca281aa69c5410d6ae7aa5a85ef47149909a297525e1651e9d
 R 69a29ce092f5af857bcf59873f5056ae
+T +closed 2a251af84ff1f5ca281aa69c5410d6ae7aa5a85ef47149909a297525e1651e9d
 U drh
-Z e3e8c0f9a7476656806546b877310ca8
+Z f0509e0a6ac22a3eb269a4a65f129fe3
