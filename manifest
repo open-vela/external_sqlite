@@ -1,5 +1,5 @@
-C Fix\sunreachable\sbranches.
-D 2020-07-30T17:14:55.498
+C Allow\sfor\spage\snumbers\sas\slarge\sas\s4294967294\s(0xfffffffe)\swhich\smeans\ndatabase\sfiles\sas\slarge\sas\s281\sTB.
+D 2020-07-30T17:29:39.908
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1879,7 +1879,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 1d69eee8b085d514f442840346f001b4785f8ec64f5ba66943e9577b26e2e29c
+P ee8a108058c304f9b6b02f84f1da01a0b7a3a21992627bcc1f97d42e8d23da69 905752da9815ff8242b3cb9a77b1ffdc5cfc76143f47c774890f617a542457a5
 R e750109cf0648accd12ecb5530f24e6e
+T +closed 905752da9815ff8242b3cb9a77b1ffdc5cfc76143f47c774890f617a542457a5
 U drh
-Z 4d1ff6cf3b2902d2c83733f58d9b4355
+Z 8808954f14f87ecdfc4e3db2afb14772
