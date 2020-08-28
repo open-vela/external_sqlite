@@ -427,10 +427,11 @@ void sqlite3_str_vappendf(
             v = va_arg(ap,int);
           }
           if( v<0 ){
-            testcase( v==SMALLEST_INT64 );
-            testcase( v==(-1) );
-            longvalue = ~v;
-            longvalue++;
+            if( v==SMALLEST_INT64 ){
+              longvalue = ((u64)1)<<63;
+            }else{
+              longvalue = -v;
+            }
             prefix = '-';
           }else{
             longvalue = v;
