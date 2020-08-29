@@ -1,5 +1,5 @@
-C Fix\shandling\sof\san\sxShmLock(SHARED,\sUNLOCK)\scall\swhen\sthe\scaller\sdoes\snot\shold\sany\slock\son\sthe\sspecified\sslot,\sbut\sanother\sconnection\sin\sthe\ssame\sprocess\sholds\san\sEXCLUSIVE.
-D 2020-08-28T20:01:06.517
+C Improve\sperformance\sof\swal-mode\slocking\son\sunix\sin\scases\swhere\sthere\sare\shundreds\sof\sconnections\sto\sa\ssingle\sdatabase\swithin\sthe\ssame\sprocess.
+D 2020-08-29T15:15:07.650
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -38,7 +38,7 @@ F configure 63af83d31b9fdf304f2dbb1e1638530d4ceff31702d1e19550d1fbf3bdf9471e x
 F configure.ac 40d01e89cb325c28b33f5957e61fede0bd17da2b5e37d9b223a90c8a318e88d4
 F contrib/sqlitecon.tcl 210a913ad63f9f991070821e599d600bd913e0ad
 F doc/F2FS.txt c1d4a0ae9711cfe0e1d8b019d154f1c29e0d3abfe820787ba1e9ed7691160fcd
-F doc/lemon.html 1edc0f916e771212792d4d077aedc05168bf13fd65d64d41b2c13e46ac0063a8
+F doc/lemon.html 5155bf346e59385ac8d14da0c1e895d8dbc5d225a7d93d3f8249cbfb3c938f55
 F doc/pager-invariants.txt 27fed9a70ddad2088750c4a2b493b63853da2710
 F doc/trusted-schema.md 33625008620e879c7bcfbbfa079587612c434fa094d338b08242288d358c3e8a
 F doc/vfs-shm.txt e101f27ea02a8387ce46a05be2b1a902a021d37a
@@ -496,7 +496,7 @@ F src/hash.c 8d7dda241d0ebdafb6ffdeda3149a412d7df75102cecfc1021c98d6219823b19
 F src/hash.h 9d56a9079d523b648774c1784b74b89bd93fac7b365210157482e4319a468f38
 F src/hwtime.h cb1d7e3e1ed94b7aa6fde95ae2c2daccc3df826be26fc9ed7fd90d1750ae6144
 F src/in-operator.md 10cd8f4bcd225a32518407c2fb2484089112fd71
-F src/insert.c 1103270dfc1a94d1ca69f36dc3e021a335459583195e4b9e5a4d6e3c840279ba
+F src/insert.c 7e081d33aab4a9d761c39dccf3c3872c35501565d2ed9db66301918d23bc7901
 F src/legacy.c d7874bc885906868cd51e6c2156698f2754f02d9eee1bae2d687323c3ca8e5aa
 F src/loadext.c 436af4968c6954d304fce9efa12719367bd8f37b19b93b71d6ad607e85adbb47
 F src/main.c d71b989398a4cdb4e7ece0478b763834d7732fb78dd24702d36366743853ac82
@@ -531,12 +531,12 @@ F src/pcache1.c 6596e10baf3d8f84cc1585d226cf1ab26564a5f5caf85a15757a281ff977d51a
 F src/pragma.c 5435b9fe17f7728bd460f52d6d9388e7e45658c6f5549f28fc2d408be9efd2d5
 F src/pragma.h 8dc78ab7e9ec6ce3ded8332810a2066f1ef6267e2e03cd7356ee00276125c6cf
 F src/prepare.c 38ae9c2e3550bfa496886a862a5344c420ded052fd92294f409a07a53f372ffe
-F src/printf.c 9efcd4e984f22bcccb1ded37a1178cac98f6e3a0534e1e0629f64899971f8838
+F src/printf.c 30e92b638fac71dcd85cdea1d12ecfae354c9adee2c71e8e1ae4727cde7c91ed
 F src/random.c 80f5d666f23feb3e6665a6ce04c7197212a88384
 F src/resolve.c 97b91fb25d86881ff20c9ad2ad98412c6c1bb5f7d6c9bb044db250cbc9cfcd4b
 F src/rowset.c ba9515a922af32abe1f7d39406b9d35730ed65efab9443dc5702693b60854c92
 F src/select.c 233e884d7da6601486c7b93aedb97fd29302ae5c03742d0e0eccb4790638bb77
-F src/shell.c.in ee40209106b1f12e1ae803deb427f7ab153bd7ab6fed16ed3ba8b6a6d1fa74d5
+F src/shell.c.in 14385d8c121600bd9092824d5cf7646eb717137648bc342077987c49e16de216
 F src/sqlite.h.in b91e4a5b9b25eb95260be0bf9716d2bdba0da06b72eb439f41592b226f58881d
 F src/sqlite3.rc 5121c9e10c3964d5755191c80dd1180c122fc3a8
 F src/sqlite3ext.h 2d1af80082edffd71c6f96f70ad1ce6a4fb46615ad10291fc77fe0dea9ff0197
@@ -1879,7 +1879,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P e0faddf0dfc3a40b6b94408296dd781dd0264ecc9f2129ce4405438433fb00e0
-R e6bcf42bbee53ae5585d2ea1ed2212fa
+P fc0856dccfab273d50457052fa3c6da768d0eb2504ad04d9540da4e3222fc829 3eb365027b885e1f61965efd53a3643b6ff441ae01e79038a091314516a50dd4
+R e2ba8a5583c80bb95657ae8ebc8ad469
+T +closed 3eb365027b885e1f61965efd53a3643b6ff441ae01e79038a091314516a50dd4
 U dan
-Z 13cfa1981b90fb57cb3c9a6bb39ef17d
+Z 6b5d0c223b51bcc2c5b4ad0cc8397b1a
