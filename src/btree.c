@@ -5750,7 +5750,7 @@ static SQLITE_NOINLINE int btreeNext(BtCursor *pCur){
 
   pPage = pCur->pPage;
   idx = ++pCur->ix;
-  if( !pPage->isInit || sqlite3FaultSim(412) ){
+  if( !pPage->isInit ){
     /* The only known way for this to happen is for there to be a
     ** recursive SQL function that does a DELETE operation as part of a
     ** SELECT which deletes content out from under an active cursor
