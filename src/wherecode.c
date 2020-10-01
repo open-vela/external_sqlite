@@ -608,12 +608,7 @@ static int codeEqualityTerm(
           pIn++;
         }
       }
-      testcase( iEq>0
-                && (pLoop->wsFlags & WHERE_IN_SEEKSCAN)==0
-                && (pLoop->wsFlags & WHERE_VIRTUALTABLE)!=0 );
-      if( iEq>0 
-       && (pLoop->wsFlags & (WHERE_IN_SEEKSCAN|WHERE_VIRTUALTABLE))==0
-      ){
+      if( iEq>0 && (pLoop->wsFlags & WHERE_IN_SEEKSCAN)==0 ){
         sqlite3VdbeAddOp3(v, OP_SeekHit, pLevel->iIdxCur, 0, iEq);
       }
     }else{
