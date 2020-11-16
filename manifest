@@ -1,5 +1,5 @@
-C Modify\sUPDATE\sso\sthat\stwo-pass\supdates\son\sa\srowid\stable\suse\san\sephemeral\ntable\sto\sstore\srowids\srather\sthan\sa\sRowSet.\s\sThis\suses\sless\smemory,\sthough\nit\sis\sslower.
-D 2020-11-14T20:03:34.128
+C Enhance\sthe\sunix\sVFS\sso\sthat\sit\sremoves\sextra\s"/",\s"/./"\sand\s"/../"\sfrom\nthe\sdatabase\sfilename.
+D 2020-11-16T18:45:21.014
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -521,7 +521,7 @@ F src/os.c 80e4cf3e5da06be03ca641661e331ce60eeeeabf0d7354dbb1c0e166d0eedbbe
 F src/os.h 48388821692e87da174ea198bf96b1b2d9d83be5dfc908f673ee21fafbe0d432
 F src/os_common.h b2f4707a603e36811d9b1a13278bffd757857b85
 F src/os_setup.h 0dbaea40a7d36bf311613d31342e0b99e2536586
-F src/os_unix.c ff10667369f3b05aa697278a72d58fe7a43aaa674cb3fa9654d0fe21cda265d0
+F src/os_unix.c cd1ff5c1e49e8d9869a689ac40e626cb91c4f4a0aedb3c03bfaa22e6cfff12e2
 F src/os_win.c 77d39873836f1831a9b0b91894fec45ab0e9ca8e067dc8c549e1d1eca1566fe9
 F src/os_win.h 7b073010f1451abe501be30d12f6bc599824944a
 F src/pager.c 3700a1c55427a3d4168ad1f1b8a8b0cb9ace1d107e4506e30a8f1e66d8a1195e
@@ -604,7 +604,7 @@ F src/threads.c 4ae07fa022a3dc7c5beb373cf744a85d3c5c6c3c
 F src/tokenize.c 4dc01b267593537e2a0d0efe9f80dabe24c5b6f7627bc6971c487fa6a1dacbbf
 F src/treeview.c 4b92992176fb2caefbe06ba5bd06e0e0ebcde3d5564758da672631f17aa51cda
 F src/trigger.c 515e79206d40d1d4149129318582e79a6e9db590a7b74e226fdb5b2a6c7e1b10
-F src/update.c 5d9894b53209e42f57141f1b3d9d86361993049c42b393243abbee0f4bdd49fa
+F src/update.c 1f6167d4acff9f2ae800f7dade84877afbd595c155cdeb7d56f08165d75570c4
 F src/upsert.c 2920de71b20f04fe25eb00b655d086f0ba60ea133c59d7fa3325c49838818e78
 F src/utf.c ee39565f0843775cc2c81135751ddd93eceb91a673ea2c57f61c76f288b041a0
 F src/util.c c0c7977de7ef9b8cb10f6c85f2d0557889a658f817b0455909a49179ba4c8002
@@ -1334,7 +1334,7 @@ F test/server1.test c2b00864514a68a0e6fd518659dc95d0050307a357a08969872bef027d78
 F test/session.test 78fa2365e93d3663a6e933f86e7afc395adf18be
 F test/sessionfuzz-data1.db 1f8d5def831f19b1c74571037f0d53a588ea49a6c4ca2a028fc0c27ef896dbcb
 F test/sessionfuzz.c f74c4e806bab5a093fb9c11b6123d17a6e0cf73fb7a0f49b12f5a75bf0b7b1a8
-F test/shared.test 1826673eb5eb745fb91a3bdac99a7737057742ae38dcb0fe076a384d6727578b
+F test/shared.test f022874d9d299fe913529dc10f52ad5a386e4e7ff709270b9b1111b3a0f3420a
 F test/shared2.test 03eb4a8d372e290107d34b6ce1809919a698e879
 F test/shared3.test ab693f9b6e156b8bfb2a0ad94f29fe69602a5d38
 F test/shared4.test c75f476804e76e26bf6fa0e7b421fb0ca7d07558
@@ -1884,9 +1884,9 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P 772ae83c61c87a9004a614d8ec120ba843286bff1edbd20b987fd592ced84d79
-R 87198020f818dc0e1868a0bdd49e2aaf
-T *branch * lowmem-update-exp
-T *sym-lowmem-update-exp *
+R c29b95339ed23f814015f1859b8e38ba
+T *branch * stronger-nofollow
+T *sym-stronger-nofollow *
 T -sym-trunk *
 U drh
-Z 026ca59c1df12878f7c57e2d3cf7ce51
+Z e93bd4a1cafad979ab0b42cbc7cacd32
