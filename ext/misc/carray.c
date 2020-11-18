@@ -464,7 +464,7 @@ int sqlite3_carray_bind(
     pNew->aData = aData;
     pNew->xDel = xDestroy;
   }
-  return sqlite3_bind_pointer(pStmt, idx, pNew, "carray-bind", carrayBindDel);
+  sqlite3_bind_pointer(pStmt, idx, pNew, "carray-bind", carrayBindDel);
 }
 
 

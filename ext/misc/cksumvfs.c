@@ -157,9 +157,6 @@
 ** value at offset 20 the SQLite database header is exactly 8.  If
 ** the reserved-space value is not 8, this module is a no-op.
 */
-#if defined(SQLITE_AMALGAMATION) && !defined(SQLITE_CKSUMVFS_STATIC)
-# define SQLITE_CKSUMVFS_STATIC
-#endif
 #ifdef SQLITE_CKSUMVFS_STATIC
 # include "sqlite3.h"
 #else
@@ -179,7 +176,7 @@ typedef struct CksmFile CksmFile;
 /*
 ** Useful datatype abbreviations
 */
-#if !defined(SQLITE_AMALGAMATION)
+#if !defined(SQLITE_CORE)
   typedef unsigned char u8;
   typedef unsigned int u32;
 #endif
@@ -398,9 +395,7 @@ static int cksmRead(
   pFile = ORIGFILE(pFile);
   rc = pFile->pMethods->xRead(pFile, zBuf, iAmt, iOfst);
   if( rc==SQLITE_OK ){
-    if( iOfst==0 && iAmt>=100 && (
-          memcmp(zBuf,"SQLite format 3",16)==0 || memcmp(zBuf,"ZV-",3)==0 
-    )){
+    if( iOfst==0 && iAmt>=100 && memcmp(zBuf,"SQLite format 3",16)==0 ){
       u8 *d = (u8*)zBuf;
       char hasCorrectReserveSize = (d[20]==8);
       cksmSetFlags(p, hasCorrectReserveSize);
@@ -439,9 +434,7 @@ static int cksmWrite(
 ){
   CksmFile *p = (CksmFile *)pFile;
   pFile = ORIGFILE(pFile);
-  if( iOfst==0 && iAmt>=100 && (
-        memcmp(zBuf,"SQLite format 3",16)==0 || memcmp(zBuf,"ZV-",3)==0 
-  )){
+  if( iOfst==0 && iAmt>=100 && memcmp(zBuf,"SQLite format 3",16)==0 ){
     u8 *d = (u8*)zBuf;
     char hasCorrectReserveSize = (d[20]==8);
     cksmSetFlags(p, hasCorrectReserveSize);
@@ -611,20 +604,13 @@ static int cksmFetch(
     return SQLITE_OK;
   }
   pFile = ORIGFILE(pFile);
-  if( pFile->pMethods->iVersion>2 && pFile->pMethods->xFetch ){
-    return pFile->pMethods->xFetch(pFile, iOfst, iAmt, pp);
-  }
-  *pp = 0;
-  return SQLITE_OK;
+  return pFile->pMethods->xFetch(pFile, iOfst, iAmt, pp);
 }
 
 /* Release a memory-mapped page */
 static int cksmUnfetch(sqlite3_file *pFile, sqlite3_int64 iOfst, void *pPage){
   pFile = ORIGFILE(pFile);
-  if( pFile->pMethods->iVersion>2 && pFile->pMethods->xUnfetch ){
-    return pFile->pMethods->xUnfetch(pFile, iOfst, pPage);
-  }
-  return SQLITE_OK;
+  return pFile->pMethods->xUnfetch(pFile, iOfst, pPage);
 }
 
 /*
@@ -776,13 +762,6 @@ static int cksmRegisterVfs(void){
 int sqlite3_register_cksumvfs(const char *NotUsed){
   (void)NotUsed;
   return cksmRegisterVfs();
-}
-int sqlite3_unregister_cksumvfs(void){
-  if( sqlite3_vfs_find("cksmvfs") ){
-    sqlite3_vfs_unregister(&cksm_vfs);
-    sqlite3_cancel_auto_extension((void(*)(void))cksmRegisterFunc);
-  }
-  return SQLITE_OK;
 }
 #endif /* defined(SQLITE_CKSUMVFS_STATIC */
 
