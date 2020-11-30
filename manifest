@@ -1,5 +1,5 @@
 C Update\sthe\stea/win/makefile.vc\sfile\sthat\sships\sas\spart\sof\sthe\sautoconf\spackage\sto\suse\s"sqlite3"\sinstead\sof\s"tclsqlite3"\sfor\sthe\sinstalled\sdll\sfilename.
-D 2020-11-30T18:43:40.569
+D 2020-11-30T18:52:08.974
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1886,10 +1886,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P fdba0b129091d607dc0c1aa52f8631a208dbff22476a298bd5428e672593ed18
+P fdba0b129091d607dc0c1aa52f8631a208dbff22476a298bd5428e672593ed18 93d4d9dc05bb86c08a12d56b3ce68ec39b69e57951a936fb3b326812c051c3b4
 R 02db8b9bcb7f3c64353edbc1fa9fbf5b
-T *branch * win-tea-fix
-T *sym-win-tea-fix *
-T -sym-trunk *
+T +closed 93d4d9dc05bb86c08a12d56b3ce68ec39b69e57951a936fb3b326812c051c3b4
 U dan
-Z bee03399d891ae58316901d882ad61c9
+Z d576d3f967d94d06fabf606d730f6867
