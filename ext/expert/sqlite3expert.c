@@ -1721,12 +1721,10 @@ static int idxPopulateStat1(sqlite3expert *p, char **pzErr){
   idxFinalize(&rc, pIndexXInfo);
   idxFinalize(&rc, pWrite);
 
-  if( pCtx ){
-    for(i=0; i<pCtx->nSlot; i++){
-      sqlite3_free(pCtx->aSlot[i].z);
-    }
-    sqlite3_free(pCtx);
+  for(i=0; i<pCtx->nSlot; i++){
+    sqlite3_free(pCtx->aSlot[i].z);
   }
+  sqlite3_free(pCtx);
 
   if( rc==SQLITE_OK ){
     rc = sqlite3_exec(p->dbm, "ANALYZE sqlite_schema", 0, 0, 0);
