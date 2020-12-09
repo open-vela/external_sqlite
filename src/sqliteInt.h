@@ -2304,22 +2304,16 @@ struct FKey {
 ** is returned.  REPLACE means that preexisting database rows that caused
 ** a UNIQUE constraint violation are removed so that the new insert or
 ** update can proceed.  Processing continues and no error is reported.
-** UPDATE applies to insert operations only and means that the insert
-** is omitted and the DO UPDATE clause of an upsert is run instead.
 **
-** RESTRICT, SETNULL, SETDFLT, and CASCADE actions apply only to foreign keys.
+** RESTRICT, SETNULL, and CASCADE actions apply only to foreign keys.
 ** RESTRICT is the same as ABORT for IMMEDIATE foreign keys and the
 ** same as ROLLBACK for DEFERRED keys.  SETNULL means that the foreign
-** key is set to NULL.  SETDFLT means that the foreign key is set
-** to its default value.  CASCADE means that a DELETE or UPDATE of the
+** key is set to NULL.  CASCADE means that a DELETE or UPDATE of the
 ** referenced table row is propagated into the row that holds the
 ** foreign key.
 **
-** The OE_Default value is a place holder that means to use whatever
-** conflict resolution algorthm is required from context.
-**
 ** The following symbolic values are used to record which type
-** of conflict resolution action to take.
+** of action to take.
 */
 #define OE_None     0   /* There is no constraint to check */
 #define OE_Rollback 1   /* Fail the operation and rollback the transaction */
@@ -3073,11 +3067,10 @@ struct NameContext {
 ** WHERE clause is omitted.
 */
 struct Upsert {
-  ExprList *pUpsertTarget;  /* Optional description of conflict target */
+  ExprList *pUpsertTarget;  /* Optional description of conflicting index */
   Expr *pUpsertTargetWhere; /* WHERE clause for partial index targets */
   ExprList *pUpsertSet;     /* The SET clause from an ON CONFLICT UPDATE */
   Expr *pUpsertWhere;       /* WHERE clause for the ON CONFLICT UPDATE */
-  Upsert *pNextUpsert;      /* Next ON CONFLICT clause in the list */
   /* The fields above comprise the parse tree for the upsert clause.
   ** The fields below are used to transfer information from the INSERT
   ** processing down into the UPDATE processing while generating code.
@@ -4831,15 +4824,15 @@ const char *sqlite3JournalModename(int);
 #define sqlite3WithDelete(x,y)
 #endif
 #ifndef SQLITE_OMIT_UPSERT
-  Upsert *sqlite3UpsertNew(sqlite3*,ExprList*,Expr*,ExprList*,Expr*,Upsert*);
+  Upsert *sqlite3UpsertNew(sqlite3*,ExprList*,Expr*,ExprList*,Expr*);
   void sqlite3UpsertDelete(sqlite3*,Upsert*);
   Upsert *sqlite3UpsertDup(sqlite3*,Upsert*);
   int sqlite3UpsertAnalyzeTarget(Parse*,SrcList*,Upsert*);
   void sqlite3UpsertDoUpdate(Parse*,Upsert*,Table*,Index*,int);
 #else
-#define sqlite3UpsertNew(u,v,w,x,y,z) ((Upsert*)0)
+#define sqlite3UpsertNew(v,w,x,y,z) ((Upsert*)0)
 #define sqlite3UpsertDelete(x,y)
-#define sqlite3UpsertDup(x,y)         ((Upsert*)0)
+#define sqlite3UpsertDup(x,y)       ((Upsert*)0)
 #endif
 
 
