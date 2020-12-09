@@ -1144,24 +1144,6 @@ static SQLITE_NOINLINE void btreeParseCellAdjustSizeForOverflow(
 }
 
 /*
-** Given a record with nPayload bytes of payload stored within btree
-** page pPage, return the number of bytes of payload stored locally.
-*/
-static int btreePayloadToLocal(MemPage *pPage, int nPayload){
-  int maxLocal;  /* Maximum amount of payload held locally */
-  maxLocal = pPage->maxLocal;
-  if( nPayload<=maxLocal ){
-    return nPayload;
-  }else{
-    int minLocal;  /* Minimum amount of payload held locally */
-    int surplus;   /* Overflow payload available for local storage */
-    minLocal = pPage->minLocal;
-    surplus = minLocal + (nPayload - minLocal)%(pPage->pBt->usableSize-4);
-    return ( surplus <= maxLocal ) ? surplus : minLocal;
-  }
-}
-
-/*
 ** The following routines are implementations of the MemPage.xParseCell()
 ** method.
 **
@@ -8678,8 +8660,7 @@ int sqlite3BtreeInsert(
   unsigned char *oldCell;
   unsigned char *newCell = 0;
 
-  assert( (flags & (BTREE_SAVEPOSITION|BTREE_APPEND|BTREE_PREFORMAT))==flags );
-  assert( (flags & BTREE_PREFORMAT)==0 || seekResult );
+  assert( (flags & (BTREE_SAVEPOSITION|BTREE_APPEND))==flags );
 
   if( pCur->eState==CURSOR_FAULT ){
     assert( pCur->skipNext!=SQLITE_OK );
@@ -8697,7 +8678,7 @@ int sqlite3BtreeInsert(
   ** keys with no associated data. If the cursor was opened expecting an
   ** intkey table, the caller should be inserting integer keys with a
   ** blob of associated data.  */
-  assert( (pX->pKey==0)==(pCur->pKeyInfo==0) || (flags & BTREE_PREFORMAT) );
+  assert( (pX->pKey==0)==(pCur->pKeyInfo==0) );
 
   /* Save the positions of any other cursors open on this table.
   **
@@ -8807,7 +8788,7 @@ int sqlite3BtreeInsert(
        || CORRUPT_DB );
 
   pPage = pCur->pPage;
-  assert( pPage->intKey || pX->nKey>=0 || (flags & BTREE_PREFORMAT) );
+  assert( pPage->intKey || pX->nKey>=0 );
   assert( pPage->leaf || !pPage->intKey );
   if( pPage->nFree<0 ){
     if( pCur->eState>CURSOR_INVALID ){
@@ -8824,15 +8805,8 @@ int sqlite3BtreeInsert(
   assert( pPage->isInit );
   newCell = pBt->pTmpSpace;
   assert( newCell!=0 );
-  if( flags & BTREE_PREFORMAT ){
-    assert( pX->pData==pBt->pTmpSpace );
-    szNew = pX->nData;
-    if( szNew<4 ) szNew = 4;
-    rc = SQLITE_OK;
-  }else{
-    rc = fillInCell(pPage, newCell, pX, &szNew);
-    if( rc ) goto end_insert;
-  }
+  rc = fillInCell(pPage, newCell, pX, &szNew);
+  if( rc ) goto end_insert;
   assert( szNew==pPage->xCellSize(pPage, newCell) );
   assert( szNew <= MX_CELL_SIZE(pBt) );
   idx = pCur->ix;
@@ -8935,102 +8909,6 @@ int sqlite3BtreeInsert(
   assert( pCur->iPage<0 || pCur->pPage->nOverflow==0 );
 
 end_insert:
-  return rc;
-}
-
-int sqlite3BtreeTransfer(
-  BtCursor *pDest,
-  BtCursor *pSrc,
-  i64 iKey,
-  int seekResult
-){
-  int rc = SQLITE_OK;
-  BtreePayload x;
-  Pager *pSrcPager = pSrc->pBt->pPager;
-  u8 *pCell = pDest->pBt->pTmpSpace;
-  u8 *aOut;                     /* Pointer to next output buffer */
-  int nOut;                     /* Size of output buffer aOut[] */
-  const u8 *aIn;                /* Pointer to next input buffer */
-  int nIn;                      /* Size of input buffer aIn[] */
-  int nRem;                     /* Bytes of data still to copy */
-  u8 *pPgnoOut = 0;
-  Pgno ovflIn = 0;
-  DbPage *pPageIn = 0;
-  MemPage *pPageOut = 0;
-
-  memset(&x, 0, sizeof(x));
-  x.nKey = iKey;
-  getCellInfo(pSrc);
-
-  x.pData = pCell;
-  x.nData += putVarint32(pCell, pSrc->info.nPayload);
-  if( pDest->pKeyInfo==0 ) x.nData += putVarint(&pCell[x.nData], iKey);
-
-  nOut = btreePayloadToLocal(pDest->pPage, pSrc->info.nPayload);
-  aOut = &pCell[x.nData];
-  nIn = pSrc->info.nLocal;
-  aIn = pSrc->info.pPayload;
-  nRem = pSrc->info.nPayload;
-
-  x.nData += nOut;
-  if( nOut<pSrc->info.nPayload ){
-    pPgnoOut = &pCell[x.nData];
-    x.nData += 4;
-  }
-
-  if( nRem>nIn ){
-    ovflIn = get4byte(&pSrc->info.pPayload[nIn]);
-  }
-
-  do {
-    nRem -= nOut;
-    do{
-      assert( nOut>0 );
-      if( nIn>0 ){
-        int nCopy = MIN(nOut, nIn);
-        memcpy(aOut, aIn, nCopy);
-        nOut -= nCopy;
-        nIn -= nCopy;
-        aOut += nCopy;
-        aIn += nCopy;
-      }
-      if( nOut>0 ){
-        sqlite3PagerUnref(pPageIn);
-        pPageIn = 0;
-        rc = sqlite3PagerGet(pSrcPager, ovflIn, &pPageIn, PAGER_GET_READONLY);
-        if( rc==SQLITE_OK ){
-          aIn = (const u8*)sqlite3PagerGetData(pPageIn);
-          ovflIn = get4byte(aIn);
-          aIn += 4;
-          nIn = pSrc->pBt->usableSize - 4;
-        }
-      }
-    }while( rc==SQLITE_OK && nOut>0 );
-
-    if( rc==SQLITE_OK && nRem>0 ){
-      Pgno pgnoNew;
-      MemPage *pNew = 0;
-      rc = allocateBtreePage(pDest->pBt, &pNew, &pgnoNew, 0, 0);
-      put4byte(pPgnoOut, pgnoNew);
-      releasePage(pPageOut);
-      pPageOut = pNew;
-      if( pPageOut ){
-        pPgnoOut = pPageOut->aData;
-        put4byte(pPgnoOut, 0);
-        aOut = &pPgnoOut[4];
-        nOut = MIN(pDest->pBt->usableSize - 4, nRem);
-      }
-    }
-  }while( nRem>0 && rc==SQLITE_OK );
-
-  releasePage(pPageOut);
-  sqlite3PagerUnref(pPageIn);
-
-  if( rc==SQLITE_OK ){
-    int flags = BTREE_APPEND|BTREE_PREFORMAT;
-    rc = sqlite3BtreeInsert(pDest, &x, flags, seekResult);
-  }
-
   return rc;
 }
 
