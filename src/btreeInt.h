@@ -455,7 +455,6 @@ struct BtShared {
   Btree *pWriter;       /* Btree with currently open write transaction */
 #endif
   u8 *pTmpSpace;        /* Temp space sufficient to hold a single cell */
-  int nPreformatSize;   /* Size of last cell written by TransferRow() */
 };
 
 /*
