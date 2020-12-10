@@ -119,18 +119,6 @@
 # define MSVC_VERSION 0
 #endif
 
-/*
-** Some C99 functions in "math.h" are only present for MSVC when its version
-** is associated with Visual Studio 2013 or higher.
-*/
-#ifndef SQLITE_HAVE_C99_MATH_FUNCS
-# if MSVC_VERSION==0 || MSVC_VERSION>=1800
-#  define SQLITE_HAVE_C99_MATH_FUNCS (1)
-# else
-#  define SQLITE_HAVE_C99_MATH_FUNCS (0)
-# endif
-#endif
-
 /* Needed for various definitions... */
 #if defined(__GNUC__) && !defined(_GNU_SOURCE)
 # define _GNU_SOURCE
@@ -3529,6 +3517,7 @@ struct AuthContext {
 #define OPFLAG_SAVEPOSITION  0x02    /* OP_Delete/Insert: save cursor pos */
 #define OPFLAG_AUXDELETE     0x04    /* OP_Delete: index in a DELETE op */
 #define OPFLAG_NOCHNG_MAGIC  0x6d    /* OP_MakeRecord: serialtype 10 is ok */
+#define OPFLAG_PREFORMAT     0x80    /* OP_Insert uses preformatted cell */ 
 
 /*
  * Each trigger present in the database schema is stored as an instance of
