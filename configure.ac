@@ -134,10 +134,8 @@ AC_ARG_VAR([TCLLIBDIR], [Where to install tcl plugin])
 if test "x${TCLLIBDIR+set}" != "xset" ; then
   TCLLIBDIR='$(libdir)'
   for i in `echo 'puts stdout $auto_path' | ${TCLSH_CMD}` ; do
-    if test -d $i ; then
-      TCLLIBDIR=$i
-      break
-    fi
+    TCLLIBDIR=$i
+    break
   done
   TCLLIBDIR="${TCLLIBDIR}/sqlite3"
 fi
