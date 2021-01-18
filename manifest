@@ -1,5 +1,5 @@
-C More\scomments\son\sthe\sEXISTS-to-IN\soptimization\slogic.
-D 2021-01-18T00:11:20.813
+C Enhance\sthe\squery\splanner\sso\sthat\sit\sis\sable\sto\scode\sEXISTS\soperators\sin\nthe\sWHERE\sclause\sas\sif\sthey\swere\sIN\soperators,\swhen\sappropriate.
+D 2021-01-18T12:35:16.581
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -38,7 +38,7 @@ F configure 91893a81f698778dda4d8fb24bfca606ded31ef02bcfbc2ab072d30fb67138d6 x
 F configure.ac 412b65c6107e41c098ad7f5f2e6a3f74ac02ffc6e92b9a6264b9f1060c235a04
 F contrib/sqlitecon.tcl 210a913ad63f9f991070821e599d600bd913e0ad
 F doc/F2FS.txt c1d4a0ae9711cfe0e1d8b019d154f1c29e0d3abfe820787ba1e9ed7691160fcd
-F doc/lemon.html c5d8ba85ac1daef7be8c2d389899480eb62451ff5c09b0c28ff8157bb8770746
+F doc/lemon.html 1bb72ece6271df0d901d233551dd985f2c6ba30d09382cf2d321ed951ab57491
 F doc/pager-invariants.txt 27fed9a70ddad2088750c4a2b493b63853da2710
 F doc/trusted-schema.md 33625008620e879c7bcfbbfa079587612c434fa094d338b08242288d358c3e8a
 F doc/vdbesort-memory.md 4da2639c14cd24a31e0af694b1a8dd37eaf277aff3867e9a8cc14046bc49df56
@@ -1897,7 +1897,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P cac90a9f4ab0a8f3ff77ee1f8549213c2f97169fc3469e55d57caa564079ce2a
-R f533358ab2d88dffa58abcd3bcdbe4bd
+P 2ffb2ffa0ea147edd88632d2bbe29cc1d66d0911ce8e1068c406c81dd5a20242 92cc29099f796f5f244dd80ee431c48d36d01eaece6f150119ead5ecd14eaae1
+R e9622ae2cc2f8f16e772e641d8b24f1c
+T +closed 92cc29099f796f5f244dd80ee431c48d36d01eaece6f150119ead5ecd14eaae1
 U drh
-Z 7271ac9ea9a27eaec7cf5d0a637bfec4
+Z f5a7eb36d087a773f1b509e693ef42b1
