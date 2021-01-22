@@ -1,5 +1,5 @@
-C Merge\sfixes\sfrom\strunk.\s\sOmit\sa\sconditional\sin\s\nsqlite3IsLikeFunction()\sthat\swas\smade\sunreachable\sby\sthis\senhancement.
-D 2021-01-22T20:28:30.345
+C Enhance\sthe\squery\splanner\sto\senable\sit\sto\suse\san\sindex\sfor\sIS\sNOT\sNULL\nconstraints,\seven\sif\sSTAT4\sis\snot\senabled.
+D 2021-01-22T21:23:12.101
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1898,7 +1898,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 6d60cf540b8cc231448175f1e16e1f4f7a0aee26898570a5b8a09c89fae53c02 d5ea75a09d4bf61262cead2604e35d8331b727c504807592d09f5d9e01ce794a
+P d5ea75a09d4bf61262cead2604e35d8331b727c504807592d09f5d9e01ce794a 0b42f9eb5dd710991af3cf4b16464b22db9539361d618e50eaa4d43c811577b4
 R dd365517921749a64a3732b6a8560730
+T +closed 0b42f9eb5dd710991af3cf4b16464b22db9539361d618e50eaa4d43c811577b4
 U drh
-Z 57540375938636005cdf9e0125af5478
+Z 6ed219298d2cd360981b4aacc96226a6
