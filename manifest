@@ -1,5 +1,5 @@
-C Ensure\sa\scursor\sused\sby\sthe\sSeekScan\soperator\sdoes\snot\spoint\sto\sa\svalid\srow\son\sthe\sfirst\siteration\sof\sthe\sloop.\sPossible\sfix\sfor\s[2d6e8400].
-D 2021-01-27T17:15:06.938
+C Fix\san\sissue\swith\sIN\soperator\soptimization\sintroduced\sby\ncheck-in\s[4a43430fd23f8835]\sand\sdescribed\sby\sticket\s[ee51301f316c09e9].
+D 2021-01-27T19:15:06.983
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1898,10 +1898,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 0571c24177d77ac966bcf42cb8ab00fdf541ce84af1468c8ef0b60c48c45a22f
+P 0571c24177d77ac966bcf42cb8ab00fdf541ce84af1468c8ef0b60c48c45a22f 390cf60a286b13f454429f4652a133f95a7891a75c1ec6d16cd39990590fd3fb
 R 4574041b82ab28e377188abbe28af4d5
-T *branch * fix-2d6e8400
-T *sym-fix-2d6e8400 *
-T -sym-trunk *
-U dan
-Z e3d30b9ac2ed7bc4de1a15a8bab650b5
+T +closed 390cf60a286b13f454429f4652a133f95a7891a75c1ec6d16cd39990590fd3fb
+U drh
+Z 071fbdee3969843efb30cf74f43578ee
