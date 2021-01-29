@@ -1243,14 +1243,6 @@ void sqlite3ColumnPropertiesFromName(Table *pTab, Column *pCol){
 }
 #endif
 
-/*
-** Add the RETURNING clause to the parser currently underway.
-*/
-void sqlite3AddReturning(Parse *pParse, ExprList *pList){
-  sqlite3ParserAddCleanup(pParse,
-     (void(*)(sqlite3*,void*))sqlite3ExprListDelete, pList);
-  pParse->pReturning = pList;
-}
 
 /*
 ** Add a new column to the table currently being constructed.
