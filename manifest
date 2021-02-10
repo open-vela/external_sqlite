@@ -1,5 +1,5 @@
-C Remove\san\sassert()\sadded\sby\sthe\sprevious\scommit\sthat\sis\ssometimes\sfalse.
-D 2021-02-10T19:49:35.745
+C Fix\sa\slongstanding\sproblem\scausing\san\sRBU\svacuum\sto\somit\sreleasing\ssome\slocks\sbefore\sfinishing.
+D 2021-02-10T20:00:40.512
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1899,7 +1899,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P cb5bdf82fe0f90922dc34202be9d0aa34d899afff4200456623765da2877ca41
+P bd1e9e0a4c0e07901ef59fe3b7e6f7b9cc66ccfcd5192f576e1620820891de99 fb36ac4dc60ccc6c5fba3f23e13fcab985f27ebef0527c929806cda5f9d3660c
 R f4fc3fdf82de1da25700d7b06c4d78f5
+T +closed fb36ac4dc60ccc6c5fba3f23e13fcab985f27ebef0527c929806cda5f9d3660c
 U dan
-Z a1b0598c229f8a1f298b7df3e89aeb78
+Z e97f611a0a7197a91080c2d49e7edf82
