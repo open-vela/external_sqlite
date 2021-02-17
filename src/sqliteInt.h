@@ -2591,7 +2591,6 @@ struct AggInfo {
   } *aFunc;
   int nFunc;              /* Number of entries in aFunc[] */
   u32 selId;              /* Select to which this AggInfo belongs */
-  AggInfo *pNext;         /* Next in list of them all */
 };
 
 /*
@@ -3427,7 +3426,6 @@ struct Parse {
   Parse *pToplevel;    /* Parse structure for main program (or NULL) */
   Table *pTriggerTab;  /* Table triggers are being coded for */
   Parse *pParentParse; /* Parent parser if this parser is nested */
-  AggInfo *pAggList;   /* List of all AggInfo objects */
   union {
     int addrCrTab;         /* Address of OP_CreateBtree on CREATE TABLE */
     Returning *pReturning; /* The RETURNING clause */
@@ -3711,8 +3709,7 @@ typedef struct {
 /*
 ** Allowed values for mInitFlags
 */
-#define INITFLAG_AlterRename   0x0001  /* Reparse after a RENAME */
-#define INITFLAG_AlterDrop     0x0002  /* Reparse after a DROP COLUMN */
+#define INITFLAG_AlterTable   0x0001  /* This is a reparse after ALTER TABLE */
 
 /*
 ** Structure containing global configuration data for the SQLite library.
@@ -4532,7 +4529,6 @@ void sqlite3MaterializeView(Parse*, Table*, Expr*, ExprList*,Expr*,int);
 #endif
 
 int sqlite3JoinType(Parse*, Token*, Token*, Token*);
-int sqlite3ColumnIndex(Table *pTab, const char *zCol);
 void sqlite3SetJoinExpr(Expr*,int);
 void sqlite3CreateForeignKey(Parse*, ExprList*, Token*, ExprList*, int);
 void sqlite3DeferForeignKey(Parse*, int);
@@ -4717,7 +4713,6 @@ int sqlite3ResolveOrderGroupBy(Parse*, Select*, ExprList*, const char*);
 void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
-void sqlite3AlterDropColumn(Parse*, SrcList*, Token*);
 void *sqlite3RenameTokenMap(Parse*, void*, Token*);
 void sqlite3RenameTokenRemap(Parse*, void *pTo, void *pFrom);
 void sqlite3RenameExprUnmap(Parse*, Expr*);
