@@ -262,7 +262,7 @@ int sqlite3JoinType(Parse *pParse, Token *pA, Token *pB, Token *pC){
 ** Return the index of a column in a table.  Return -1 if the column
 ** is not contained in the table.
 */
-static int columnIndex(Table *pTab, const char *zCol){
+int sqlite3ColumnIndex(Table *pTab, const char *zCol){
   int i;
   u8 h = sqlite3StrIHash(zCol);
   Column *pCol;
@@ -294,7 +294,7 @@ static int tableAndColumnIndex(
 
   assert( (piTab==0)==(piCol==0) );  /* Both or neither are NULL */
   for(i=0; i<N; i++){
-    iCol = columnIndex(pSrc->a[i].pTab, zCol);
+    iCol = sqlite3ColumnIndex(pSrc->a[i].pTab, zCol);
     if( iCol>=0 
      && (bIgnoreHidden==0 || IsHiddenColumn(&pSrc->a[i].pTab->aCol[iCol])==0)
     ){
@@ -504,7 +504,7 @@ static int sqliteProcessJoin(Parse *pParse, Select *p){
         int iRightCol;   /* Column number of matching column on the right */
 
         zName = pList->a[j].zName;
-        iRightCol = columnIndex(pRightTab, zName);
+        iRightCol = sqlite3ColumnIndex(pRightTab, zName);
         if( iRightCol<0
          || !tableAndColumnIndex(pSrc, i+1, zName, &iLeft, &iLeftCol, 0)
         ){
@@ -2086,7 +2086,6 @@ void sqlite3SelectAddColumnTypeAndCollation(
   for(i=0, pCol=pTab->aCol; i<pTab->nCol; i++, pCol++){
     const char *zType;
     int n, m;
-    pTab->tabFlags |= (pCol->colFlags & COLFLAG_NOINSERT);
     p = a[i].pExpr;
     zType = columnType(&sNC, p, 0, 0, 0);
     /* pCol->szEst = ... // Column size est for SELECT tables never used */
@@ -5794,15 +5793,6 @@ static struct SrcList_item *isSelfJoinView(
   return 0;
 }
 
-/*
-** Deallocate a single AggInfo object
-*/
-static void agginfoFree(sqlite3 *db, AggInfo *p){
-  sqlite3DbFree(db, p->aCol);
-  sqlite3DbFree(db, p->aFunc);
-  sqlite3DbFreeNN(db, p);
-}
-
 #ifdef SQLITE_COUNTOFVIEW_OPTIMIZATION
 /*
 ** Attempt to transform a query of the form
@@ -6547,13 +6537,11 @@ int sqlite3Select(
     ** SELECT statement.
     */
     pAggInfo = sqlite3DbMallocZero(db, sizeof(*pAggInfo) );
-    if( pAggInfo ){
-      sqlite3ParserAddCleanup(pParse,
-          (void(*)(sqlite3*,void*))agginfoFree, pAggInfo);
-    }
-    if( db->mallocFailed ){
+    if( pAggInfo==0 ){
       goto select_end;
     }
+    pAggInfo->pNext = pParse->pAggList;
+    pParse->pAggList = pAggInfo;
     pAggInfo->selId = p->selId;
     memset(&sNC, 0, sizeof(sNC));
     sNC.pParse = pParse;

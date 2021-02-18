@@ -82,7 +82,7 @@ static void resolveAlias(
   db = pParse->db;
   pDup = sqlite3ExprDup(db, pOrig, 0);
   if( pDup!=0 ){
-    incrAggFunctionDepth(pDup, nSubquery);
+    if( nSubquery ) incrAggFunctionDepth(pDup, nSubquery);
     if( pExpr->op==TK_COLLATE ){
       pDup = sqlite3ExprAddCollateString(pParse, pDup, pExpr->u.zToken);
     }
@@ -625,12 +625,10 @@ static int lookupName(
 
   /* Clean up and return
   */
-  if( !ExprHasProperty(pExpr,(EP_TokenOnly|EP_Leaf)) ){
-    sqlite3ExprDelete(db, pExpr->pLeft);
-    pExpr->pLeft = 0;
-    sqlite3ExprDelete(db, pExpr->pRight);
-    pExpr->pRight = 0;
-  }
+  sqlite3ExprDelete(db, pExpr->pLeft);
+  pExpr->pLeft = 0;
+  sqlite3ExprDelete(db, pExpr->pRight);
+  pExpr->pRight = 0;
   pExpr->op = eNewExprOp;
   ExprSetProperty(pExpr, EP_Leaf);
 lookupname_end:
