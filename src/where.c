@@ -2956,7 +2956,7 @@ static int whereLoopAddBtree(
 
   if( pSrc->fg.isIndexedBy ){
     /* An INDEXED BY clause specifies a particular index to use */
-    pProbe = pSrc->u2.pIBIndex;
+    pProbe = pSrc->pIBIndex;
   }else if( !HasRowid(pTab) ){
     pProbe = pTab->pIndex;
   }else{
