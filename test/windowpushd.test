@@ -158,10 +158,21 @@ foreach tn {0 1} {
   if {$tn==1} {
     do_eqp_test 2.$tn.3.3 {
       SELECT * FROM v3 WHERE b='E'
-    } {USING INDEX i2 (b=?)}
+    } {SEARCH TABLE t1 USING INDEX i2 (b=?)}
     do_eqp_test 2.$tn.3.4 {
       SELECT * FROM v3 WHERE b>'C'
-    } {USING INDEX i2 (b>?)}
+    } {SEARCH TABLE t1 USING INDEX i2 (b>?)}
+  }
+
+  do_execsql_test 2.$tn.3.5 { SELECT * FROM v3 WHERE d<0.55; } { 
+    C 0.1 1.0 1 C 0.4 1.0 2
+    D 0.2 1.1 1 D 0.5 1.1 2
+    E 0.3 1.2 1
+  }
+  if {$tn==1} {
+    do_eqp_test 2.$tn.3.6 {
+      SELECT * FROM v3 WHERE d<0.55
+    } {SCAN TABLE t1 USING INDEX i2}
   }
 
   do_execsql_test 2.$tn.4.1 {
