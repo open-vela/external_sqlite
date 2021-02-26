@@ -1,5 +1,5 @@
 C Attempt\sto\soptimize\s"x\sIS\sNULL"\sand\s"x\sIS\sNOT\sNULL"\sexpressions\swhen\sx\sis\sa\scolumn\swith\sa\sNOT\sNULL\sconstraint.
-D 2021-02-26T20:14:32.131
+D 2021-02-26T20:39:08.934
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1908,10 +1908,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 310dac342e7b1f9b5a5df6a9d598e85d5fef59bba9307d9230baf77c8f2351a2
+P 310dac342e7b1f9b5a5df6a9d598e85d5fef59bba9307d9230baf77c8f2351a2 5ecd842555009ce27ee6390325ac5c2504143474b12b730933f0833b3dad788a
 R 5da9c9b015e5cf6e85f36d061ac9c73d
-T *branch * ifnull-opt
-T *sym-ifnull-opt *
-T -sym-trunk *
+T +closed 5ecd842555009ce27ee6390325ac5c2504143474b12b730933f0833b3dad788a
 U dan
-Z 9cbe82fbe7c5328bb13207c38d4a331e
+Z 563142b6d6e036f424233eef5aeb4af2
