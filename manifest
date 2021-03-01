@@ -1,5 +1,5 @@
-C Fix\sanother\smsan\scomplain\striggered\sby\sa\scorrupt\sdatabase.
-D 2021-03-01T16:15:41.526
+C Fix\sa\scouple\sof\smemory-sanitizer\scomplaints\sthat\scould\sbe\striggered\sby\sa\scorrupt\sdatabase.
+D 2021-03-01T16:16:59.534
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1908,7 +1908,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 4cb2ea5795b0c0678665fd89bd560209beaab8a756fe00335dbfd07493b0542d
+P a631c38d22bc00d38b0f112a623fb24c0e03a962f661ffe0931dad32fd31ba31 d235d406283191fc7b9e1299be602f1e8be6f36cee8b183cf85c8660519a1c3b
 R 77dd21d5cda99cecce763a4b3e142b99
+T +closed d235d406283191fc7b9e1299be602f1e8be6f36cee8b183cf85c8660519a1c3b
 U dan
-Z 6cd7a73f945651c0ccd62f6c92141ec4
+Z 89e7b2d8688a895f01f8719482567db5
