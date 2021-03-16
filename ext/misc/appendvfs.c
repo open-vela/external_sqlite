@@ -122,10 +122,6 @@ struct ApndFile {
   sqlite3_int64 iPgOne;
   /* File offset of written append-mark, or -1 if unwritten */
   sqlite3_int64 iMark;
-  /* Whenever file is open and .iMark >= 0, and file size changes are
-   * not in progress, .iMark + sizeof(append mark) == base file size,
-   * and append file size == .iMark - .iPgOne .
-   */
 };
 
 /*
@@ -221,7 +217,6 @@ static const sqlite3_io_methods apnd_io_methods = {
 ** Close an apnd-file.
 */
 static int apndClose(sqlite3_file *pFile){
-  assert((ApndFile*)pFile == ORIGFILE(pFile));
   pFile = ORIGFILE(pFile);
   return pFile->pMethods->xClose(pFile);
 }
@@ -255,7 +250,6 @@ static int apndWriteMark(
   int i = APND_MARK_FOS_SZ;
   int rc;
   assert(pFile == ORIGFILE(paf));
-  /* assert(pFile == paf->base); */
   memcpy(a, APND_MARK_PREFIX, APND_MARK_PREFIX_SZ);
   while (--i >= 0) {
     a[APND_MARK_PREFIX_SZ+i] = (unsigned char)(iPgOne & 0xff);
@@ -282,7 +276,6 @@ static int apndWrite(
   sqlite_int64 iWriteEnd = iOfst + iAmt;
   if( iWriteEnd>=APND_MAX_SIZE ) return SQLITE_FULL;
   pFile = ORIGFILE(pFile);
-  /* assert(pFile == paf->base); */
   /* If append-mark is absent or will be overwritten, write it. */
   if( paf->iMark < 0 || paf->iPgOne + iWriteEnd > paf->iMark ){
     int rc = apndWriteMark(paf, pFile, iWriteEnd);
@@ -506,60 +499,55 @@ static int apndIsOrdinaryDatabaseFile(sqlite3_int64 sz, sqlite3_file *pFile){
 ** Open an apnd file handle.
 */
 static int apndOpen(
-  sqlite3_vfs *pApndVfs,
+  sqlite3_vfs *pVfs,
   const char *zName,
   sqlite3_file *pFile,
   int flags,
   int *pOutFlags
 ){
-  ApndFile *pApndFile = (ApndFile*)pFile;
-  sqlite3_file *pBaseFile = ORIGFILE(pFile);
-  sqlite3_vfs *pBaseVfs = ORIGVFS(pApndVfs);
+  ApndFile *p;
+  sqlite3_file *pSubFile;
+  sqlite3_vfs *pSubVfs;
   int rc;
   sqlite3_int64 sz;
+  pSubVfs = ORIGVFS(pVfs);
   if( (flags & SQLITE_OPEN_MAIN_DB)==0 ){
-    /* The appendvfs is not to be used for transient or temporary databases.
-     * Just use the base VFS open to initialize the given file object and
-     * open the underlying file. (Appendvfs is then unused for this file.)
-     */
-    return pBaseVfs->xOpen(pBaseVfs, zName, pFile, flags, pOutFlags);
+    /* The appendvfs is not to be used for transient or temporary databases. */
+    return pSubVfs->xOpen(pSubVfs, zName, pFile, flags, pOutFlags);
   }
-  memset(pApndFile, 0, sizeof(ApndFile));
+  p = (ApndFile*)pFile;
+  memset(p, 0, sizeof(*p));
+  pSubFile = ORIGFILE(pFile);
   pFile->pMethods = &apnd_io_methods;
-  /* Record that append mark has not been written until seen otherwise. */
-  pApndFile->iMark = -1;
-
-  rc = pBaseVfs->xOpen(pBaseVfs, zName, pBaseFile, flags, pOutFlags);
+  rc = pSubVfs->xOpen(pSubVfs, zName, pSubFile, flags, pOutFlags);
   if( rc ) goto apnd_open_done;
-  rc = pBaseFile->pMethods->xFileSize(pBaseFile, &sz);
+  rc = pSubFile->pMethods->xFileSize(pSubFile, &sz);
   if( rc ){
-    pBaseFile->pMethods->xClose(pBaseFile);
+    pSubFile->pMethods->xClose(pSubFile);
     goto apnd_open_done;
   }
-  if( apndIsOrdinaryDatabaseFile(sz, pBaseFile) ){
-    /* The file being opened appears to be just an ordinary DB. Copy
-     * the base dispatch-table so this instance mimics the base VFS. 
-     */
-    memmove(pApndFile, pBaseFile, pBaseVfs->szOsFile);
+  if( apndIsOrdinaryDatabaseFile(sz, pSubFile) ){
+    memmove(pFile, pSubFile, pSubVfs->szOsFile);
     return SQLITE_OK;
   }
-  pApndFile->iPgOne = apndReadMark(sz, pFile);
-  if( pApndFile->iPgOne>=0 ){
+  /* Record that append mark has not been written until seen otherwise. */
+  p->iMark = -1;
+  p->iPgOne = apndReadMark(sz, pFile);
+  if( p->iPgOne>=0 ){
     /* Append mark was found, infer its offset */
-    pApndFile->iMark = sz - APND_MARK_SIZE;
-    /* pApndFile->base = pBaseFile; */
+    p->iMark = sz - p->iPgOne - APND_MARK_SIZE;
     return SQLITE_OK;
   }
   if( (flags & SQLITE_OPEN_CREATE)==0 ){
-    pBaseFile->pMethods->xClose(pBaseFile);
+    pSubFile->pMethods->xClose(pSubFile);
     rc = SQLITE_CANTOPEN;
   }
   /* Round newly added appendvfs location to #define'd page boundary. 
    * Note that nothing has yet been written to the underlying file.
    * The append mark will be written along with first content write.
-   * Until then, paf->iMark value indicates it is not yet written.
+   * Until then, the p->iMark value indicates it is not yet written.
    */
-  pApndFile->iPgOne = APND_START_ROUNDUP(sz, APND_ROUNDUP_BITS);
+  p->iPgOne = APND_START_ROUNDUP(sz, APND_ROUNDUP_BITS);
 apnd_open_done:
   if( rc ) pFile->pMethods = 0;
   return rc;
