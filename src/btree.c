@@ -4131,7 +4131,7 @@ int sqlite3BtreeCommitPhaseTwo(Btree *p, int bCleanup){
       sqlite3BtreeLeave(p);
       return rc;
     }
-    p->iDataVersion--;  /* Compensate for pPager->iDataVersion++; */
+    p->iBDataVersion--;  /* Compensate for pPager->iDataVersion++; */
     pBt->inTransaction = TRANS_READ;
     btreeClearHasContent(pBt);
   }
@@ -9654,7 +9654,7 @@ void sqlite3BtreeGetMeta(Btree *p, int idx, u32 *pMeta){
   assert( idx>=0 && idx<=15 );
 
   if( idx==BTREE_DATA_VERSION ){
-    *pMeta = sqlite3PagerDataVersion(pBt->pPager) + p->iDataVersion;
+    *pMeta = sqlite3PagerDataVersion(pBt->pPager) + p->iBDataVersion;
   }else{
     *pMeta = get4byte(&pBt->pPage1->aData[36 + idx*4]);
   }
@@ -10704,14 +10704,6 @@ int sqlite3BtreeIsReadonly(Btree *p){
 ** Return the size of the header added to each page by this module.
 */
 int sqlite3HeaderSizeBtree(void){ return ROUND8(sizeof(MemPage)); }
-
-/*
-** Return the Btree object used to open the cursor provided as an
-** argument.
-*/
-Btree *sqlite3BtreeGetBtree(BtCursor *pCsr){
-  return pCsr->pBtree;
-}
 
 #if !defined(SQLITE_OMIT_SHARED_CACHE)
 /*
