@@ -2742,7 +2742,6 @@ int sqlite3BtreeClose(Btree *p){
   /* Close all cursors opened via this handle.  */
   assert( sqlite3_mutex_held(p->db->mutex) );
   sqlite3BtreeEnter(p);
-  pBt->openFlags &= ~BTREE_SINGLE;
   pCur = pBt->pCursor;
   while( pCur ){
     BtCursor *pTmp = pCur;
@@ -4132,7 +4131,7 @@ int sqlite3BtreeCommitPhaseTwo(Btree *p, int bCleanup){
       sqlite3BtreeLeave(p);
       return rc;
     }
-    p->iDataVersion--;  /* Compensate for pPager->iDataVersion++; */
+    p->iBDataVersion--;  /* Compensate for pPager->iDataVersion++; */
     pBt->inTransaction = TRANS_READ;
     btreeClearHasContent(pBt);
   }
@@ -4542,14 +4541,7 @@ int sqlite3BtreeCloseCursor(BtCursor *pCur){
     unlockBtreeIfUnused(pBt);
     sqlite3_free(pCur->aOverflow);
     sqlite3_free(pCur->pKey);
-    if( (pBt->openFlags & BTREE_SINGLE) && pBt->pCursor==0 ){
-      /* Since the BtShared is not sharable, there is no need to
-      ** worry about the missing sqlite3BtreeLeave() call here.  */
-      assert( pBtree->sharable==0 );
-      sqlite3BtreeClose(pBtree);
-    }else{
-      sqlite3BtreeLeave(pBtree);
-    }
+    sqlite3BtreeLeave(pBtree);
     pCur->pBtree = 0;
   }
   return SQLITE_OK;
@@ -9662,7 +9654,7 @@ void sqlite3BtreeGetMeta(Btree *p, int idx, u32 *pMeta){
   assert( idx>=0 && idx<=15 );
 
   if( idx==BTREE_DATA_VERSION ){
-    *pMeta = sqlite3PagerDataVersion(pBt->pPager) + p->iDataVersion;
+    *pMeta = sqlite3PagerDataVersion(pBt->pPager) + p->iBDataVersion;
   }else{
     *pMeta = get4byte(&pBt->pPage1->aData[36 + idx*4]);
   }
