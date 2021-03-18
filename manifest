@@ -1,5 +1,5 @@
-C Allow\sinstruction\sOP_OpenDup\sto\sduplicate\scursors\screated\sby\sOP_OpenDup,\sas\swell\sas\sby\sOP_OpenEphemeral.
-D 2021-03-18T13:42:53.871
+C Fix\sa\sproblem\swith\sthe\sfilename\snormalizer\sin\sunix,\sdiscovered\sby\sdbsqlfuzz.
+D 2021-03-18T13:55:25.762
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -483,9 +483,9 @@ F src/auth.c 08954fdc4cc2da5264ba5b75cfd90b67a6fc7d1710a02ccf917c38eadec77853
 F src/backup.c 3014889fa06e20e6adfa0d07b60097eec1f6e5b06671625f476a714d2356513d
 F src/bitvec.c 17ea48eff8ba979f1f5b04cc484c7bb2be632f33
 F src/btmutex.c 8acc2f464ee76324bf13310df5692a262b801808984c1b79defb2503bbafadb6
-F src/btree.c 83cb92554f14752d1446ecebf9d2b38292d36af23d1b422862653192b742e1b7
-F src/btree.h a25ab8dfe82764e0449e12091f4dbedcf2995a70db6a27e224d1f3772a0d640c
-F src/btreeInt.h 7614cae30f95b6aed0c7cac7718276a55cfe2c77058cbfd8bef5b75329757331
+F src/btree.c f5334a1c0960dc0bc74fd0b263e352e8ba632f455b6107594c59cb0492efc4af
+F src/btree.h 096cc53baa58be22b02c896d1cf933c38cfc6d65f9253c1367ece8cc88a24de5
+F src/btreeInt.h 7bc15a24a02662409ebcd6aeaa1065522d14b7fda71573a2b0568b458f514ae0
 F src/build.c fec73c39d756f31d35ccbaa80fe1e040a8d675a318d4d30f41c444167bf3b860
 F src/callback.c d0b853dd413255d2e337b34545e54d888ea02f20da5ad0e63585b389624c4a6c
 F src/complete.c a3634ab1e687055cd002e11b8f43eb75c17da23e
@@ -526,7 +526,7 @@ F src/os.c 2d6e646370b1aa78942c68d7edf124e518963adf4a90bce87f365a5a5495529a
 F src/os.h 48388821692e87da174ea198bf96b1b2d9d83be5dfc908f673ee21fafbe0d432
 F src/os_common.h b2f4707a603e36811d9b1a13278bffd757857b85
 F src/os_setup.h 0dbaea40a7d36bf311613d31342e0b99e2536586
-F src/os_unix.c adbbcea4c63d3b400d405f60a5da4c01433753ec4a12e2dc695beb2bbd671fe9
+F src/os_unix.c 7a9eab7b11f552ab91ead980086b312c7e3b871efdee8c0c072b682bbec6592e
 F src/os_win.c 77d39873836f1831a9b0b91894fec45ab0e9ca8e067dc8c549e1d1eca1566fe9
 F src/os_win.h 7b073010f1451abe501be30d12f6bc599824944a
 F src/pager.c 970691daea03f9f15e34de671bd8675c1e136232b529e21bfd36d4dba6d41753
@@ -614,11 +614,11 @@ F src/upsert.c df8f1727d62b5987c4fd302cd4d7c0c84ae57cd65683c5a34a740dfe24039235
 F src/utf.c ee39565f0843775cc2c81135751ddd93eceb91a673ea2c57f61c76f288b041a0
 F src/util.c 41c7a72da1df47864faa378a1c720b38adb288c6838cb6be5594511b6287a048
 F src/vacuum.c 492422c1463c076473bae1858799c7a0a5fe87a133d1223239447c422cd26286
-F src/vdbe.c ae4ebb8762fc1b30f11a0498eba74c193f052c6724f73ffb63548875200813c6
+F src/vdbe.c 2cdbdb1e2df46fd65a72bcb2da7da2f9978407fa89b4af446e27e8f5c37a329e
 F src/vdbe.h 25dabb25c7e157b84e59260cfb5b466c3ac103ede9f36f4db371332c47601abe
 F src/vdbeInt.h 3df118924e1711f1bbc8e30c46260d0ab6c3b029b32dd411f789111f76434f3c
 F src/vdbeapi.c 4a43e303ec3354c785f453e881521969378e85628278ab74ba4a9df790c0d93b
-F src/vdbeaux.c fb51483c2bcaf45c5de63c26cce8649ef37f1332e8e035867033d21ef5e7fc2c
+F src/vdbeaux.c e982cb548cc29841a5b571eb56f666c3fe93e8c209ed172275fae3ff13b1ad88
 F src/vdbeblob.c 253ed82894924c362a7fa3079551d3554cd1cdace39aa833da77d3bc67e7c1b1
 F src/vdbemem.c 947f2a65910edb4014dc981d33e414a68c51f169f9df8c4c493a0ba840b6eb1f
 F src/vdbesort.c f5b5e473a7cee44e47a94817b042fd7172cf3aa2c0a7928a8339d612bcfdec5a
@@ -1910,10 +1910,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ea80f3002f4120f5dcee76e8779dfdc88e1e096c5cdd06904c20fd26d50c3827
-R 5690d05e7243d41ceb9332de8bdd3707
-T *branch * opendup-fix
-T *sym-opendup-fix *
-T -sym-trunk *
-U dan
-Z fd7ffe22c065e32af24a29a1b9c91b9f
+P a8ce73e2573b271d5d45838802ed1905ce5e18d5fafe0078700e79fab85457e2
+R a7058bc81a7ed447b3fd897044acb8b9
+U drh
+Z 7bd33555fc5d9a28891bb4e7f995247b
