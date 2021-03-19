@@ -4249,7 +4249,7 @@ void sqlite3DropIndex(Parse *pParse, SrcList *pName, int ifExists){
   pIndex = sqlite3FindIndex(db, pName->a[0].zName, pName->a[0].zDatabase);
   if( pIndex==0 ){
     if( !ifExists ){
-      sqlite3ErrorMsg(pParse, "no such index: %S", pName->a);
+      sqlite3ErrorMsg(pParse, "no such index: %S", pName, 0);
     }else{
       sqlite3CodeVerifyNamedSchema(pParse, pName->a[0].zDatabase);
     }
