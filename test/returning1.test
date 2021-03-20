@@ -116,3 +116,4 @@ do_execsql_test 5.5 {
 } {123}
 
 finish_test
+

@@ -1025,10 +1025,10 @@ do_eqp_test 19.1b {
   SELECT * FROM t1;
 } {
   QUERY PLAN
-  |--MATERIALIZE x1
+  |--MATERIALIZE xxxxxx
   |  `--SCAN CONSTANT ROW
-  |--SCAN x1
-  `--SCAN x1
+  |--SCAN SUBQUERY xxxxxx
+  `--SCAN SUBQUERY xxxxxx
 }
 
 # 2017-10-28.

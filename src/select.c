@@ -5782,7 +5782,7 @@ static void explainSimpleCount(
 ){
   if( pParse->explain==2 ){
     int bCover = (pIdx!=0 && (HasRowid(pTab) || !IsPrimaryKeyIndex(pIdx)));
-    sqlite3VdbeExplain(pParse, 0, "SCAN %s%s%s",
+    sqlite3VdbeExplain(pParse, 0, "SCAN TABLE %s%s%s",
         pTab->zName,
         bCover ? " USING COVERING INDEX " : "",
         bCover ? pIdx->zName : ""
@@ -6355,10 +6355,10 @@ int sqlite3Select(
      
       pItem->regReturn = ++pParse->nMem;
       sqlite3VdbeAddOp3(v, OP_InitCoroutine, pItem->regReturn, 0, addrTop);
-      VdbeComment((v, "%!S", pItem));
+      VdbeComment((v, "%s", pItem->pTab->zName));
       pItem->addrFillSub = addrTop;
       sqlite3SelectDestInit(&dest, SRT_Coroutine, pItem->regReturn);
-      ExplainQueryPlan((pParse, 1, "CO-ROUTINE %!S", pItem));
+      ExplainQueryPlan((pParse, 1, "CO-ROUTINE %u", pSub->selId));
       sqlite3Select(pParse, pSub, &dest);
       pItem->pTab->nRowLogEst = pSub->nSelectRow;
       pItem->fg.viaCoroutine = 1;
@@ -6402,17 +6402,17 @@ int sqlite3Select(
         ** a trigger, then we only need to compute the value of the subquery
         ** once. */
         onceAddr = sqlite3VdbeAddOp0(v, OP_Once); VdbeCoverage(v);
-        VdbeComment((v, "materialize %!S", pItem));
+        VdbeComment((v, "materialize \"%s\"", pItem->pTab->zName));
       }else{
-        VdbeNoopComment((v, "materialize %!S", pItem));
+        VdbeNoopComment((v, "materialize \"%s\"", pItem->pTab->zName));
       }
       sqlite3SelectDestInit(&dest, SRT_EphemTab, pItem->iCursor);
-      ExplainQueryPlan((pParse, 1, "MATERIALIZE %!S", pItem));
+      ExplainQueryPlan((pParse, 1, "MATERIALIZE %u", pSub->selId));
       sqlite3Select(pParse, pSub, &dest);
       pItem->pTab->nRowLogEst = pSub->nSelectRow;
       if( onceAddr ) sqlite3VdbeJumpHere(v, onceAddr);
       retAddr = sqlite3VdbeAddOp1(v, OP_Return, pItem->regReturn);
-      VdbeComment((v, "end %!S", pItem));
+      VdbeComment((v, "end %s", pItem->pTab->zName));
       sqlite3VdbeChangeP1(v, topAddr, retAddr);
       sqlite3ClearTempRegCache(pParse);
       if( pItem->fg.isCte && pItem->fg.isCorrelated==0 ){

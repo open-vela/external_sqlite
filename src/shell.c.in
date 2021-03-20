@@ -3063,6 +3063,7 @@ static void exec_prepared_stmt_columnar(
   if( rc!=SQLITE_ROW ) return;
   nColumn = sqlite3_column_count(pStmt);
   nAlloc = nColumn*4;
+  if( nAlloc<=0 ) nAlloc = 1;
   azData = sqlite3_malloc64( nAlloc*sizeof(char*) );
   if( azData==0 ) shell_out_of_memory();
   for(i=0; i<nColumn; i++){
@@ -3102,6 +3103,7 @@ static void exec_prepared_stmt_columnar(
     if( n>p->actualWidth[j] ) p->actualWidth[j] = n;
   }
   if( seenInterrupt ) goto columnar_end;
+  if( nColumn==0 ) goto columnar_end;
   switch( p->cMode ){
     case MODE_Column: {
       colSep = "  ";
@@ -5777,7 +5779,7 @@ static int lintFkeyIndexes(
     "  || fkey_collate_clause("
     "       f.[table], COALESCE(f.[to], p.[name]), s.name, f.[from]),' AND ')"
     ", "
-    "     'SEARCH ' || s.name || ' USING COVERING INDEX*('"
+    "     'SEARCH TABLE ' || s.name || ' USING COVERING INDEX*('"
     "  || group_concat('*=?', ' AND ') || ')'"
     ", "
     "     s.name  || '(' || group_concat(f.[from],  ', ') || ')'"
@@ -5797,7 +5799,7 @@ static int lintFkeyIndexes(
     "GROUP BY s.name, f.id "
     "ORDER BY (CASE WHEN ? THEN f.[table] ELSE s.name END)"
   ;
-  const char *zGlobIPK = "SEARCH * USING INTEGER PRIMARY KEY (rowid=?)";
+  const char *zGlobIPK = "SEARCH TABLE * USING INTEGER PRIMARY KEY (rowid=?)";
 
   for(i=2; i<nArg; i++){
     int n = strlen30(azArg[i]);
