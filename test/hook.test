@@ -1015,3 +1015,4 @@ do_catchsql_test 12.6 {
 } {1 {UNIQUE constraint failed: t4.a}}
 
 finish_test
+

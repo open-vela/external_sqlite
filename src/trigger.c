@@ -209,12 +209,12 @@ void sqlite3BeginTrigger(
   */
   if( pTab->pSelect && tr_tm!=TK_INSTEAD ){
     sqlite3ErrorMsg(pParse, "cannot create %s trigger on view: %S", 
-        (tr_tm == TK_BEFORE)?"BEFORE":"AFTER", pTableName->a);
+        (tr_tm == TK_BEFORE)?"BEFORE":"AFTER", pTableName, 0);
     goto trigger_orphan_error;
   }
   if( !pTab->pSelect && tr_tm==TK_INSTEAD ){
     sqlite3ErrorMsg(pParse, "cannot create INSTEAD OF"
-        " trigger on table: %S", pTableName->a);
+        " trigger on table: %S", pTableName, 0);
     goto trigger_orphan_error;
   }
 
@@ -611,7 +611,7 @@ void sqlite3DropTrigger(Parse *pParse, SrcList *pName, int noErr){
   }
   if( !pTrigger ){
     if( !noErr ){
-      sqlite3ErrorMsg(pParse, "no such trigger: %S", pName->a);
+      sqlite3ErrorMsg(pParse, "no such trigger: %S", pName, 0);
     }else{
       sqlite3CodeVerifyNamedSchema(pParse, zDb);
     }

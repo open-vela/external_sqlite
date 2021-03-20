@@ -64,3 +64,5 @@ do_execsql_test 2.1 {
 
 set sqlite_fts3_enable_parentheses $saved_sqlite_fts3_enable_parentheses
 finish_test
+
+
