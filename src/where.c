@@ -576,7 +576,6 @@ static int isDistinctRedundant(
   */
   for(pIdx=pTab->pIndex; pIdx; pIdx=pIdx->pNext){
     if( !IsUniqueIndex(pIdx) ) continue;
-    if( pIdx->pPartIdxWhere ) continue;
     for(i=0; i<pIdx->nKeyCol; i++){
       if( 0==sqlite3WhereFindTerm(pWC, iBase, i, ~(Bitmask)0, WO_EQ, pIdx) ){
         if( findIndexCol(pParse, pDistinct, iBase, pIdx, i)<0 ) break;
@@ -631,14 +630,14 @@ static void translateColumnToCopy(
       pOp->p2 = pOp->p3;
       pOp->p3 = 0;
     }else if( pOp->opcode==OP_Rowid ){
-      if( iAutoidxCur ){
-        pOp->opcode = OP_Sequence;
-        pOp->p1 = iAutoidxCur;
-      }else{
+      pOp->opcode = OP_Sequence;
+      pOp->p1 = iAutoidxCur;
+#ifdef SQLITE_ALLOW_ROWID_IN_VIEW
+      if( iAutoidxCur==0 ){
         pOp->opcode = OP_Null;
-        pOp->p1 = 0;
         pOp->p3 = 0;
       }
+#endif
     }
   }
 }
@@ -803,7 +802,7 @@ static void constructAutomaticIndex(
       }
     }
   }
-  assert( nKeyCol>0 || pParse->db->mallocFailed );
+  assert( nKeyCol>0 );
   pLoop->u.btree.nEq = pLoop->nLTerm = nKeyCol;
   pLoop->wsFlags = WHERE_COLUMN_EQ | WHERE_IDX_ONLY | WHERE_INDEXED
                      | WHERE_AUTO_INDEX;
