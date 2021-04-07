@@ -2743,7 +2743,7 @@ static int multiSelect(
     switch( p->op ){
       case TK_ALL: {
         int addr = 0;
-        int nLimit;
+        int nLimit = 0;  /* Initialize to suppress harmless compiler warning */
         assert( !pPrior->pLimit );
         pPrior->iLimit = p->iLimit;
         pPrior->iOffset = p->iOffset;
