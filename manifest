@@ -1,5 +1,5 @@
-C Do\snot\sinvoke\ssqlite3ExprAffinity()\sif\sthere\sis\sa\spossibility\sthat\sthe\sExpr\nis\sincomplete\sdue\sto\sa\sprior\sOOM.\ndbsqlfuzz\sb8a824706914488bd236da51118eb9174ceb870f
-D 2021-04-16T01:03:16.932
+C Dial\sback\sassumptions\son\scompile\soption\sdefaults\sto\sreflect\sactual\sconditionals.
+D 2021-04-16T10:25:54.528
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -489,7 +489,7 @@ F src/btreeInt.h 7bc15a24a02662409ebcd6aeaa1065522d14b7fda71573a2b0568b458f514ae
 F src/build.c 9f15ff3e074d3989cc1396f575118eb4c28fb677d33f54393ec263799c94b5bd
 F src/callback.c d0b853dd413255d2e337b34545e54d888ea02f20da5ad0e63585b389624c4a6c
 F src/complete.c a3634ab1e687055cd002e11b8f43eb75c17da23e
-F src/ctime.c 2a322b9a3d75771fb4d99e0702851f4f68dda982507a0f798eefb0712969a410
+F src/ctime.c fbc6243075128ddf187ec469a6d178ebd58bb6eae8e3ba191446fa18cffb17c3
 F src/date.c e0632f335952b32401482d099321bbf12716b29d6e72836b53ae49683ebae4bf
 F src/dbpage.c 8a01e865bf8bc6d7b1844b4314443a6436c07c3efe1d488ed89e81719047833a
 F src/dbstat.c 3aa79fc3aed7ce906e4ea6c10e85d657299e304f6049861fe300053ac57de36c
@@ -631,7 +631,7 @@ F src/wal.h c3aa7825bfa2fe0d85bef2db94655f99870a285778baa36307c0a16da32b226a
 F src/walker.c d42d6c80ea363ef689a462e65eefcfe87deab924c50de5baa37ecb6af7d7ddaa
 F src/where.c a96a99ec5acb186f789d5597249a2c1eb1a8602173fe2fee745be5510f590e27
 F src/whereInt.h 446e5e8018f83358ef917cf32d8e6a86dc8430113d0b17e720f1839d3faa44c4
-F src/wherecode.c 0e42f4ad53962e90349462520891734ed3217c7852f41c69ffac7a9eeaf31451
+F src/wherecode.c 8bdc239eae3d39f9f6ace4299eeb86e1e0c56eed88b60f9c473dc85ae79f4e89
 F src/whereexpr.c d8cafcf6781cf871082f04d7540862cf0fe30cb381dd1b2145a380376364fe8e
 F src/window.c ae9fbd0cbaa39e1b384c13289ed769f9981383bde7b2f262c70ad6c42e5ab226
 F test/8_3_names.test ebbb5cd36741350040fd28b432ceadf495be25b2
@@ -1839,7 +1839,7 @@ F tool/logest.c 11346aa019e2e77a00902aa7d0cabd27bd2e8cca
 F tool/max-limits.c cbb635fbb37ae4d05f240bfb5b5270bb63c54439
 F tool/mkautoconfamal.sh f62353eb6c06ab264da027fd4507d09914433dbdcab9cb011cdc18016f1ab3b8
 F tool/mkccode.tcl 86463e68ce9c15d3041610fedd285ce32a5cf7a58fc88b3202b8b76837650dbe x
-F tool/mkctimec.tcl dd183b73ae1c28249669741c250525f0407e579a70482371668fd5f130d9feb3
+F tool/mkctimec.tcl 6469850ad5e9f9173046da7569a0a6f40c5b21316406b70aaa029b357bc8d220
 F tool/mkkeywordhash.c 08b6e4d7a482a7f37a9a0032e7ba968e26624a027b6b2e9ba589be6f5e3d8c2c
 F tool/mkmsvcmin.tcl 6ecab9fe22c2c8de4d82d4c46797bda3d2deac8e763885f5a38d0c44a895ab33
 F tool/mkopcodec.tcl d1b6362bd3aa80d5520d4d6f3765badf01f6c43c
@@ -1912,7 +1912,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 2363a14ca723c0343fbe350f6c19787a7a47c2289fd9af136c97a451b53b5226
-R 1b807f7b5fbd51b7f8566b4336ed35b6
-U drh
-Z bcb5423f89b5818431a20238dcd969bb
+P 6eb83f83d280f82bd225972f52c52922257303740a968457ff0be08d43993d59
+R 81b6477b1bd41ea5f96a630ccfc9d907
+U larrybr
+Z cb4d1f0cfcf57b3bffb8efd3b5ca63ec
