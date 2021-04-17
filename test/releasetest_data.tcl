@@ -56,7 +56,6 @@ array set ::Configs [strip_comments {
   "Sanitize" {
     CC=clang -fsanitize=address,undefined
     -DSQLITE_ENABLE_STAT4
-    -DCONFIG_SLOWDOWN_FACTOR=5.0
     --enable-debug
     --enable-all
   }
@@ -259,7 +258,6 @@ array set ::Configs [strip_comments {
     -DSQLITE_ENABLE_FTS4
     -DSQLITE_ENABLE_RTREE
     -DSQLITE_ENABLE_HIDDEN_COLUMNS
-    -DCONFIG_SLOWDOWN_FACTOR=8.0
     --enable-json1
   }
 
