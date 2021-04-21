@@ -5189,8 +5189,7 @@ void sqlite3VdbePreUpdateHook(
   const char *zDb,                /* Database name */
   Table *pTab,                    /* Modified table */
   i64 iKey1,                      /* Initial key value */
-  int iReg,                       /* Register for new.* record */
-  int iBlobWrite
+  int iReg                        /* Register for new.* record */
 ){
   sqlite3 *db = v->db;
   i64 iKey2;
@@ -5226,7 +5225,6 @@ void sqlite3VdbePreUpdateHook(
   preupdate.iKey1 = iKey1;
   preupdate.iKey2 = iKey2;
   preupdate.pTab = pTab;
-  preupdate.iBlobWrite = iBlobWrite;
 
   db->pPreUpdate = &preupdate;
   db->xPreUpdateCallback(db->pPreUpdateArg, db, op, zDb, zTbl, iKey1, iKey2);
