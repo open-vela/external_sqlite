@@ -1,5 +1,5 @@
-C Fix\sa\sformatting\serror\son\sthe\scomment.
-D 2021-05-19T19:27:42.183
+C Add\sa\scomment\swith\suseful\sinformation\sabout\sSHM\slocking.\s\sNo\schanges\sto\ndeliverable\scode.
+D 2021-05-19T19:28:48.372
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1913,7 +1913,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P b480aacb3430a789d98ffd81a1886bbbc3cda5b0e736ec9a3e2b463db2a3b3ad
+P 3daab94977af5e8a95690acc555540311403d890a3261a9757c633fcaaf428a9 6f2fb60e499fc758bea6ffec030fef8ab5f97d08d31450f0b3ffafc20e652891
 R 51a5c10eeb74e980a28bc317ddd05223
 U drh
-Z 312f630c2639a44670ce7c2d40505de2
+Z b7fe08aae0b2fc89ef00be04a5d5c5af
