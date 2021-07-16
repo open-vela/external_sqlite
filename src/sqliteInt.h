@@ -1745,6 +1745,7 @@ struct sqlite3 {
 #define SQLITE_MinMaxOpt      0x00010000 /* The min/max optimization */
 #define SQLITE_SeekScan       0x00020000 /* The OP_SeekScan optimization */
 #define SQLITE_OmitOrderBy    0x00040000 /* Omit pointless ORDER BY */
+   /* TH3 expects this value  ^^^^^^^^^^ to be 0x40000. Coordinate any change */
 #define SQLITE_AllOpts        0xffffffff /* All optimizations */
 
 /*
