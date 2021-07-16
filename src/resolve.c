@@ -1087,12 +1087,9 @@ static int resolveExprStep(Walker *pWalker, Expr *pExpr){
           assert( pDef!=0 || IN_RENAME_OBJECT );
           if( pNC2 && pDef ){
             assert( SQLITE_FUNC_MINMAX==NC_MinMaxAgg );
-            assert( SQLITE_FUNC_ANYORDER==NC_OrderAgg );
             testcase( (pDef->funcFlags & SQLITE_FUNC_MINMAX)!=0 );
-            testcase( (pDef->funcFlags & SQLITE_FUNC_ANYORDER)!=0 );
-            pNC2->ncFlags |= NC_HasAgg 
-              | ((pDef->funcFlags^SQLITE_FUNC_ANYORDER)
-                  & (SQLITE_FUNC_MINMAX|SQLITE_FUNC_ANYORDER));
+            pNC2->ncFlags |= NC_HasAgg | (pDef->funcFlags & SQLITE_FUNC_MINMAX);
+
           }
         }
         pNC->ncFlags |= savedAllowFlags;
@@ -1679,8 +1676,7 @@ static int resolveSelectStep(Walker *pWalker, Select *p){
     pGroupBy = p->pGroupBy;
     if( pGroupBy || (sNC.ncFlags & NC_HasAgg)!=0 ){
       assert( NC_MinMaxAgg==SF_MinMaxAgg );
-      assert( NC_OrderAgg==SF_OrderByReqd );
-      p->selFlags |= SF_Aggregate | (sNC.ncFlags&(NC_MinMaxAgg|NC_OrderAgg));
+      p->selFlags |= SF_Aggregate | (sNC.ncFlags&NC_MinMaxAgg);
     }else{
       sNC.ncFlags &= ~NC_AllowAgg;
     }
@@ -1863,8 +1859,8 @@ int sqlite3ResolveExprNames(
   Walker w;
 
   if( pExpr==0 ) return SQLITE_OK;
-  savedHasAgg = pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
-  pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
+  savedHasAgg = pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
+  pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
   w.pParse = pNC->pParse;
   w.xExprCallback = resolveExprStep;
   w.xSelectCallback = (pNC->ncFlags & NC_NoSelect) ? 0 : resolveSelectStep;
@@ -1907,8 +1903,8 @@ int sqlite3ResolveExprListNames(
   w.xSelectCallback = resolveSelectStep;
   w.xSelectCallback2 = 0;
   w.u.pNC = pNC;
-  savedHasAgg = pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
-  pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
+  savedHasAgg = pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
+  pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
   for(i=0; i<pList->nExpr; i++){
     Expr *pExpr = pList->a[i].pExpr;
     if( pExpr==0 ) continue;
@@ -1926,11 +1922,10 @@ int sqlite3ResolveExprListNames(
     assert( EP_Win==NC_HasWin );
     testcase( pNC->ncFlags & NC_HasAgg );
     testcase( pNC->ncFlags & NC_HasWin );
-    if( pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg) ){
+    if( pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin) ){
       ExprSetProperty(pExpr, pNC->ncFlags & (NC_HasAgg|NC_HasWin) );
-      savedHasAgg |= pNC->ncFlags &
-                          (NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
-      pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin|NC_OrderAgg);
+      savedHasAgg |= pNC->ncFlags & (NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
+      pNC->ncFlags &= ~(NC_HasAgg|NC_MinMaxAgg|NC_HasWin);
     }
     if( w.pParse->nErr>0 ) return WRC_Abort;
   }
