@@ -1,5 +1,5 @@
-C Complete\swarning-free\sbuild\son\sold\sPPC\siBook.
-D 2021-07-29T17:23:23.932
+C Improvements\sto\sasserts\sto\senforce\smagic\snumbers\sin\sthe\swal-index\sformat.\nAlso\simprove\sautomatic\sconfigure\sand\smake\sbuilds\son\slegacy\sPPC\siBooks.
+D 2021-07-29T17:31:40.386
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1920,7 +1920,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ad24334bc06dc9ae52825a1873a1eab6c258d77fcc00dec55884ddddecd9932e
+P 4d1dbfa35c7dc0f09321b2e274a00e506f4ca65322454652d5891d815a6966d3 ef2a0850394b1c6c1fc84b26694a3712ae1e50d52bb78fea2ec40148a7d833de
 R 0cc81a8b442d38496113a96ee86b0452
+T +closed ef2a0850394b1c6c1fc84b26694a3712ae1e50d52bb78fea2ec40148a7d833de
 U drh
-Z fb51ecf5d08ca6d7c7f076fcbd12aa41
+Z 98161da94e50e1df5812fdb04f331f1a
