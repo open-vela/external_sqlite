@@ -981,14 +981,11 @@ void Parse(
         yy_destructor(yypParser, (YYCODETYPE)yymajor, &yyminorunion);
         yymajor = YYNOCODE;
       }else{
-        while( yypParser->yytos > yypParser->yystack ){
-          yyact = yy_find_reduce_action(yypParser->yytos->stateno,
-                                        YYERRORSYMBOL);
-          if( yyact<=YY_MAX_SHIFTREDUCE ) break;
-          if( yyact>=YY_MIN_REDUCE && yyRuleInfoNRhs[yyact-YY_MIN_REDUCE] ){
-            yyact -= YY_MIN_REDUCE - YY_MIN_SHIFTREDUCE;
-            break;
-          }
+        while( yypParser->yytos > yypParser->yystack
+            && (yyact = yy_find_reduce_action(
+                        yypParser->yytos->stateno,
+                        YYERRORSYMBOL)) > YY_MAX_SHIFTREDUCE
+        ){
           yy_pop_parser_stack(yypParser);
         }
         if( yypParser->yytos <= yypParser->yystack || yymajor==0 ){
