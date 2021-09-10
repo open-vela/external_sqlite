@@ -2556,7 +2556,7 @@ void sqlite3EndTable(
   Parse *pParse,          /* Parse context */
   Token *pCons,           /* The ',' token after the last column defn. */
   Token *pEnd,            /* The ')' before options in the CREATE TABLE */
-  u32 tabOpts,            /* Extra table options. Usually 0. */
+  u8 tabOpts,             /* Extra table options. Usually 0. */
   Select *pSelect         /* Select from a "CREATE ... AS SELECT" */
 ){
   Table *p;                 /* The new table */
@@ -2590,44 +2590,6 @@ void sqlite3EndTable(
     }
     p->tnum = db->init.newTnum;
     if( p->tnum==1 ) p->tabFlags |= TF_Readonly;
-  }
-
-  /* Special processing for tables that include the STRICT keyword:
-  **
-  **   *  Do not allow custom column datatypes.  Every column must have
-  **      a datatype that is one of INT, INTEGER, REAL, TEXT, or BLOB.
-  **
-  **   *  If a PRIMARY KEY is defined, other than the INTEGER PRIMARY KEY,
-  **      then all columns of the PRIMARY KEY must have a NOT NULL
-  **      constraint.
-  */
-  if( tabOpts & TF_Strict ){
-    int ii;
-    p->tabFlags |= TF_Strict;
-    for(ii=0; ii<p->nCol; ii++){
-      Column *pCol = &p->aCol[ii];
-      if( pCol->eCType==COLTYPE_CUSTOM ){
-        if( pCol->colFlags & COLFLAG_HASTYPE ){
-          sqlite3ErrorMsg(pParse,
-            "unknown datatype for %s.%s: \"%s\"",
-            p->zName, pCol->zCnName, sqlite3ColumnType(pCol, "")
-          );
-        }else{
-          sqlite3ErrorMsg(pParse, "missing datatype for %s.%s",
-                          p->zName, pCol->zCnName);
-        }
-        return;
-      }else if( pCol->eCType==COLTYPE_ANY ){
-        pCol->affinity = SQLITE_AFF_BLOB;
-      }
-      if( (pCol->colFlags & COLFLAG_PRIMKEY)!=0
-       && p->iPKey!=ii
-       && pCol->notNull == OE_None
-      ){
-        pCol->notNull = OE_Abort;
-        p->tabFlags |= TF_HasNotNull;
-      }
-    }    
   }
 
   assert( (p->tabFlags & TF_HasPrimaryKey)==0
