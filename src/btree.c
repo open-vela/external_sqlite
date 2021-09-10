@@ -3142,7 +3142,7 @@ static int lockBtree(BtShared *pBt){
       goto page1_init_failed;
     }
 
-    /* If the read version is set to 2, this database should be accessed
+    /* If the write version is set to 2, this database should be accessed
     ** in WAL mode. If the log is not already open, open it now. Then 
     ** return SQLITE_OK and return without populating BtShared.pPage1.
     ** The caller detects this and calls this function again. This is
@@ -7096,7 +7096,7 @@ static int rebuildPage(
 
   assert( i<iEnd );
   j = get2byte(&aData[hdr+5]);
-  if( j>(u32)usableSize ){ j = 0; }
+  if( NEVER(j>(u32)usableSize) ){ j = 0; }
   memcpy(&pTmp[j], &aData[j], usableSize - j);
 
   for(k=0; pCArray->ixNx[k]<=i && ALWAYS(k<NB*2); k++){}
@@ -7327,7 +7327,6 @@ static int editPage(
 
   pData = &aData[get2byteNotZero(&aData[hdr+5])];
   if( pData<pBegin ) goto editpage_fail;
-  if( pData>pPg->aDataEnd ) goto editpage_fail;
 
   /* Add cells to the start of the page */
   if( iNew<iOld ){
