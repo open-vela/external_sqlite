@@ -508,7 +508,7 @@ static int memdbOpen(
   if( (flags & SQLITE_OPEN_MAIN_DB)==0 ){
     return ORIGVFS(pVfs)->xOpen(ORIGVFS(pVfs), zName, pFd, flags, pOutFlags);
   }
-  memset(pFile, 0, sizeof(*pFile));
+  memset(pFile, 0, sizeof(*p));
   szName = sqlite3Strlen30(zName);
   if( szName>1 && zName[0]=='/' ){
     int i;
