@@ -2193,7 +2193,7 @@ void sqlite3SelectAddColumnTypeAndCollation(
     }
     if( pCol->affinity<=SQLITE_AFF_NONE ) pCol->affinity = aff;
     pColl = sqlite3ExprCollSeq(pParse, p);
-    if( pColl ){
+    if( pColl && (pCol->colFlags & COLFLAG_HASCOLL)==0 ){
       assert( pTab->pIndex==0 );
       sqlite3ColumnSetColl(db, pCol, pColl->zName);
     }
@@ -3015,11 +3015,7 @@ static int multiSelect(
 multi_select_end:
   pDest->iSdst = dest.iSdst;
   pDest->nSdst = dest.nSdst;
-  if( pDelete ){
-    sqlite3ParserAddCleanup(pParse,
-        (void(*)(sqlite3*,void*))sqlite3SelectDelete,
-        pDelete);
-  }
+  sqlite3SelectDelete(db, pDelete);
   return rc;
 }
 #endif /* SQLITE_OMIT_COMPOUND_SELECT */
