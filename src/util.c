@@ -60,21 +60,11 @@ int sqlite3FaultSim(int iTest){
 #ifndef SQLITE_OMIT_FLOATING_POINT
 /*
 ** Return true if the floating point value is Not a Number (NaN).
-**
-** Use the math library isnan() function if compiled with SQLITE_HAVE_ISNAN.
-** Otherwise, we have our own implementation that works on most systems.
 */
 int sqlite3IsNaN(double x){
-  int rc;   /* The value return */
-#if !SQLITE_HAVE_ISNAN && !HAVE_ISNAN
   u64 y;
   memcpy(&y,&x,sizeof(y));
-  rc = IsNaN(y);
-#else
-  rc = isnan(x);
-#endif /* HAVE_ISNAN */
-  testcase( rc );
-  return rc;
+  return IsNaN(y);
 }
 #endif /* SQLITE_OMIT_FLOATING_POINT */
 
@@ -146,6 +136,23 @@ void sqlite3ErrorClear(sqlite3 *db){
 */
 void sqlite3SystemError(sqlite3 *db, int rc){
   if( rc==SQLITE_IOERR_NOMEM ) return;
+#ifdef SQLITE_USE_SEH
+  if( rc==SQLITE_IOERR_IN_PAGE ){
+    int ii;
+    int iErr;
+    sqlite3BtreeEnterAll(db);
+    for(ii=0; ii<db->nDb; ii++){
+      if( db->aDb[ii].pBt ){
+        iErr = sqlite3PagerWalSystemErrno(sqlite3BtreePager(db->aDb[ii].pBt));
+        if( iErr ){
+          db->iSysErrno = iErr;
+        }
+      }
+    }
+    sqlite3BtreeLeaveAll(db);
+    return;
+  }
+#endif
   rc &= 0xff;
   if( rc==SQLITE_CANTOPEN || rc==SQLITE_IOERR ){
     db->iSysErrno = sqlite3OsGetLastError(db->pVfs);
