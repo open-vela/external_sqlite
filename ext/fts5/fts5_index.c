@@ -2213,10 +2213,6 @@ static void fts5SegIterReverse(Fts5Index *p, Fts5SegIter *pIter){
     pIter->pLeaf = pLast;
     pIter->iLeafPgno = pgnoLast;
     iOff = fts5LeafFirstRowidOff(pLast);
-    if( iOff>pLast->szLeaf ){
-      p->rc = FTS5_CORRUPT;
-      return;
-    }
     iOff += fts5GetVarint(&pLast->p[iOff], (u64*)&pIter->iRowid);
     pIter->iLeafOffset = iOff;
 
@@ -2225,6 +2221,7 @@ static void fts5SegIterReverse(Fts5Index *p, Fts5SegIter *pIter){
     }else{
       pIter->iEndofDoclist = fts5LeafFirstTermOff(pLast);
     }
+
   }
 
   fts5SegIterReverseInitPage(p, pIter);

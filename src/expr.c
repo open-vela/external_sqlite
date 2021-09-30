@@ -516,16 +516,12 @@ Expr *sqlite3ExprForVectorField(
       pRet->pLeft = pVector;
     }
   }else{
-    if( pVector->op==TK_VECTOR ){
-      Expr **ppVector = &pVector->x.pList->a[iField].pExpr;
-      pVector = *ppVector;
-      if( IN_RENAME_OBJECT ){
-        /* This must be a vector UPDATE inside a trigger */
-        *ppVector = 0;
-        return pVector;
-      }
-    }
+    if( pVector->op==TK_VECTOR ) pVector = pVector->x.pList->a[iField].pExpr;
     pRet = sqlite3ExprDup(pParse->db, pVector, 0);
+    if( IN_RENAME_OBJECT && pRet ){
+      SWAP(Expr, *pRet, *pVector);
+      sqlite3RenameTokenRemap(pParse, pRet, pVector);
+    }
   }
   return pRet;
 }
