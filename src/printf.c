@@ -145,7 +145,7 @@ static char et_getdigit(LONGDOUBLE_TYPE *val, int *cnt){
 /*
 ** Set the StrAccum object to an error mode.
 */
-void sqlite3StrAccumSetError(StrAccum *p, u8 eError){
+static void setStrAccumError(StrAccum *p, u8 eError){
   assert( eError==SQLITE_NOMEM || eError==SQLITE_TOOBIG );
   p->accError = eError;
   if( p->mxAlloc ) sqlite3_str_reset(p);
@@ -181,12 +181,12 @@ static char *printfTempBuf(sqlite3_str *pAccum, sqlite3_int64 n){
   char *z;
   if( pAccum->accError ) return 0;
   if( n>pAccum->nAlloc && n>pAccum->mxAlloc ){
-    sqlite3StrAccumSetError(pAccum, SQLITE_TOOBIG);
+    setStrAccumError(pAccum, SQLITE_TOOBIG);
     return 0;
   }
   z = sqlite3DbMallocRaw(pAccum->db, n);
   if( z==0 ){
-    sqlite3StrAccumSetError(pAccum, SQLITE_NOMEM);
+    setStrAccumError(pAccum, SQLITE_NOMEM);
   }
   return z;
 }
@@ -925,7 +925,7 @@ static int sqlite3StrAccumEnlarge(StrAccum *p, int N){
     return 0;
   }
   if( p->mxAlloc==0 ){
-    sqlite3StrAccumSetError(p, SQLITE_TOOBIG);
+    setStrAccumError(p, SQLITE_TOOBIG);
     return p->nAlloc - p->nChar - 1;
   }else{
     char *zOld = isMalloced(p) ? p->zText : 0;
@@ -938,7 +938,7 @@ static int sqlite3StrAccumEnlarge(StrAccum *p, int N){
     }
     if( szNew > p->mxAlloc ){
       sqlite3_str_reset(p);
-      sqlite3StrAccumSetError(p, SQLITE_TOOBIG);
+      setStrAccumError(p, SQLITE_TOOBIG);
       return 0;
     }else{
       p->nAlloc = (int)szNew;
@@ -956,7 +956,7 @@ static int sqlite3StrAccumEnlarge(StrAccum *p, int N){
       p->printfFlags |= SQLITE_PRINTF_MALLOCED;
     }else{
       sqlite3_str_reset(p);
-      sqlite3StrAccumSetError(p, SQLITE_NOMEM);
+      setStrAccumError(p, SQLITE_NOMEM);
       return 0;
     }
   }
@@ -1029,7 +1029,7 @@ static SQLITE_NOINLINE char *strAccumFinishRealloc(StrAccum *p){
     memcpy(zText, p->zText, p->nChar+1);
     p->printfFlags |= SQLITE_PRINTF_MALLOCED;
   }else{
-    sqlite3StrAccumSetError(p, SQLITE_NOMEM);
+    setStrAccumError(p, SQLITE_NOMEM);
   }
   p->zText = zText;
   return zText;
