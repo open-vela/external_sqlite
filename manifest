@@ -1,5 +1,5 @@
-C Some\s#defines\ssomehow\sfailed\sto\sget\sset\scorrectly\sin\sthe\sprevious\scheck-in.\nFixed\shere.
-D 2021-10-04T18:57:42.757
+C Merge\sstatic-analyzer\swarning\sfixes\sand\sthe\snew\sSQLITE_OMIT_AUXILIARY_SAFETY_CHECKS\smacro.
+D 2021-10-04T18:59:02.285
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1929,7 +1929,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 1c67f957fc77e37ce8f0d447c41ca975e8e79a35d332739c24a633649b5b0387
+P f2f279b2cc1c8b3b162058c33956be4037cd519715ac0c4290f10c58d2528f0a 15bbdf9ac840a220f384411d3025ef22f949d310194b60bca8e6d6a759e6042e
 R e4fec384b9b81dd75f2f9dbefbf1c470
+T +closed 15bbdf9ac840a220f384411d3025ef22f949d310194b60bca8e6d6a759e6042e
 U drh
-Z f3095bec1807bac205dafa906eef3829
+Z c20af47dd06bfe213e39442e78aafbf5
