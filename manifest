@@ -1,5 +1,5 @@
-C Add\sphase\sand\serror\snumber\sto\sCLI\serror\smessages.
-D 2021-10-26T16:57:09.903
+C Improved\sCLI\serror\smessages.
+D 2021-10-26T17:36:26.684
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1929,10 +1929,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 4b41535b096dec4b15a85e657102a72d4288728da6103f3fdcbe0e6f244c673a
+P 4b41535b096dec4b15a85e657102a72d4288728da6103f3fdcbe0e6f244c673a 7f87a298688c37bbad8fd2e1cf0e8fbcc36f0c211dcfa3685298525648dbe21b
 R 0e943f95c783da0ea080484e06b0d01a
-T *branch * detail_cli_errors
-T *sym-detail_cli_errors *
-T -sym-trunk *
-U larrybr
-Z 75e901f51a636f4c844fe34247eb3a80
+T +closed 7f87a298688c37bbad8fd2e1cf0e8fbcc36f0c211dcfa3685298525648dbe21b
+U drh
+Z 2ef74f1ee23e599e6910e8c7178d34e6
