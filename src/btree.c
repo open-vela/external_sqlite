@@ -3939,18 +3939,16 @@ int sqlite3BtreeIncrVacuum(Btree *p){
 /*
 ** This routine is called prior to sqlite3PagerCommit when a transaction
 ** is committed for an auto-vacuum database.
+**
+** If SQLITE_OK is returned, then *pnTrunc is set to the number of pages
+** the database file should be truncated to during the commit process. 
+** i.e. the database has been reorganized so that only the first *pnTrunc
+** pages are in use.
 */
-static int autoVacuumCommit(Btree *p){
+static int autoVacuumCommit(BtShared *pBt){
   int rc = SQLITE_OK;
-  Pager *pPager;
-  BtShared *pBt;
-  sqlite3 *db;
-  VVA_ONLY( int nRef );
-
-  assert( p!=0 );
-  pBt = p->pBt;  
-  pPager = pBt->pPager;
-  VVA_ONLY( nRef = sqlite3PagerRefcount(pPager); )
+  Pager *pPager = pBt->pPager;
+  VVA_ONLY( int nRef = sqlite3PagerRefcount(pPager); )
 
   assert( sqlite3_mutex_held(pBt->mutex) );
   invalidateAllOverflowCache(pBt);
@@ -3958,7 +3956,6 @@ static int autoVacuumCommit(Btree *p){
   if( !pBt->incrVacuum ){
     Pgno nFin;         /* Number of pages in database after autovacuuming */
     Pgno nFree;        /* Number of pages on the freelist initially */
-    Pgno nVac;         /* Number of pages to vacuum */
     Pgno iFree;        /* The next page to be freed */
     Pgno nOrig;        /* Database size before freeing */
 
@@ -3972,42 +3969,18 @@ static int autoVacuumCommit(Btree *p){
     }
 
     nFree = get4byte(&pBt->pPage1->aData[36]);
-    db = p->db;
-    if( db->xAutovacPages ){
-      int iDb;
-      for(iDb=0; ALWAYS(iDb<db->nDb); iDb++){
-        if( db->aDb[iDb].pBt==p ) break;
-      }
-      nVac = db->xAutovacPages(
-        db->pAutovacPagesArg,
-        db->aDb[iDb].zDbSName,
-        nOrig,
-        nFree,
-        pBt->pageSize
-      );
-      if( nVac>nFree ){
-        nVac = nFree;
-      }
-      if( nVac==0 ){
-        return SQLITE_OK;
-      }
-    }else{
-      nVac = nFree;
-    }
-    nFin = finalDbSize(pBt, nOrig, nVac);
+    nFin = finalDbSize(pBt, nOrig, nFree);
     if( nFin>nOrig ) return SQLITE_CORRUPT_BKPT;
     if( nFin<nOrig ){
       rc = saveAllCursors(pBt, 0, 0);
     }
     for(iFree=nOrig; iFree>nFin && rc==SQLITE_OK; iFree--){
-      rc = incrVacuumStep(pBt, nFin, iFree, nVac==nFree);
+      rc = incrVacuumStep(pBt, nFin, iFree, 1);
     }
     if( (rc==SQLITE_DONE || rc==SQLITE_OK) && nFree>0 ){
       rc = sqlite3PagerWrite(pBt->pPage1->pDbPage);
-      if( nVac==nFree ){
-        put4byte(&pBt->pPage1->aData[32], 0);
-        put4byte(&pBt->pPage1->aData[36], 0);
-      }
+      put4byte(&pBt->pPage1->aData[32], 0);
+      put4byte(&pBt->pPage1->aData[36], 0);
       put4byte(&pBt->pPage1->aData[28], nFin);
       pBt->bDoTruncate = 1;
       pBt->nPage = nFin;
@@ -4058,7 +4031,7 @@ int sqlite3BtreeCommitPhaseOne(Btree *p, const char *zSuperJrnl){
     sqlite3BtreeEnter(p);
 #ifndef SQLITE_OMIT_AUTOVACUUM
     if( pBt->autoVacuum ){
-      rc = autoVacuumCommit(p);
+      rc = autoVacuumCommit(pBt);
       if( rc!=SQLITE_OK ){
         sqlite3BtreeLeave(p);
         return rc;
