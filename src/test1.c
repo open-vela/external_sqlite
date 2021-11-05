@@ -4850,7 +4850,6 @@ static int SQLITE_TCLAPI test_open_v2(
       { "SQLITE_OPEN_PRIVATECACHE", SQLITE_OPEN_PRIVATECACHE },
       { "SQLITE_OPEN_WAL", SQLITE_OPEN_WAL },
       { "SQLITE_OPEN_URI", SQLITE_OPEN_URI },
-      { "SQLITE_OPEN_EXRESCODE", SQLITE_OPEN_EXRESCODE },
       { 0, 0 }
     };
     rc = Tcl_GetIndexFromObjStruct(interp, apFlag[i], aFlag, sizeof(aFlag[0]), 
