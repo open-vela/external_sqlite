@@ -904,10 +904,6 @@ static void constructAutomaticIndex(
   sqlite3VdbeAddOp2(v, OP_OpenAutoindex, pLevel->iIdxCur, nKeyCol+1);
   sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
   VdbeComment((v, "for %s", pTable->zName));
-  if( OptimizationEnabled(pParse->db, SQLITE_BloomFilter) ){
-    pLevel->regFilter = ++pParse->nMem;
-    sqlite3VdbeAddOp1(v, OP_FilterInit, pLevel->regFilter);
-  }
 
   /* Fill the automatic index with content */
   pTabItem = &pWC->pWInfo->pTabList->a[pLevel->iFrom];
@@ -930,10 +926,6 @@ static void constructAutomaticIndex(
   regBase = sqlite3GenerateIndexKey(
       pParse, pIdx, pLevel->iTabCur, regRecord, 0, 0, 0, 0
   );
-  if( pLevel->regFilter ){
-    sqlite3VdbeAddOp4Int(v, OP_FilterAdd, pLevel->regFilter, 0,
-                         regBase, pLoop->u.btree.nEq);
-  }
   sqlite3VdbeAddOp2(v, OP_IdxInsert, pLevel->iIdxCur, regRecord);
   sqlite3VdbeChangeP5(v, OPFLAG_USESEEKRESULT);
   if( pPartial ) sqlite3VdbeResolveLabel(v, iContinue);
@@ -4876,12 +4868,6 @@ WhereInfo *sqlite3WhereBegin(
   if( pOrderBy && pOrderBy->nExpr>=BMS ) pOrderBy = 0;
   sWLB.pOrderBy = pOrderBy;
 
-  /* Disable the DISTINCT optimization if SQLITE_DistinctOpt is set via
-  ** sqlite3_test_ctrl(SQLITE_TESTCTRL_OPTIMIZATIONS,...) */
-  if( OptimizationDisabled(db, SQLITE_DistinctOpt) ){
-    wctrlFlags &= ~WHERE_WANT_DISTINCT;
-  }
-
   /* The number of tables in the FROM clause is limited by the number of
   ** bits in a Bitmask 
   */
@@ -4948,7 +4934,9 @@ WhereInfo *sqlite3WhereBegin(
   */
   if( nTabList==0 ){
     if( pOrderBy ) pWInfo->nOBSat = pOrderBy->nExpr;
-    if( wctrlFlags & WHERE_WANT_DISTINCT ){
+    if( (wctrlFlags & WHERE_WANT_DISTINCT)!=0
+     && OptimizationEnabled(db, SQLITE_DistinctOpt)
+    ){
       pWInfo->eDistinct = WHERE_DISTINCT_UNIQUE;
     }
     ExplainQueryPlan((pParse, 0, "SCAN CONSTANT ROW"));
@@ -5009,7 +4997,12 @@ WhereInfo *sqlite3WhereBegin(
   }
 
   if( wctrlFlags & WHERE_WANT_DISTINCT ){
-    if( isDistinctRedundant(pParse, pTabList, &pWInfo->sWC, pResultSet) ){
+    if( OptimizationDisabled(db, SQLITE_DistinctOpt) ){
+      /* Disable the DISTINCT optimization if SQLITE_DistinctOpt is set via
+      ** sqlite3_test_ctrl(SQLITE_TESTCTRL_OPTIMIZATIONS,...) */
+      wctrlFlags &= ~WHERE_WANT_DISTINCT;
+      pWInfo->wctrlFlags &= ~WHERE_WANT_DISTINCT;
+    }else if( isDistinctRedundant(pParse, pTabList, &pWInfo->sWC, pResultSet) ){
       /* The DISTINCT marking is pointless.  Ignore it. */
       pWInfo->eDistinct = WHERE_DISTINCT_UNIQUE;
     }else if( pOrderBy==0 ){
