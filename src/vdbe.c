@@ -672,6 +672,48 @@ static Mem *out2Prerelease(Vdbe *p, VdbeOp *pOp){
 }
 
 /*
+** The minimum size (in bytes) for a Bloom filter.
+**
+** No Bloom filter will be smaller than this many bytes.  But they
+** may be larger.
+*/
+#ifndef SQLITE_BLOOM_MIN
+# define SQLITE_BLOOM_MIN 10000
+#endif
+
+/*
+** The maximum size (in bytes) for a Bloom filter.
+*/
+#ifndef SQLITE_BLOOM_MAX
+# define SQLITE_BLOOM_MAX 1000000
+#endif
+
+/*
+** Compute a bloom filter hash using pOp->p4.i registers from aMem[] beginning
+** with pOp->p3.  Return the hash.
+*/
+static u64 filterHash(const Mem *aMem, const Op *pOp){
+  int i, mx;
+  u64 h = 0;
+
+  i = pOp->p3;
+  assert( pOp->p4type==P4_INT32 );
+  mx = i + pOp->p4.i;
+  for(i=pOp->p3, mx=i+pOp->p4.i; i<mx; i++){
+    const Mem *p = &aMem[i];
+    if( p->flags & (MEM_Int|MEM_IntReal) ){
+      h += p->u.i;
+    }else if( p->flags & MEM_Real ){
+      h += sqlite3VdbeIntValue(p);
+    }else if( p->flags & (MEM_Str|MEM_Blob) ){
+      h += p->n;
+      if( p->flags & MEM_Zero ) h += p->u.nZero;
+    }
+  }
+  return h;
+}
+
+/*
 ** Return the symbolic name for the data type of a pMem
 */
 static const char *vdbeMemTypeName(Mem *pMem){
@@ -8124,6 +8166,119 @@ case OP_Function: {            /* group */
 
   REGISTER_TRACE(pOp->p3, pOut);
   UPDATE_MAX_BLOBSIZE(pOut);
+  break;
+}
+
+/* Opcode: FilterInit P1 P2 * * *
+**
+** Initialize register P1 so that is an empty bloom filter.
+**
+** If P2 is positive, it is a register that holds an estimate on
+** the number of entries to be added to the Bloom filter.  The
+** Bloom filter is sized accordingly.  If P2 is zero or negative,
+** then a default-size Bloom filter is created.
+**
+** It is ok for P1 and P2 to be the same register.  In that case the
+** integer value originally in that register will be overwritten
+** with the new empty bloom filter.
+*/
+case OP_FilterInit: {
+  i64 n, mx;
+  assert( pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor) );
+  pIn1 = &aMem[pOp->p1];
+  if( pOp->p2>0 ){
+    assert( pOp->p2<=(p->nMem+1 - p->nCursor) );
+    n = sqlite3VdbeIntValue(&aMem[pOp->p2]);
+    if( n<SQLITE_BLOOM_MIN ){
+      n = SQLITE_BLOOM_MIN;
+    }else if( n>SQLITE_BLOOM_MAX ){
+      n = SQLITE_BLOOM_MAX;
+    }
+  }else{
+    n = SQLITE_BLOOM_MIN;
+  }
+  mx = sqlite3EstMemoryAvailable()/2;
+  if( n>mx && mx>SQLITE_BLOOM_MIN ){
+    n = mx;
+  }
+#ifdef SQLITE_DEBUG
+  if( db->flags&SQLITE_VdbeTrace ){
+    printf("Bloom-filter size: %llu bytes\n", n);
+  }
+#endif
+  sqlite3VdbeMemSetZeroBlob(pIn1, n);
+  if( sqlite3VdbeMemExpandBlob(pIn1) ) goto no_mem;
+  break;
+}
+
+/* Opcode: FilterAdd P1 * P3 P4 *
+** Synopsis: filter(P1) += key(P3@P4)
+**
+** Compute a hash on the P4 registers starting with r[P3] and
+** add that hash to the bloom filter contained in r[P1].
+*/
+case OP_FilterAdd: {
+  u64 h;
+
+  assert( pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor) );
+  pIn1 = &aMem[pOp->p1];
+  assert( pIn1->flags & MEM_Blob );
+  assert( pIn1->n>0 );
+  h = filterHash(aMem, pOp);
+#ifdef SQLITE_DEBUG
+  if( db->flags&SQLITE_VdbeTrace ){
+    int ii;
+    for(ii=pOp->p3; ii<pOp->p3+pOp->p4.i; ii++){
+      registerTrace(ii, &aMem[ii]);
+    }
+    printf("hash: %llu modulo %d -> %u\n", h, pIn1->n, (int)(h%pIn1->n));
+  }
+#endif
+  h %= pIn1->n;
+  pIn1->z[h/8] |= 1<<(h&7);
+  break;
+}
+
+/* Opcode: Filter P1 P2 P3 P4 *
+** Synopsis: if key(P3@P4) not in filter(P1) goto P2
+**
+** Compute a hash on the key contained in the P4 registers starting
+** with r[P3].  Check to see if that hash is found in the
+** bloom filter hosted by register P1.  If it is not present then
+** maybe jump to P2.  Otherwise fall through.
+**
+** False negatives are harmless.  It is always safe to fall through,
+** even if the value is in the bloom filter.  A false negative causes
+** more CPU cycles to be used, but it should still yield the correct
+** answer.  However, an incorrect answer may well arise from a
+** false positive - if the jump is taken when it should fall through.
+*/
+case OP_Filter: {          /* jump */
+  u64 h;
+
+  assert( pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor) );
+  pIn1 = &aMem[pOp->p1];
+  if( (pIn1->flags & MEM_Blob)==0 || NEVER(pIn1->n<=0) ){
+    VdbeBranchTaken(0, 2);
+    break;
+  }
+  h = filterHash(aMem, pOp);
+#ifdef SQLITE_DEBUG
+  if( db->flags&SQLITE_VdbeTrace ){
+    int ii;
+    for(ii=pOp->p3; ii<pOp->p3+pOp->p4.i; ii++){
+      registerTrace(ii, &aMem[ii]);
+    }
+    printf("hash: %llu modulo %d -> %u\n", h, pIn1->n, (int)(h%pIn1->n));
+  }
+#endif
+  h %= pIn1->n;
+  if( (pIn1->z[h/8] & (1<<(h&7)))==0 ){
+    VdbeBranchTaken(1, 2);
+    goto jump_to_p2;
+  }else{
+    VdbeBranchTaken(0, 2);
+  }
   break;
 }
 

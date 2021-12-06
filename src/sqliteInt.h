@@ -1761,6 +1761,8 @@ struct sqlite3 {
 #define SQLITE_SeekScan       0x00020000 /* The OP_SeekScan optimization */
 #define SQLITE_OmitOrderBy    0x00040000 /* Omit pointless ORDER BY */
    /* TH3 expects this value  ^^^^^^^^^^ to be 0x40000. Coordinate any change */
+#define SQLITE_BloomFilter    0x00080000 /* Use a Bloom filter on searches */
+#define SQLITE_BloomPulldown  0x00100000 /* Run Bloom filters early */
 #define SQLITE_AllOpts        0xffffffff /* All optimizations */
 
 /*
@@ -4291,6 +4293,7 @@ void sqlite3MemSetDefault(void);
 void sqlite3BenignMallocHooks(void (*)(void), void (*)(void));
 #endif
 int sqlite3HeapNearlyFull(void);
+sqlite3_int64 sqlite3EstMemoryAvailable(void);
 
 /*
 ** On systems with ample stack space and that support alloca(), make
