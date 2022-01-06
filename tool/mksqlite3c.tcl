@@ -429,7 +429,7 @@ foreach file {
    fts3_unicode.c
    fts3_unicode2.c
 
-   json.c
+   json1.c
    rtree.c
    icu.c
    fts3_icu.c
