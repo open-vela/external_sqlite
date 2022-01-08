@@ -50,6 +50,9 @@ int sqlite3Fts2Init(sqlite3*);
 #ifdef SQLITE_ENABLE_FTS5
 int sqlite3Fts5Init(sqlite3*);
 #endif
+#ifdef SQLITE_ENABLE_JSON1
+int sqlite3Json1Init(sqlite3*);
+#endif
 #ifdef SQLITE_ENABLE_STMTVTAB
 int sqlite3StmtVtabInit(sqlite3*);
 #endif
@@ -84,8 +87,8 @@ static int (*const sqlite3BuiltinExtensions[])(sqlite3*) = {
   sqlite3DbstatRegister,
 #endif
   sqlite3TestExtInit,
-#if !defined(SQLITE_OMIT_VIRTUALTABLE) && !defined(SQLITE_OMIT_JSON)
-  sqlite3JsonTableFunctions,
+#ifdef SQLITE_ENABLE_JSON1
+  sqlite3Json1Init,
 #endif
 #ifdef SQLITE_ENABLE_STMTVTAB
   sqlite3StmtVtabInit,
