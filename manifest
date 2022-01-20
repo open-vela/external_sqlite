@@ -1,5 +1,5 @@
-C Add\srequirements\smarks\sand\stuning.
-D 2022-01-21T00:38:49.617
+C Add\sthe\ssqlite3_vtab_rhs_value()\sinterface,\sallowing\sthe\sxBestIndex\smethod\nof\sa\svirtual\stable\sto\saccess\sknown\svalues\son\sthe\sright-hand\sside\sof\nconstraint\sexpressions.
+D 2022-01-21T01:00:53.326
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1940,8 +1940,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 577d3d66558368c34acab8a9e552957cf3fa054c348f1383a9121de6e8b281b7
+P 71bfd0b57ab197405606b8096b8521d784ff174c4eecf1d9804d38342c03cc80 ac951490fd7d5864fe422a80ee8557478e823e79461bec2ee538f57b6733eb5a
 R 90012b52ae4dda5b0e0f59cd4c524b70
+T +closed ac951490fd7d5864fe422a80ee8557478e823e79461bec2ee538f57b6733eb5a
 U drh
-Z 0ca7e1064e9e25edf7c6ed09bdf60dba
+Z 34e99bffd10cf2786088d1ed018f667b
 # Remove this line to create a well-formed Fossil manifest.
