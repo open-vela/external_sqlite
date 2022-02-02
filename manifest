@@ -1,5 +1,5 @@
-C Additional\stest\scases.
-D 2022-02-02T19:30:24.554
+C Add\sthe\ssqlite3_vtab_in()\sinterface\sthat\sallows\svirtual\stables\sto\sprocess\nIN\sconstraints\sall\sat\sonce,\srather\sthan\sone\svalue\sat\sa\stime.
+D 2022-02-02T19:51:44.684
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -642,7 +642,7 @@ F src/walker.c f890a3298418d7cba3b69b8803594fdc484ea241206a8dfa99db6dd36f8cbb3b
 F src/where.c d7d996a5d4501fbf14997e965d7f641fe7b2a0dd89b2296e5310b506da3fb822
 F src/whereInt.h 1d821657238a0bd12b3c8f2926c7f8f9294bc5efe20af53c7c50d53a0a026cb9
 F src/wherecode.c 5879604677f0bdfb8d95ff616d834daecc12256346b7d9ad96a7e84a1cb08fdc
-F src/whereexpr.c ddb6ab49f745154c37dbdb291433c933e00175929647290a11f487af701d0392
+F src/whereexpr.c fa8017f9fed4b50c59b4f105139679dd59ed7fea43179ebb0f6b8b5796a30515
 F src/window.c dfaec4abc6012cbc18e4a202ca3a5d5a0efcc4011d86a06d882ddaab8aedee4d
 F test/8_3_names.test ebbb5cd36741350040fd28b432ceadf495be25b2
 F test/affinity2.test ce1aafc86e110685b324e9a763eab4f2a73f737842ec3b687bd965867de90627
@@ -1943,8 +1943,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 21afb81d0a73af39aacd9329b1441faa2b535a52a52036daec89fd303a8b344f
-R bd0b74bd91f16e8219ac183cf658cda6
+P 41d8d26e48a440da44582763f6b0c097febe3b8ac16adb662f688c3662c301bf 733d81c3a6a513b0b893a7d14894f36aebbbca9da375c326db8a72df4f0c6238
+R bea83344da84fc60a55eb54290dfe95b
+T +closed 733d81c3a6a513b0b893a7d14894f36aebbbca9da375c326db8a72df4f0c6238
 U drh
-Z 4de6a8e85d90e316804149623317b18b
+Z 2ffca9e5143ef0b555ac148560cccc3c
 # Remove this line to create a well-formed Fossil manifest.
