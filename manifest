@@ -1,5 +1,5 @@
-C The\sperformance\sincrease\sin\sthe\sprevious\scheck-in\sof\sthis\sbranch\swas\sdue\sto\nthe\srevised\sloop\sin\sinitMemArray()\sand\sreordering\sfields\sof\sMem\s-\snot\sthe\ncall\sthe\smemcpy().\s\sChanging\sthe\scode\sto\savoid\smemcpy()\sresults\sin\san\seven\nbetter\sgain,\sand\scode\sthat\sis\sfar\sless\sdodgy.
-D 2022-02-28T12:08:09.462
+C Performance\soptimization\sin\sinitMemArray()\ssaves\sabout\s750K\scycles\swith\sonly\na\s4-byte\sincrease\sin\scode\ssize.
+D 2022-02-28T12:16:51.464
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1944,8 +1944,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 7fefd8676110a53e6c98a697e2dbf820740fe602a1e83b6caa8d099c41a15d80
+P bb520293d8c11518ba153b986662f081ebfd781d38eb624c509605fa9148f6e9 d74aa979530d4236f5900d2ef998b27065d352d7c18bcd822e5c8f1041a1a81c
 R 0cbe8ba68087a6c2d38d406f08a0fa0f
+T +closed d74aa979530d4236f5900d2ef998b27065d352d7c18bcd822e5c8f1041a1a81c
 U drh
-Z d7015a158f91cecfa6d5c894c1220cae
+Z 9bc2a643cc2decfa66e7a766c34e11ae
 # Remove this line to create a well-formed Fossil manifest.
