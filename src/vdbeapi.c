@@ -391,7 +391,7 @@ static void setResultStrOrError(
     }
     return;
   }
-  sqlite3VdbeChangeEncoding(pOut, ENC(pOut->db));
+  sqlite3VdbeChangeEncoding(pOut, pCtx->enc);
   if( sqlite3VdbeMemTooBig(pOut) ){
     sqlite3_result_error_toobig(pCtx);
   }
@@ -540,7 +540,7 @@ void sqlite3_result_value(sqlite3_context *pCtx, sqlite3_value *pValue){
   Mem *pOut = pCtx->pOut;
   assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
   sqlite3VdbeMemCopy(pOut, pValue);
-  sqlite3VdbeChangeEncoding(pOut, ENC(pOut->db));
+  sqlite3VdbeChangeEncoding(pOut, pCtx->enc);
   if( sqlite3VdbeMemTooBig(pOut) ){
     sqlite3_result_error_toobig(pCtx);
   }
@@ -642,6 +642,35 @@ static int sqlite3Step(Vdbe *p){
   sqlite3 *db;
   int rc;
 
+  assert(p);
+  if( p->iVdbeMagic!=VDBE_MAGIC_RUN ){
+    /* We used to require that sqlite3_reset() be called before retrying
+    ** sqlite3_step() after any error or after SQLITE_DONE.  But beginning
+    ** with version 3.7.0, we changed this so that sqlite3_reset() would
+    ** be called automatically instead of throwing the SQLITE_MISUSE error.
+    ** This "automatic-reset" change is not technically an incompatibility, 
+    ** since any application that receives an SQLITE_MISUSE is broken by
+    ** definition.
+    **
+    ** Nevertheless, some published applications that were originally written
+    ** for version 3.6.23 or earlier do in fact depend on SQLITE_MISUSE 
+    ** returns, and those were broken by the automatic-reset change.  As a
+    ** a work-around, the SQLITE_OMIT_AUTORESET compile-time restores the
+    ** legacy behavior of returning SQLITE_MISUSE for cases where the 
+    ** previous sqlite3_step() returned something other than a SQLITE_LOCKED
+    ** or SQLITE_BUSY error.
+    */
+#ifdef SQLITE_OMIT_AUTORESET
+    if( (rc = p->rc&0xff)==SQLITE_BUSY || rc==SQLITE_LOCKED ){
+      sqlite3_reset((sqlite3_stmt*)p);
+    }else{
+      return SQLITE_MISUSE_BKPT;
+    }
+#else
+    sqlite3_reset((sqlite3_stmt*)p);
+#endif
+  }
+
   /* Check that malloc() has not failed. If it has, return early. */
   db = p->db;
   if( db->mallocFailed ){
@@ -649,83 +678,45 @@ static int sqlite3Step(Vdbe *p){
     return SQLITE_NOMEM_BKPT;
   }
 
-  assert(p);
-  if( p->eVdbeState!=VDBE_RUN_STATE ){
-    restart_step:
-    if( p->eVdbeState==VDBE_READY_STATE ){
-      if( p->expired ){
-        p->rc = SQLITE_SCHEMA;
-        rc = SQLITE_ERROR;
-        if( (p->prepFlags & SQLITE_PREPARE_SAVESQL)!=0 ){
-          /* If this statement was prepared using saved SQL and an 
-          ** error has occurred, then return the error code in p->rc to the
-          ** caller. Set the error code in the database handle to the same
-          ** value.
-          */ 
-          rc = sqlite3VdbeTransferError(p);
-        }
-        goto end_of_step;
-      }
+  if( p->pc<0 && p->expired ){
+    p->rc = SQLITE_SCHEMA;
+    rc = SQLITE_ERROR;
+    if( (p->prepFlags & SQLITE_PREPARE_SAVESQL)!=0 ){
+      /* If this statement was prepared using saved SQL and an 
+      ** error has occurred, then return the error code in p->rc to the
+      ** caller. Set the error code in the database handle to the same value.
+      */ 
+      rc = sqlite3VdbeTransferError(p);
+    }
+    goto end_of_step;
+  }
+  if( p->pc<0 ){
+    /* If there are no other statements currently running, then
+    ** reset the interrupt flag.  This prevents a call to sqlite3_interrupt
+    ** from interrupting a statement that has not yet started.
+    */
+    if( db->nVdbeActive==0 ){
+      AtomicStore(&db->u1.isInterrupted, 0);
+    }
 
-      /* If there are no other statements currently running, then
-      ** reset the interrupt flag.  This prevents a call to sqlite3_interrupt
-      ** from interrupting a statement that has not yet started.
-      */
-      if( db->nVdbeActive==0 ){
-        AtomicStore(&db->u1.isInterrupted, 0);
-      }
-
-      assert( db->nVdbeWrite>0 || db->autoCommit==0 
-          || (db->nDeferredCons==0 && db->nDeferredImmCons==0)
-      );
+    assert( db->nVdbeWrite>0 || db->autoCommit==0 
+        || (db->nDeferredCons==0 && db->nDeferredImmCons==0)
+    );
 
 #ifndef SQLITE_OMIT_TRACE
-      if( (db->mTrace & (SQLITE_TRACE_PROFILE|SQLITE_TRACE_XPROFILE))!=0
-          && !db->init.busy && p->zSql ){
-        sqlite3OsCurrentTimeInt64(db->pVfs, &p->startTime);
-      }else{
-        assert( p->startTime==0 );
-      }
-#endif
-
-      db->nVdbeActive++;
-      if( p->readOnly==0 ) db->nVdbeWrite++;
-      if( p->bIsReader ) db->nVdbeRead++;
-      p->pc = 0;
-      p->eVdbeState = VDBE_RUN_STATE;
-    }else
-
-    if( p->eVdbeState==VDBE_HALT_STATE ){
-      /* We used to require that sqlite3_reset() be called before retrying
-      ** sqlite3_step() after any error or after SQLITE_DONE.  But beginning
-      ** with version 3.7.0, we changed this so that sqlite3_reset() would
-      ** be called automatically instead of throwing the SQLITE_MISUSE error.
-      ** This "automatic-reset" change is not technically an incompatibility, 
-      ** since any application that receives an SQLITE_MISUSE is broken by
-      ** definition.
-      **
-      ** Nevertheless, some published applications that were originally written
-      ** for version 3.6.23 or earlier do in fact depend on SQLITE_MISUSE 
-      ** returns, and those were broken by the automatic-reset change.  As a
-      ** a work-around, the SQLITE_OMIT_AUTORESET compile-time restores the
-      ** legacy behavior of returning SQLITE_MISUSE for cases where the 
-      ** previous sqlite3_step() returned something other than a SQLITE_LOCKED
-      ** or SQLITE_BUSY error.
-      */
-#ifdef SQLITE_OMIT_AUTORESET
-      if( (rc = p->rc&0xff)==SQLITE_BUSY || rc==SQLITE_LOCKED ){
-        sqlite3_reset((sqlite3_stmt*)p);
-      }else{
-        return SQLITE_MISUSE_BKPT;
-      }
-#else
-      sqlite3_reset((sqlite3_stmt*)p);
-#endif
-      assert( p->eVdbeState==VDBE_READY_STATE );
-      goto restart_step;
+    if( (db->mTrace & (SQLITE_TRACE_PROFILE|SQLITE_TRACE_XPROFILE))!=0
+        && !db->init.busy && p->zSql ){
+      sqlite3OsCurrentTimeInt64(db->pVfs, &p->startTime);
+    }else{
+      assert( p->startTime==0 );
     }
-  }
+#endif
 
+    db->nVdbeActive++;
+    if( p->readOnly==0 ) db->nVdbeWrite++;
+    if( p->bIsReader ) db->nVdbeRead++;
+    p->pc = 0;
+  }
 #ifdef SQLITE_DEBUG
   p->rcApp = SQLITE_OK;
 #endif
@@ -1437,7 +1428,7 @@ static int vdbeUnbind(Vdbe *p, int i){
     return SQLITE_MISUSE_BKPT;
   }
   sqlite3_mutex_enter(p->db->mutex);
-  if( p->eVdbeState!=VDBE_READY_STATE ){
+  if( p->iVdbeMagic!=VDBE_MAGIC_RUN || p->pc>=0 ){
     sqlite3Error(p->db, SQLITE_MISUSE);
     sqlite3_mutex_leave(p->db->mutex);
     sqlite3_log(SQLITE_MISUSE, 
@@ -1790,7 +1781,7 @@ int sqlite3_stmt_isexplain(sqlite3_stmt *pStmt){
 */
 int sqlite3_stmt_busy(sqlite3_stmt *pStmt){
   Vdbe *v = (Vdbe*)pStmt;
-  return v!=0 && v->eVdbeState==VDBE_RUN_STATE;
+  return v!=0 && v->iVdbeMagic==VDBE_MAGIC_RUN && v->pc>=0;
 }
 
 /*
