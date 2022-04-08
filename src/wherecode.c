@@ -640,8 +640,9 @@ static int codeEqualityTerm(
     i = pLevel->u.in.nIn;
     pLevel->u.in.nIn += nEq;
     pLevel->u.in.aInLoop =
-       sqlite3DbReallocOrFree(pParse->db, pLevel->u.in.aInLoop,
-                              sizeof(pLevel->u.in.aInLoop[0])*pLevel->u.in.nIn);
+       sqlite3WhereRealloc(pTerm->pWC->pWInfo,
+                           pLevel->u.in.aInLoop,
+                           sizeof(pLevel->u.in.aInLoop[0])*pLevel->u.in.nIn);
     pIn = pLevel->u.in.aInLoop;
     if( pIn ){
       int iMap = 0;               /* Index in aiMap[] */
@@ -2604,9 +2605,7 @@ Bitmask sqlite3WhereCodeOneLoopStart(
       }
       pE = pTerm->pExpr;
       assert( pE!=0 );
-      if( (pTabItem->fg.jointype & (JT_LEFT|JT_LTORJ))
-       && !ExprHasProperty(pE,EP_FromJoin)
-      ){
+      if( (pTabItem->fg.jointype&JT_LEFT) && !ExprHasProperty(pE,EP_FromJoin) ){
         continue;
       }
       
@@ -2668,7 +2667,7 @@ Bitmask sqlite3WhereCodeOneLoopStart(
     if( (pTerm->eOperator & (WO_EQ|WO_IS))==0 ) continue;
     if( (pTerm->eOperator & WO_EQUIV)==0 ) continue;
     if( pTerm->leftCursor!=iCur ) continue;
-    if( pTabItem->fg.jointype & (JT_LEFT|JT_LTORJ) ) continue;
+    if( pTabItem->fg.jointype & JT_LEFT ) continue;
     pE = pTerm->pExpr;
 #ifdef WHERETRACE_ENABLED /* 0x800 */
     if( sqlite3WhereTrace & 0x800 ){
