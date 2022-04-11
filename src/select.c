@@ -301,10 +301,6 @@ int sqlite3JoinType(Parse *pParse, Token *pA, Token *pB, Token *pC){
     sqlite3ErrorMsg(pParse, "unknown or unsupported join type: "
        "%T%s%T%s%T", pA, zSp1, pB, zSp2, pC);
     jointype = JT_INNER;
-  }else if( (jointype & JT_RIGHT)!=0 ){
-    sqlite3ErrorMsg(pParse, 
-      "RIGHT and FULL OUTER JOINs are not currently supported");
-    jointype = JT_INNER;
   }
   return jointype;
 }
@@ -3979,6 +3975,7 @@ static void renumberCursors(
 **             table and
 **        (3c) the outer query may not be an aggregate.
 **        (3d) the outer query may not be DISTINCT.
+**        See also (26) for restrictions on RIGHT JOIN.
 **
 **   (4)  The subquery can not be DISTINCT.
 **
@@ -4076,6 +4073,9 @@ static void renumberCursors(
 **  (25)  If either the subquery or the parent query contains a window
 **        function in the select list or ORDER BY clause, flattening
 **        is not attempted.
+**
+**  (26)  The subquery may not be the right operand of a RIGHT JOIN.
+**        See also (3) for restrictions on LEFT JOIN.
 **
 **
 ** In this routine, the "p" parameter is a pointer to the outer query.
@@ -4176,14 +4176,15 @@ static int flattenSubquery(
   ** See also tickets #306, #350, and #3300.
   */
   if( (pSubitem->fg.jointype & JT_OUTER)!=0 ){
-    isLeftJoin = 1;
-    if( pSubSrc->nSrc>1                   /* (3a) */
-     || isAgg                             /* (3b) */
-     || IsVirtual(pSubSrc->a[0].pTab)     /* (3c) */
-     || (p->selFlags & SF_Distinct)!=0    /* (3d) */
+    if( pSubSrc->nSrc>1                        /* (3a) */
+     || isAgg                                  /* (3b) */
+     || IsVirtual(pSubSrc->a[0].pTab)          /* (3c) */
+     || (p->selFlags & SF_Distinct)!=0         /* (3d) */
+     || (pSubitem->fg.jointype & JT_RIGHT)!=0  /* (26) */
     ){
       return 0;
     }
+    isLeftJoin = 1;
   }
 #ifdef SQLITE_EXTRA_IFNULLROW
   else if( iFrom>0 && !isAgg ){
@@ -4372,6 +4373,7 @@ static int flattenSubquery(
   for(pParent=p; pParent; pParent=pParent->pPrior, pSub=pSub->pPrior){
     int nSubSrc;
     u8 jointype = 0;
+    u8 ltorj = pSrc->a[iFrom].fg.jointype & JT_LTORJ;
     assert( pSub!=0 );
     pSubSrc = pSub->pSrc;     /* FROM clause of subquery */
     nSubSrc = pSubSrc->nSrc;  /* Number of terms in subquery FROM clause */
@@ -4410,10 +4412,11 @@ static int flattenSubquery(
       if( pItem->fg.isUsing ) sqlite3IdListDelete(db, pItem->u3.pUsing);
       assert( pItem->fg.isTabFunc==0 );
       *pItem = pSubSrc->a[i];
+      pItem->fg.jointype |= ltorj;
       iNewParent = pSubSrc->a[i].iCursor;
       memset(&pSubSrc->a[i], 0, sizeof(pSubSrc->a[i]));
     }
-    pSrc->a[iFrom].fg.jointype = jointype;
+    pSrc->a[iFrom].fg.jointype = jointype | ltorj;
   
     /* Now begin substituting subquery result set expressions for 
     ** references to the iParent in the outer query.
@@ -6589,7 +6592,7 @@ int sqlite3Select(
      && i==0
      && (p->selFlags & SF_ComplexResult)!=0
      && (pTabList->nSrc==1
-         || (pTabList->a[1].fg.jointype&(JT_LEFT|JT_CROSS))!=0)
+         || (pTabList->a[1].fg.jointype&(JT_OUTER|JT_CROSS))!=0)
     ){
       continue;
     }
@@ -6711,6 +6714,7 @@ int sqlite3Select(
     if( OptimizationEnabled(db, SQLITE_PushDown)
      && (pItem->fg.isCte==0 
          || (pItem->u2.pCteUse->eM10d!=M10d_Yes && pItem->u2.pCteUse->nUse<2))
+     && (pItem->fg.jointype & JT_RIGHT)==0
      && pushDownWhereTerms(pParse, pSub, p->pWhere, pItem->iCursor,
                            (pItem->fg.jointype & JT_OUTER)!=0)
     ){
@@ -6731,18 +6735,19 @@ int sqlite3Select(
 
     /* Generate code to implement the subquery
     **
-    ** The subquery is implemented as a co-routine if:
+    ** The subquery is implemented as a co-routine all of the following are
+    ** true:
+    **
     **    (1)  the subquery is guaranteed to be the outer loop (so that
     **         it does not need to be computed more than once), and
     **    (2)  the subquery is not a CTE that should be materialized
-    **
-    ** TODO: Are there other reasons beside (1) and (2) to use a co-routine
-    ** implementation?
+    **    (3)  the subquery is not part of a left operand for a RIGHT JOIN
     */
     if( i==0
      && (pTabList->nSrc==1
-            || (pTabList->a[1].fg.jointype&(JT_LEFT|JT_CROSS))!=0)  /* (1) */
-     && (pItem->fg.isCte==0 || pItem->u2.pCteUse->eM10d!=M10d_Yes)  /* (2) */
+            || (pTabList->a[1].fg.jointype&(JT_OUTER|JT_CROSS))!=0)  /* (1) */
+     && (pItem->fg.isCte==0 || pItem->u2.pCteUse->eM10d!=M10d_Yes)   /* (2) */
+     && (pTabList->a[0].fg.jointype & JT_LTORJ)==0                   /* (3) */
     ){
       /* Implement a co-routine that will return a single row of the result
       ** set on each invocation.
