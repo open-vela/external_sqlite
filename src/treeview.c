@@ -144,17 +144,10 @@ void sqlite3TreeViewSrcList(TreeView *pView, const SrcList *pSrc){
       sqlite3_str_appendf(&x, " tab=%Q nCol=%d ptr=%p used=%llx",
            pItem->pTab->zName, pItem->pTab->nCol, pItem->pTab, pItem->colUsed);
     }
-    if( (pItem->fg.jointype & (JT_LEFT|JT_RIGHT))==(JT_LEFT|JT_RIGHT) ){
-      sqlite3_str_appendf(&x, " FULL-OUTER-JOIN");
-    }else if( pItem->fg.jointype & JT_LEFT ){
+    if( pItem->fg.jointype & JT_LEFT ){
       sqlite3_str_appendf(&x, " LEFT-JOIN");
-    }else if( pItem->fg.jointype & JT_RIGHT ){
-      sqlite3_str_appendf(&x, " RIGHT-JOIN");
     }else if( pItem->fg.jointype & JT_CROSS ){
       sqlite3_str_appendf(&x, " CROSS-JOIN");
-    }
-    if( pItem->fg.jointype & JT_LTORJ ){
-      sqlite3_str_appendf(&x, " LTORJ");
     }
     if( pItem->fg.fromDDL ){
       sqlite3_str_appendf(&x, " DDL");
@@ -423,7 +416,7 @@ void sqlite3TreeViewExpr(TreeView *pView, const Expr *pExpr, u8 moreToFollow){
     sqlite3_str_appendf(&x, " fg.af=%x.%c",
       pExpr->flags, pExpr->affExpr ? pExpr->affExpr : 'n');
     if( ExprHasProperty(pExpr, EP_FromJoin) ){
-      sqlite3_str_appendf(&x, " iRJT=%d", pExpr->w.iRightJoinTable);
+      sqlite3_str_appendf(&x, " iJoin=%d", pExpr->w.iJoin);
     }
     if( ExprHasProperty(pExpr, EP_FromDDL) ){
       sqlite3_str_appendf(&x, " DDL");
