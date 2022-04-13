@@ -367,7 +367,9 @@ static int lookupName(
         pExpr->iTable = pMatch->iCursor;
         assert( ExprUseYTab(pExpr) );
         pExpr->y.pTab = pMatch->pTab;
-        if( (pMatch->fg.jointype & (JT_LEFT|JT_LTORJ))!=0 ){
+        /* RIGHT JOIN not (yet) supported */
+        assert( (pMatch->fg.jointype & JT_RIGHT)==0 );
+        if( (pMatch->fg.jointype & JT_LEFT)!=0 ){
           ExprSetProperty(pExpr, EP_CanBeNull);
         }
         pSchema = pExpr->y.pTab->pSchema;
