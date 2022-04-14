@@ -133,6 +133,7 @@ void sqlite3TreeViewWith(TreeView *pView, const With *pWith, u8 moreToFollow){
 */
 void sqlite3TreeViewSrcList(TreeView *pView, const SrcList *pSrc){
   int i;
+  if( pSrc==0 ) return;
   for(i=0; i<pSrc->nSrc; i++){
     const SrcItem *pItem = &pSrc->a[i];
     StrAccum x;
@@ -144,10 +145,17 @@ void sqlite3TreeViewSrcList(TreeView *pView, const SrcList *pSrc){
       sqlite3_str_appendf(&x, " tab=%Q nCol=%d ptr=%p used=%llx",
            pItem->pTab->zName, pItem->pTab->nCol, pItem->pTab, pItem->colUsed);
     }
-    if( pItem->fg.jointype & JT_LEFT ){
+    if( (pItem->fg.jointype & (JT_LEFT|JT_RIGHT))==(JT_LEFT|JT_RIGHT) ){
+      sqlite3_str_appendf(&x, " FULL-OUTER-JOIN");
+    }else if( pItem->fg.jointype & JT_LEFT ){
       sqlite3_str_appendf(&x, " LEFT-JOIN");
+    }else if( pItem->fg.jointype & JT_RIGHT ){
+      sqlite3_str_appendf(&x, " RIGHT-JOIN");
     }else if( pItem->fg.jointype & JT_CROSS ){
       sqlite3_str_appendf(&x, " CROSS-JOIN");
+    }
+    if( pItem->fg.jointype & JT_LTORJ ){
+      sqlite3_str_appendf(&x, " LTORJ");
     }
     if( pItem->fg.fromDDL ){
       sqlite3_str_appendf(&x, " DDL");
