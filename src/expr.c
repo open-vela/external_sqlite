@@ -1698,16 +1698,22 @@ IdList *sqlite3IdListDup(sqlite3 *db, const IdList *p){
   int i;
   assert( db!=0 );
   if( p==0 ) return 0;
-  assert( p->eU4!=EU4_EXPR );
-  pNew = sqlite3DbMallocRawNN(db, sizeof(*pNew)+(p->nId-1)*sizeof(p->a[0]) );
+  pNew = sqlite3DbMallocRawNN(db, sizeof(*pNew) );
   if( pNew==0 ) return 0;
   pNew->nId = p->nId;
-  pNew->eU4 = p->eU4;
+  pNew->a = sqlite3DbMallocRawNN(db, p->nId*sizeof(p->a[0]) );
+  if( pNew->a==0 ){
+    sqlite3DbFreeNN(db, pNew);
+    return 0;
+  }
+  /* Note that because the size of the allocation for p->a[] is not
+  ** necessarily a power of two, sqlite3IdListAppend() may not be called
+  ** on the duplicate created by this function. */
   for(i=0; i<p->nId; i++){
     struct IdList_item *pNewItem = &pNew->a[i];
-    const struct IdList_item *pOldItem = &p->a[i];
+    struct IdList_item *pOldItem = &p->a[i];
     pNewItem->zName = sqlite3DbStrDup(db, pOldItem->zName);
-    pNewItem->u4 = pOldItem->u4;
+    pNewItem->idx = pOldItem->idx;
   }
   return pNew;
 }
@@ -2173,7 +2179,7 @@ Expr *sqlite3ExprSimplifiedAndOr(Expr *pExpr){
 static int exprNodeIsConstant(Walker *pWalker, Expr *pExpr){
 
   /* If pWalker->eCode is 2 then any term of the expression that comes from
-  ** the ON or USING clauses of an outer join disqualifies the expression
+  ** the ON or USING clauses of a left join disqualifies the expression
   ** from being considered constant. */
   if( pWalker->eCode==2 && ExprHasProperty(pExpr, EP_FromJoin) ){
     pWalker->eCode = 0;
@@ -4494,18 +4500,16 @@ expr_code_doover:
     }
     case TK_SELECT_COLUMN: {
       int n;
-      Expr *pLeft = pExpr->pLeft;
-      if( pLeft->iTable==0 || pParse->withinRJSubrtn > pLeft->op2 ){
-        pLeft->iTable = sqlite3CodeSubselect(pParse, pLeft);
-        pLeft->op2 = pParse->withinRJSubrtn;
+      if( pExpr->pLeft->iTable==0 ){
+        pExpr->pLeft->iTable = sqlite3CodeSubselect(pParse, pExpr->pLeft);
       }
-      assert( pLeft->op==TK_SELECT || pLeft->op==TK_ERROR );
-      n = sqlite3ExprVectorSize(pLeft);
+      assert( pExpr->pLeft->op==TK_SELECT || pExpr->pLeft->op==TK_ERROR );
+      n = sqlite3ExprVectorSize(pExpr->pLeft);
       if( pExpr->iTable!=n ){
         sqlite3ErrorMsg(pParse, "%d columns assigned %d values",
                                 pExpr->iTable, n);
       }
-      return pLeft->iTable + pExpr->iColumn;
+      return pExpr->pLeft->iTable + pExpr->iColumn;
     }
     case TK_IN: {
       int destIfFalse = sqlite3VdbeMakeLabel(pParse);
@@ -5813,7 +5817,7 @@ static int impliesNotNullRow(Walker *pWalker, Expr *pExpr){
 ** in an incorrect answer.
 **
 ** Terms of p that are marked with EP_FromJoin (and hence that come from
-** the ON or USING clauses of OUTER JOINS) are excluded from the analysis.
+** the ON or USING clauses of LEFT JOINS) are excluded from the analysis.
 **
 ** This routine is used to check if a LEFT JOIN can be converted into
 ** an ordinary JOIN.  The p argument is the WHERE clause.  If the WHERE
