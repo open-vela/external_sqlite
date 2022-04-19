@@ -2887,7 +2887,7 @@ struct Expr {
 #define EP_ConstFunc  0x080000 /* A SQLITE_FUNC_CONSTANT or _SLOCHNG function */
 #define EP_CanBeNull  0x100000 /* Can be null despite NOT NULL constraint */
 #define EP_Subquery   0x200000 /* Tree contains a TK_SELECT operator */
-#define EP_InnerJoin  0x400000 /* Originates in ON/USING of an inner join */
+                 /*   0x400000 // Available */
 #define EP_Leaf       0x800000 /* Expr.pLeft, .pRight, .u.pSelect all NULL */
 #define EP_WinFunc   0x1000000 /* TK_FUNCTION with Expr.y.pWin set */
 #define EP_Subrtn    0x2000000 /* Uses Expr.y.sub. TK_IN, _SELECT, or _EXISTS */
@@ -3038,24 +3038,12 @@ struct ExprList {
 ** If "a" is the k-th column of table "t", then IdList.a[0].idx==k.
 */
 struct IdList {
-  int nId;         /* Number of identifiers on the list */
-  u8 eU4;          /* Which element of a.u4 is valid */
   struct IdList_item {
     char *zName;      /* Name of the identifier */
-    union {
-      int idx;          /* Index in some Table.aCol[] of a column named zName */
-      Expr *pExpr;      /* Expr to implement a USING variable -- NOT USED */
-    } u4;
-  } a[1];
+    int idx;          /* Index in some Table.aCol[] of a column named zName */
+  } *a;
+  int nId;         /* Number of identifiers on the list */
 };
-
-/*
-** Allowed values for IdList.eType, which determines which value of the a.u4
-** is valid.
-*/
-#define EU4_NONE   0   /* Does not use IdList.a.u4 */
-#define EU4_IDX    1   /* Uses IdList.a.u4.idx */
-#define EU4_EXPR   2   /* Uses IdList.a.u4.pExpr -- NOT CURRENTLY USED */
 
 /*
 ** The SrcItem object represents a single term in the FROM clause of a query.
@@ -3090,7 +3078,6 @@ struct SrcItem {
     unsigned isCte :1;         /* This is a CTE */
     unsigned notCte :1;        /* This item may not match a CTE */
     unsigned isUsing :1;       /* u3.pUsing is valid */
-    unsigned isSynthUsing :1;  /* u3.pUsing is synthensized from NATURAL */
   } fg;
   int iCursor;      /* The VDBE cursor number used to access this table */
   union {
@@ -3145,15 +3132,14 @@ struct SrcList {
 /*
 ** Permitted values of the SrcList.a.jointype field
 */
-#define JT_INNER     0x01    /* Any kind of inner or cross join */
-#define JT_CROSS     0x02    /* Explicit use of the CROSS keyword */
-#define JT_NATURAL   0x04    /* True for a "natural" join */
-#define JT_LEFT      0x08    /* Left outer join */
-#define JT_RIGHT     0x10    /* Right outer join */
-#define JT_OUTER     0x20    /* The "OUTER" keyword is present */
-#define JT_LTORJ     0x40    /* One of the LEFT operands of a RIGHT JOIN
-                             ** Mnemonic: Left Table Of Right Join */
-#define JT_ERROR     0x80    /* unknown or unsupported join type */
+#define JT_INNER     0x0001    /* Any kind of inner or cross join */
+#define JT_CROSS     0x0002    /* Explicit use of the CROSS keyword */
+#define JT_NATURAL   0x0004    /* True for a "natural" join */
+#define JT_LEFT      0x0008    /* Left outer join */
+#define JT_RIGHT     0x0010    /* Right outer join */
+#define JT_OUTER     0x0020    /* The "OUTER" keyword is present */
+#define JT_ERROR     0x0040    /* unknown or unsupported join type */
+
 
 /*
 ** Flags appropriate for the wctrlFlags parameter of sqlite3WhereBegin()
@@ -3176,7 +3162,7 @@ struct SrcList {
 #define WHERE_SORTBYGROUP      0x0200 /* Support sqlite3WhereIsSorted() */
 #define WHERE_AGG_DISTINCT     0x0400 /* Query is "SELECT agg(DISTINCT ...)" */
 #define WHERE_ORDERBY_LIMIT    0x0800 /* ORDERBY+LIMIT on the inner loop */
-#define WHERE_RIGHT_JOIN       0x1000 /* Processing a RIGHT JOIN */
+                        /*     0x1000    not currently used */
                         /*     0x2000    not currently used */
 #define WHERE_USE_LIMIT        0x4000 /* Use the LIMIT in cost estimates */
                         /*     0x8000    not currently used */
@@ -3583,7 +3569,6 @@ struct Parse {
   u8 okConstFactor;    /* OK to factor out constants */
   u8 disableLookaside; /* Number of times lookaside has been disabled */
   u8 disableVtab;      /* Disable all virtual tables for this parse */
-  u8 withinRJSubrtn;   /* Nesting level for RIGHT JOIN body subroutines */
 #if defined(SQLITE_DEBUG) || defined(SQLITE_COVERAGE_TEST)
   u8 earlyCleanup;     /* OOM inside sqlite3ParserAddCleanup() */
 #endif
@@ -4643,7 +4628,7 @@ SrcList *sqlite3SrcListAppendFromTerm(Parse*, SrcList*, Token*, Token*,
 void sqlite3SrcListIndexedBy(Parse *, SrcList *, Token *);
 void sqlite3SrcListFuncArgs(Parse*, SrcList*, ExprList*);
 int sqlite3IndexedByLookup(Parse *, SrcItem *);
-void sqlite3SrcListShiftJoinType(Parse*,SrcList*);
+void sqlite3SrcListShiftJoinType(SrcList*);
 void sqlite3SrcListAssignCursors(Parse*, SrcList*);
 void sqlite3IdListDelete(sqlite3*, IdList*);
 void sqlite3ClearOnOrUsing(sqlite3*, OnOrUsing*);
@@ -4843,7 +4828,7 @@ void sqlite3MaterializeView(Parse*, Table*, Expr*, ExprList*,Expr*,int);
 
 int sqlite3JoinType(Parse*, Token*, Token*, Token*);
 int sqlite3ColumnIndex(Table *pTab, const char *zCol);
-void sqlite3SetJoinExpr(Expr*,int,u32);
+void sqlite3SetJoinExpr(Expr*,int);
 void sqlite3CreateForeignKey(Parse*, ExprList*, Token*, ExprList*, int);
 void sqlite3DeferForeignKey(Parse*, int);
 #ifndef SQLITE_OMIT_AUTHORIZATION
