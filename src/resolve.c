@@ -115,6 +115,22 @@ static void resolveAlias(
   }
 }
 
+
+/*
+** Return TRUE if the name zCol occurs anywhere in the USING clause.
+**
+** Return FALSE if the USING clause is NULL or if it does not contain
+** zCol.
+*/
+static int nameInUsingClause(IdList *pUsing, const char *zCol){
+  int k;
+  assert( pUsing!=0 );
+  for(k=0; k<pUsing->nId; k++){
+    if( sqlite3StrICmp(pUsing->a[k].zName, zCol)==0 ) return 1;
+  }
+  return 0;
+}
+
 /*
 ** Subqueries stores the original database, table and column names for their
 ** result sets in ExprList.a[].zSpan, in the form "DATABASE.TABLE.COLUMN".
@@ -192,29 +208,6 @@ Bitmask sqlite3ExprColUsed(Expr *pExpr){
 }
 
 /*
-** Create a new expression term for the column specified by pMatch and
-** iColumn.  Append this new expression term to the FULL JOIN Match set
-** in *ppList.  Create a new *ppList if this is the first term in the
-** set.
-*/
-static void extendFJMatch(
-  Parse *pParse,          /* Parsing context */
-  ExprList **ppList,      /* ExprList to extend */
-  SrcItem *pMatch,        /* Source table containing the column */
-  i16 iColumn             /* The column number */
-){
-  Expr *pNew = sqlite3ExprAlloc(pParse->db, TK_COLUMN, 0, 0);
-  if( pNew ){
-    pNew->iTable = pMatch->iCursor;
-    pNew->iColumn = iColumn;
-    pNew->y.pTab = pMatch->pTab;
-    assert( (pMatch->fg.jointype & (JT_LEFT|JT_LTORJ))!=0 );
-    ExprSetProperty(pNew, EP_CanBeNull);
-    *ppList = sqlite3ExprListAppend(pParse, *ppList, pNew);
-  }
-}
-
-/*
 ** Given the name of a column of the form X.Y.Z or Y.Z or just Z, look up
 ** that name in the set of source tables in pSrcList and make the pExpr 
 ** expression node refer back to that source column.  The following changes
@@ -259,9 +252,8 @@ static int lookupName(
   NameContext *pTopNC = pNC;        /* First namecontext in the list */
   Schema *pSchema = 0;              /* Schema of the expression */
   int eNewExprOp = TK_COLUMN;       /* New value for pExpr->op on success */
-  Table *pTab = 0;                  /* Table holding the row */
+  Table *pTab = 0;                  /* Table hold the row */
   Column *pCol;                     /* A column of pTab */
-  ExprList *pFJMatch = 0;           /* Matches for FULL JOIN .. USING */
 
   assert( pNC );     /* the name context cannot be NULL. */
   assert( zCol );    /* The Z in X.Y.Z cannot be NULL */
@@ -313,51 +305,16 @@ static int lookupName(
         pTab = pItem->pTab;
         assert( pTab!=0 && pTab->zName!=0 );
         assert( pTab->nCol>0 || pParse->nErr );
-        assert( pItem->fg.isNestedFrom == IsNestedFrom(pItem->pSelect) );
-        if( pItem->fg.isNestedFrom ){
-          /* In this case, pItem is a subquery that has been formed from a
-          ** parenthesized subset of the FROM clause terms.  Example:
-          **   .... FROM t1 LEFT JOIN (t2 RIGHT JOIN t3 USING(x)) USING(y) ...
-          **                          \_________________________/
-          **             This pItem -------------^
-          */
+        if( pItem->pSelect && (pItem->pSelect->selFlags & SF_NestedFrom)!=0 ){
           int hit = 0;
-          assert( pItem->pSelect!=0 );
           pEList = pItem->pSelect->pEList;
-          assert( pEList!=0 );
-          assert( pEList->nExpr==pTab->nCol );
           for(j=0; j<pEList->nExpr; j++){
             if( sqlite3MatchEName(&pEList->a[j], zCol, zTab, zDb) ){
-              if( cnt>0 ){
-                if( pItem->fg.isUsing==0
-                 || sqlite3IdListIndex(pItem->u3.pUsing, zCol)<0
-                ){
-                  /* Two or more tables have the same column name which is
-                  ** not joined by USING.  This is an error.  Signal as much
-                  ** by clearing pFJMatch and letting cnt go above 1. */
-                  sqlite3ExprListDelete(db, pFJMatch);
-                  pFJMatch = 0;
-                }else
-                if( (pItem->fg.jointype & JT_RIGHT)==0 ){
-                  /* An INNER or LEFT JOIN.  Use the left-most table */
-                  continue;
-                }else
-                if( (pItem->fg.jointype & JT_LEFT)==0 ){
-                  /* A RIGHT JOIN.  Use the right-most table */
-                  cnt = 0;
-                  sqlite3ExprListDelete(db, pFJMatch);
-                  pFJMatch = 0;
-                }else{
-                  /* For a FULL JOIN, we must construct a coalesce() func */
-                  extendFJMatch(pParse, &pFJMatch, pMatch, pExpr->iColumn);
-                }
-              }
               cnt++;
               cntTab = 2;
               pMatch = pItem;
               pExpr->iColumn = j;
               hit = 1;
-              pEList->a[j].bUsed = 1;
             }
           }
           if( hit || zTab==0 ) continue;
@@ -382,28 +339,16 @@ static int lookupName(
           if( pCol->hName==hCol
            && sqlite3StrICmp(pCol->zCnName, zCol)==0
           ){
-            if( cnt>0 ){
-              if( pItem->fg.isUsing==0
-               || sqlite3IdListIndex(pItem->u3.pUsing, zCol)<0
+            /* If there has been exactly one prior match and this match
+            ** is for the right-hand table of a NATURAL JOIN or is in a 
+            ** USING clause, then skip this match.
+            */
+            if( cnt==1 ){
+              if( pItem->fg.jointype & JT_NATURAL ) continue;
+              if( pItem->fg.isUsing
+               && nameInUsingClause(pItem->u3.pUsing, zCol)
               ){
-                /* Two or more tables have the same column name which is
-                ** not joined by USING.  This is an error.  Signal as much
-                ** by clearing pFJMatch and letting cnt go above 1. */
-                sqlite3ExprListDelete(db, pFJMatch);
-                pFJMatch = 0;
-              }else
-              if( (pItem->fg.jointype & JT_RIGHT)==0 ){
-                /* An INNER or LEFT JOIN.  Use the left-most table */
                 continue;
-              }else
-              if( (pItem->fg.jointype & JT_LEFT)==0 ){
-                /* A RIGHT JOIN.  Use the right-most table */
-                cnt = 0;
-                sqlite3ExprListDelete(db, pFJMatch);
-                pFJMatch = 0;
-              }else{
-                /* For a FULL JOIN, we must construct a coalesce() func */
-                extendFJMatch(pParse, &pFJMatch, pMatch, pExpr->iColumn);
               }
             }
             cnt++;
@@ -422,7 +367,9 @@ static int lookupName(
         pExpr->iTable = pMatch->iCursor;
         assert( ExprUseYTab(pExpr) );
         pExpr->y.pTab = pMatch->pTab;
-        if( (pMatch->fg.jointype & (JT_LEFT|JT_LTORJ))!=0 ){
+        /* RIGHT JOIN not (yet) supported */
+        assert( (pMatch->fg.jointype & JT_RIGHT)==0 );
+        if( (pMatch->fg.jointype & JT_LEFT)!=0 ){
           ExprSetProperty(pExpr, EP_CanBeNull);
         }
         pSchema = pExpr->y.pTab->pSchema;
@@ -663,37 +610,11 @@ static int lookupName(
   }
 
   /*
-  ** cnt==0 means there was not match.
-  ** cnt>1 means there were two or more matches.
-  **
-  ** cnt==0 is always an error.  cnt>1 is often an error, but might
-  ** be multiple matches for a NATURAL LEFT JOIN or a LEFT JOIN USING.
+  ** cnt==0 means there was not match.  cnt>1 means there were two or
+  ** more matches.  Either way, we have an error.
   */
-  assert( pFJMatch==0 || cnt>0 );
-  assert( !ExprHasProperty(pExpr, EP_xIsSelect|EP_IntValue) );
   if( cnt!=1 ){
     const char *zErr;
-    if( pFJMatch ){
-      if( pFJMatch->nExpr==cnt-1 ){
-        if( ExprHasProperty(pExpr,EP_Leaf) ){
-          ExprClearProperty(pExpr,EP_Leaf);
-        }else{
-          sqlite3ExprDelete(db, pExpr->pLeft);
-          pExpr->pLeft = 0;
-          sqlite3ExprDelete(db, pExpr->pRight);
-          pExpr->pRight = 0;
-        }
-        extendFJMatch(pParse, &pFJMatch, pMatch, pExpr->iColumn);
-        pExpr->op = TK_FUNCTION;
-        pExpr->u.zToken = "coalesce";
-        pExpr->x.pList = pFJMatch;
-        cnt = 1;
-        goto lookupname_end;
-      }else{
-        sqlite3ExprListDelete(db, pFJMatch);
-        pFJMatch = 0;
-      }
-    }
     zErr = cnt==0 ? "no such column" : "ambiguous column name";
     if( zDb ){
       sqlite3ErrorMsg(pParse, "%s: %s.%s.%s", zErr, zDb, zTab, zCol);
@@ -705,16 +626,6 @@ static int lookupName(
     sqlite3RecordErrorOffsetOfExpr(pParse->db, pExpr);
     pParse->checkSchema = 1;
     pTopNC->nNcErr++;
-  }
-  assert( pFJMatch==0 );
-
-  /* Remove all substructure from pExpr */
-  if( !ExprHasProperty(pExpr,(EP_TokenOnly|EP_Leaf)) ){
-    sqlite3ExprDelete(db, pExpr->pLeft);
-    pExpr->pLeft = 0;
-    sqlite3ExprDelete(db, pExpr->pRight);
-    pExpr->pRight = 0;
-    ExprSetProperty(pExpr, EP_Leaf);
   }
 
   /* If a column from a table in pSrcList is referenced, then record
@@ -735,7 +646,16 @@ static int lookupName(
     pMatch->colUsed |= sqlite3ExprColUsed(pExpr);
   }
 
+  /* Clean up and return
+  */
+  if( !ExprHasProperty(pExpr,(EP_TokenOnly|EP_Leaf)) ){
+    sqlite3ExprDelete(db, pExpr->pLeft);
+    pExpr->pLeft = 0;
+    sqlite3ExprDelete(db, pExpr->pRight);
+    pExpr->pRight = 0;
+  }
   pExpr->op = eNewExprOp;
+  ExprSetProperty(pExpr, EP_Leaf);
 lookupname_end:
   if( cnt==1 ){
     assert( pNC!=0 );
