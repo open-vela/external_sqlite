@@ -1729,7 +1729,7 @@ static void windowAggStep(
 
         for(iEnd=sqlite3VdbeCurrentAddr(v); iOp<iEnd; iOp++){
           VdbeOp *pOp = sqlite3VdbeGetOp(v, iOp);
-          if( pOp->opcode==OP_Column && pOp->p1==pMWin->iEphCsr ){
+          if( pOp->opcode==OP_Column && pOp->p1==pWin->iEphCsr ){
             pOp->p1 = csr;
           }
         }
