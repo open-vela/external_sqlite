@@ -1,5 +1,5 @@
-C Make\suse\sof\sthe\s"%!S"\sformat\swhen\srunning\sExplainSubquery.
-D 2022-04-22T18:07:38.628
+C Merge\sthe\slatest\senhancements\sand\sfixes\sfrom\strunk\sonto\sthe\sright-join\sbranch.
+D 2022-04-22T19:52:51.602
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1951,8 +1951,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P a2d3ee92420ec564e31eb0005367cf7ff3d00bfaed5a98ffdbe17c91c95d9d97
+P d942530a6550a0cbe31790e462b0f0d57b9b4a896161878b7d45d11cbc1cb7a3 9425d79cb407dedc259655625369e023d22a04ef7db606ea3eefe7e4d662be1a
 R d5faff9166fcd6ed79adddef328785e0
 U drh
-Z 718ee8ac0193a5ad27bc2f01dffb0763
+Z c29aa10c7d94195b4cb355a78538b541
 # Remove this line to create a well-formed Fossil manifest.
