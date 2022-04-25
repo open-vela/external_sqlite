@@ -361,7 +361,6 @@ static int lookupName(
             pExpr->iColumn = j;
             pEList->a[j].bUsed = 1;
             hit = 1;
-            if( pEList->a[j].bUsingTerm ) break;
           }
           if( hit || zTab==0 ) continue;
         }
