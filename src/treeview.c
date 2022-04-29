@@ -122,7 +122,9 @@ void sqlite3TreeViewColumnList(
     }
     if( flg & COLFLAG_PRIMKEY ) printf(" PRIMARY KEY");
     if( flg & COLFLAG_HIDDEN ) printf(" HIDDEN");
+#ifdef COLFLAG_NOEXPAND
     if( flg & COLFLAG_NOEXPAND ) printf(" NO-EXPAND");
+#endif
     if( flg ) printf(" flags=%04x", flg);
     printf("\n");      
     fflush(stdout);
@@ -868,8 +870,7 @@ void sqlite3TreeViewBareExprList(
               break;
             case ENAME_TAB:
               fprintf(stdout, "TABLE-ALIAS-NAME(\"%s\") ", zName);
-              if( pList->a[i].bUsed ) fprintf(stdout, "(used) ");
-              if( pList->a[i].bUsingTerm ) fprintf(stdout, "(USING-term) ");
+              if( pList->a[i].bUsed==0 ) fprintf(stdout, "(unused) ");
               break;
             case ENAME_SPAN:
               fprintf(stdout, "SPAN(\"%s\") ", zName);
