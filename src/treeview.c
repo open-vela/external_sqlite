@@ -462,6 +462,7 @@ void sqlite3TreeViewWindow(TreeView *pView, const Window *pWin, u8 more){
 ** Generate a human-readable explanation for a Window Function object
 */
 void sqlite3TreeViewWinFunc(TreeView *pView, const Window *pWin, u8 more){
+  if( pWin==0 ) return;
   sqlite3TreeViewPush(&pView, more);
   sqlite3TreeViewLine(pView, "WINFUNC %s(%d)",
                        pWin->pWFunc->zName, pWin->pWFunc->nArg);
@@ -880,8 +881,7 @@ void sqlite3TreeViewBareExprList(
               break;
             case ENAME_TAB:
               fprintf(stdout, "TABLE-ALIAS-NAME(\"%s\") ", zName);
-              if( pList->a[i].bUsed ) fprintf(stdout, "(used) ");
-              if( pList->a[i].bUsingTerm ) fprintf(stdout, "(USING-term) ");
+              if( pList->a[i].bUsed==0 ) fprintf(stdout, "(unused) ");
               break;
             case ENAME_SPAN:
               fprintf(stdout, "SPAN(\"%s\") ", zName);
