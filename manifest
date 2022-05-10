@@ -1,5 +1,5 @@
-C Sync\sw/\strunk
-D 2022-05-11T03:29:52.040
+C Fix\s.import\sleak\sin\sCLI\sand\sadd\sshell\sleak\stesting\sto\sdebug\sbuilds\sand\sthe\sTcl\stest\ssuite.
+D 2022-05-11T03:42:38.536
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1953,8 +1953,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P d25fbdf8772f1c8283828424b208fc1758c82e9e28e0e52122c87db4af1c672d 764b71267e0b31ff7eaf2a0def7526a1a02dce4d5b456dea060d97ed342efdd1
+P 764b71267e0b31ff7eaf2a0def7526a1a02dce4d5b456dea060d97ed342efdd1 1284225b0a8c7b630416be5348e99f7280f6443548ec97ffb1c85be23352b2bc
 R cbd08087a18243878650effded154d2f
 U larrybr
-Z c27a1070e620903c0ed9b0f0edb2e723
+Z ea5582c29873b8c02a6e6d4653537a8f
 # Remove this line to create a well-formed Fossil manifest.
