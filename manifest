@@ -1,5 +1,5 @@
-C Zap\sstray\s--help\soutput\sfrom\sintermediate\sversion.
-D 2022-05-11T20:29:32.525
+C Fix\sthe\s".echo"\scommand\sof\sthe\sCLI\sso\sthat\sit\sshows\sthe\sresults\sof\sinput\nlines\simmediately,\sbefore\sinvoking\ssqlite3_prepare().
+D 2022-05-12T11:01:41.992
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1953,8 +1953,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P c1eff632c41809214edea2850a93852fff66da3ca0dc393e8fe55e0976d422fd
+P d55273e36e312336b8fc77dc771657d3b2c3437fbbd79f3be37701982560d634 deb7372b18cc8fb9d305085498fd24b3c2c17bd920ae2d03fa885af02ad47008
 R 56f20e29d8d8bd4f94a878cd8e451873
-U larrybr
-Z ec90e5296e8a585e62fc3cef12515b0b
+T +closed deb7372b18cc8fb9d305085498fd24b3c2c17bd920ae2d03fa885af02ad47008
+U drh
+Z cf10466c2750403d999365883982fc9d
 # Remove this line to create a well-formed Fossil manifest.
