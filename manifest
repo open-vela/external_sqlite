@@ -1,5 +1,5 @@
-C When\sbuilding\sfiddle\sfrom\sits\sown\sdirectory\s(e.g.\sfrom\semacs\sinstead\sof\sthe\snormal\sbuild\sprocess),\sforce\s-O0\sthe\ssake\sof\scompilation\sspeed.\sThe\stop-level\sbuild\snow\sdefaults\sto\s-Oz,\swhich\sis\smore\sappropriate\sfor\sthat\scase.
-D 2022-05-19T16:49:15.840
+C Merge\sthe\schanges\sto\ssupport\sthe\s"fiddle"\sextension.
+D 2022-05-19T16:59:46.843
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -1959,8 +1959,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P d46a6cb97406d90b9ad1da66369454e9b8f387ffbebcdf1c386c3c21f790c16f
+P f7e1ceb5b59a876cfd04a8aac0ee2b322c970555b9c361b4953d711ef6596e37 56b82ae806c61b95e62042ca70ed952ce01832b02da55c2b315f9201989514ab
 R f9801562283af03ef889fbffa87ba13d
-U stephan
-Z edd8c70d727c3da0dc3ea944cb532c03
+T +closed 56b82ae806c61b95e62042ca70ed952ce01832b02da55c2b315f9201989514ab
+U drh
+Z 5ac79eb27823f3c1a240f3c2dd67e98a
 # Remove this line to create a well-formed Fossil manifest.
