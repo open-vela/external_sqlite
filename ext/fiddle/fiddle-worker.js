@@ -89,18 +89,7 @@
 */
 "use strict";
 
-/**
-   Posts a message in the form {type,data} unless passed more than 2
-   args, in which case it posts {type, data:[arg1...argN]}.
-*/
-const wMsg = function(type,data){
-    postMessage({
-        type,
-        data: arguments.length<3
-            ? data
-            : Array.prototype.slice.call(arguments,1)
-    });
-};
+const wMsg = (type,data)=>postMessage({type, data});
 
 self.onerror = function(/*message, source, lineno, colno, error*/) {
     const err = arguments[4];
@@ -170,120 +159,30 @@ self.Module = {
     }
 };
 
-const Sqlite3Shell = {
-    /** Returns the name of the currently-opened db. */
-    dbFilename: function f(){
-        if(!f._) f._ = Module.cwrap('fiddle_db_filename', "string", ['string']);
-        return f._();
-    },
-    /**
-       Runs the given text through the shell as if it had been typed
-       in by a user. Fires a working/start event before it starts and
-       working/end event when it finishes.
-    */
-    exec: function f(sql){
-        if(!f._) f._ = Module.cwrap('fiddle_exec', null, ['string']);
-        if(Module._isDead){
-            wMsg('stderr', "shell module has exit()ed. Cannot run SQL.");
-            return;
+const shellExec = function f(sql){
+    if(!f._) f._ = Module.cwrap('fiddle_exec', null, ['string']);
+    if(Module._isDead){
+        wMsg('stderr', "shell module has exit()ed. Cannot run SQL.");
+        return;
+    }
+    wMsg('working','start');
+    try {
+        if(f._running) wMsg('stderr','Cannot run multiple commands concurrently.');
+        else{
+            f._running = true;
+            f._(sql);
         }
-        wMsg('working','start');
-        try {
-            if(f._running){
-                wMsg('stderr','Cannot run multiple commands concurrently.');
-            }else{
-                f._running = true;
-                f._(sql);
-            }
-        } finally {
-            delete f._running;
-            wMsg('working','end');
-        }
-    },
-    /* Interrupt can't work: this Worker is tied up working, so won't get the
-       interrupt event which would be needed to perform the interrupt. */
-    interrupt: function f(){
-        if(!f._) f._ = Module.cwrap('fiddle_interrupt', null);
-        wMsg('stdout',"Requesting interrupt.");
-        f._();
+    } finally {
+        wMsg('working','end');
+        delete f._running;
     }
 };
 
-self.onmessage = function f(ev){
+self.onmessage = function(ev){
     ev = ev.data;
-    if(!f.cache){
-        f.cache = {
-            prevFilename: null
-        };
-    }
     //console.debug("worker: onmessage.data",ev);
     switch(ev.type){
-        case 'shellExec': Sqlite3Shell.exec(ev.data); return;
-        case 'interrupt': Sqlite3Shell.interrupt(); return;
-        /** Triggers the export of the current db. Fires an
-            event in the form:
-
-            {type:'db-export',
-             data:{
-               filename: name of db,
-               buffer: contents of the db file (Uint8Array),
-               error: on error, a message string and no buffer property.
-             }
-            }
-        */
-        case 'db-export': {
-            const fn = Sqlite3Shell.dbFilename();
-            wMsg('stdout',"Exporting",fn+".");
-            const fn2 = fn ? fn.split(/[/\\]/).pop() : null;
-            try{
-                if(!fn2) throw new Error("DB appears to be closed.");
-                wMsg('db-export',{
-                    filename: fn2,
-                    buffer: FS.readFile(fn, {encoding:"binary"})
-                });
-            }catch(e){
-                /* Post a failure message so that UI elements disabled
-                   during the export can be re-enabled. */
-                wMsg('db-export',{
-                    filename: fn,
-                    error: e.message
-                });
-            }
-            return;
-        }
-        case 'open': {
-            /* Expects: {
-                 buffer: ArrayBuffer | Uint8Array,
-                 filename: for logging/informational purposes only
-               } */
-            const opt = ev.data;
-            let buffer = opt.buffer;
-            if(buffer instanceof Uint8Array){
-            }else if(buffer instanceof ArrayBuffer){
-                buffer = new Uint8Array(buffer);
-            }else{
-                wMsg('stderr',"'open' expects {buffer:Uint8Array} containing an uploaded db.");
-                return;
-            }
-            const fn = (
-                opt.filename
-                    ? opt.filename.split(/[/\\]/).pop().replace('"','_')
-                    : ("db-"+((Math.random() * 10000000) | 0)+
-                       "-"+((Math.random() * 10000000) | 0)+".sqlite3")
-            );
-            /* We cannot delete the existing db file until the new one
-               is installed, which means that we risk overflowing our
-               quota (if any) by having both the previous and current
-               db briefly installed in the virtual filesystem. */
-            FS.createDataFile("/", fn, buffer, true, true);
-            const oldName = Sqlite3Shell.dbFilename();
-            Sqlite3Shell.exec('.open "/'+fn+'"');
-            if(oldName !== fn){
-                FS.unlink(oldName);
-            }
-            wMsg('stdout',"Replaced DB with",fn+".");
-            return;
-        }
+        case 'shellExec': shellExec(ev.data); return;
     };
     console.warn("Unknown fiddle-worker message type:",ev);
 };
