@@ -218,8 +218,6 @@
             if(sql) SF.dbExec(sql);
         },false);
 
-        const btnInterrupt = E("#btn-interrupt");
-        //btnInterrupt.classList.add('hidden');
         /** To be called immediately before work is sent to the
             worker. Updates some UI elements. The 'working'/'end'
             event will apply the inverse, undoing the bits this
@@ -239,7 +237,6 @@
             }
             f._.pageTitle.innerText = "[working...] "+f._.pageTitleOrig;
             btnShellExec.setAttribute('disabled','disabled');
-            btnInterrupt.removeAttribute('disabled','disabled');
         };
 
         /* Sends the given text to the db module to evaluate as if it
@@ -261,7 +258,6 @@
                     preStartWork._.pageTitle.innerText = preStartWork._.pageTitleOrig;
                     btnShellExec.innerText = preStartWork._.btnLabel;
                     btnShellExec.removeAttribute('disabled');
-                    btnInterrupt.setAttribute('disabled','disabled');
                     return;
             }
             console.warn("Unhandled 'working' event:",ev.data);
@@ -298,81 +294,11 @@
                 }, false);
             });
         /* For each button with data-cmd=X, map a click handler which
-           calls SF.dbExec(X). */
+           calls dbExec(X). */
         const cmdClick = function(){SF.dbExec(this.dataset.cmd);};
         EAll('button[data-cmd]').forEach(
             e => e.addEventListener('click', cmdClick, false)
         );
-
-        btnInterrupt.addEventListener('click',function(){
-            SF.wMsg('interrupt');
-        });
-
-        /** Initiate a download of the db. */
-        const btnExport = E('#btn-export');
-        const eDisableDuringExport = [
-            /* UI elements to disable while export is running. Normally
-               the export is fast enough that this won't matter, but we
-               really don't want to be reading (from outside of sqlite)
-               the db when the user taps btnShellExec. */
-            btnShellExec, btnExport
-        ];
-        btnExport.addEventListener('click',function(){
-            eDisableDuringExport.forEach(e=>e.setAttribute('disabled','disabled'));
-            SF.wMsg('db-export');
-        });
-        SF.addMsgHandler('db-export', function(ev){
-            eDisableDuringExport.forEach(e=>e.removeAttribute('disabled'));
-            ev = ev.data;
-            if(ev.error){
-                SF.echo("Export failed:",ev.error);
-                return;
-            }
-            const blob = new Blob([ev.buffer], {type:"application/x-sqlite3"});
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            a.href = window.URL.createObjectURL(blob);
-            a.download = ev.filename;
-            a.addEventListener('click',function(){
-                setTimeout(function(){
-                    SF.echo("Exported (possibly auto-downloaded):",ev.filename);
-                    window.URL.revokeObjectURL(a.href);
-                    a.remove();
-                },0);
-            });
-            a.click();
-        });
-
-        E('#load-db').addEventListener('change',function(){
-            const f = this.files[0];
-            const r = new FileReader();
-            const status = {loaded: 0, total: 0};
-            this.setAttribute('disabled','disabled');
-            r.addEventListener('loadstart', function(){
-                SF.echo("Loading",f.name,"...");
-            });
-            r.addEventListener('progress', function(ev){
-                SF.echo("Loading progress:",ev.loaded,"of",ev.total,"bytes.");
-            });
-            const that = this;
-            r.addEventListener('load', function(){
-                that.removeAttribute('disabled');
-                SF.echo("Loaded",f.name+". Opening db...");
-                SF.wMsg('open',{
-                    filename: f.name,
-                    buffer: this.result
-                });
-            });
-            r.addEventListener('error',function(){
-                that.removeAttribute('disabled');
-                SF.echo("Loading",f.name,"failed for unknown reason.");
-            });
-            r.addEventListener('abort',function(){
-                that.removeAttribute('disabled');
-                SF.echo("Cancelled loading of",f.name+".");
-            });
-            r.readAsArrayBuffer(f);
-        });
 
         /**
            Given a DOM element, this routine measures its "effective
@@ -519,7 +445,7 @@ SELECT group_concat(rtrim(t),x'0a') as Mandelbrot FROM a;`}
                 taInput.value = '-- ' +
                     this.selectedOptions[0].innerText +
                     '\n' + this.value;
-                SF.dbExec(this.value);
+                //dbExec(this.value);
             });
         })()/* example queries */;
 
