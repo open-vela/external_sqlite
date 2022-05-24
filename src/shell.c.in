@@ -4395,10 +4395,8 @@ static const char *(azHelp[]) = {
   "       -e     Send output to the system text editor",
   "       -x     Send output as CSV to a spreadsheet (same as \".excel\")",
   /* Note that .open is (partially) available in WASM builds but is
-  ** currently only intended to be fed the names of already-existing
-  ** binary db imports, so is "undocumented." Passing it an unknown
-  ** filename will lead to an exit(), so we don't want WASM-side
-  ** callers using it. */
+  ** currently only intended to be used by the fiddle tool, not
+  ** end users, so is "undocumented." */
   ".open ?OPTIONS? ?FILE?   Close existing database and reopen FILE",
   "     Options:",
   "        --append        Use appendvfs to append database to the end of FILE",
@@ -12612,16 +12610,16 @@ sqlite3 * fiddle_db_arg(sqlite3 *arg){
 /*
 ** Intended to be called via a SharedWorker() while a separate
 ** SharedWorker() (which manages the wasm module) is performing work
-** which should be interrupted.
+** which should be interrupted. Unfortunately, SharedWorker is not
+** portable enough to make real use of.
 */
 void fiddle_interrupt(void){
   if(globalDb) sqlite3_interrupt(globalDb);
 }
 
 /*
-** Returns the filename of the given db name, assuming
-** "main" if zDbName is NULL. Returns NULL globalDb is
-** not opened.
+** Returns the filename of the given db name, assuming "main" if
+** zDbName is NULL. Returns NULL if globalDb is not opened.
 */
 const char * fiddle_db_filename(const char * zDbName){
     return globalDb
