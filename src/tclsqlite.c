@@ -2965,7 +2965,7 @@ deserialize_error:
     }
 
     if( objc==(6+isReadonly) ){
-      zDb = Tcl_GetString(objv[2+isReadonly]);
+      zDb = Tcl_GetString(objv[2]);
     }
     zTable = Tcl_GetString(objv[objc-3]);
     zColumn = Tcl_GetString(objv[objc-2]);

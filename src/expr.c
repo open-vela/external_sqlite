@@ -3955,7 +3955,6 @@ static int exprCodeInlineFunction(
       caseExpr.x.pList = pFarg;
       return sqlite3ExprCodeTarget(pParse, &caseExpr, target);
     }
-#ifdef SQLITE_ENABLE_OFFSET_SQL_FUNC
     case INLINEFUNC_sqlite_offset: {
       Expr *pArg = pFarg->a[0].pExpr;
       if( pArg->op==TK_COLUMN && pArg->iTable>=0 ){
@@ -3965,7 +3964,6 @@ static int exprCodeInlineFunction(
       }
       break;
     }
-#endif
     default: {   
       /* The UNLIKELY() function is a no-op.  The result is the value
       ** of the first argument.
