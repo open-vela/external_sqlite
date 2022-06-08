@@ -3210,18 +3210,15 @@ static int indexMightHelpWithOrderBy(
 */
 static int whereUsablePartialIndex(
   int iTab,             /* The table for which we want an index */
-  u8 jointype,          /* The JT_* flags on the join */
+  int isLeft,           /* True if iTab is the right table of a LEFT JOIN */
   WhereClause *pWC,     /* The WHERE clause of the query */
   Expr *pWhere          /* The WHERE clause from the partial index */
 ){
   int i;
   WhereTerm *pTerm;
-  Parse *pParse;
-
-  if( jointype & JT_LTORJ ) return 0;
-  pParse = pWC->pWInfo->pParse;
+  Parse *pParse = pWC->pWInfo->pParse;
   while( pWhere->op==TK_AND ){
-    if( !whereUsablePartialIndex(iTab,jointype,pWC,pWhere->pLeft) ) return 0;
+    if( !whereUsablePartialIndex(iTab,isLeft,pWC,pWhere->pLeft) ) return 0;
     pWhere = pWhere->pRight;
   }
   if( pParse->db->flags & SQLITE_EnableQPSG ) pParse = 0;
@@ -3229,7 +3226,7 @@ static int whereUsablePartialIndex(
     Expr *pExpr;
     pExpr = pTerm->pExpr;
     if( (!ExprHasProperty(pExpr, EP_OuterON) || pExpr->w.iJoin==iTab)
-     && ((jointype & JT_OUTER)==0 || ExprHasProperty(pExpr, EP_OuterON))
+     && (isLeft==0 || ExprHasProperty(pExpr, EP_OuterON))
      && sqlite3ExprImpliesExpr(pParse, pExpr, pWhere, iTab)
      && (pTerm->wtFlags & TERM_VNULL)==0
     ){
@@ -3395,8 +3392,9 @@ static int whereLoopAddBtree(
   for(; rc==SQLITE_OK && pProbe; 
       pProbe=(pSrc->fg.isIndexedBy ? 0 : pProbe->pNext), iSortIdx++
   ){
+    int isLeft = (pSrc->fg.jointype & JT_OUTER)!=0;
     if( pProbe->pPartIdxWhere!=0
-     && !whereUsablePartialIndex(pSrc->iCursor, pSrc->fg.jointype, pWC,
+     && !whereUsablePartialIndex(pSrc->iCursor, isLeft, pWC,
                                  pProbe->pPartIdxWhere)
     ){
       testcase( pNew->iTab!=pSrc->iCursor );  /* See ticket [98d973b8f5] */
