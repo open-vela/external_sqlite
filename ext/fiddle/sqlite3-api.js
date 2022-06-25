@@ -13,11 +13,11 @@
   This file is intended to be appended to the emcc-generated
   sqlite3.js via emcc:
 
-  emcc ... -sMODULARIZE -sEXPORT_NAME=sqlite3InitModule --post-js=THIS_FILE
+  emcc ... -sMODULARIZE -sEXPORT_NAME=initSqlite3Module --post-js=THIS_FILE
 
   It is loaded by importing the emcc-generated sqlite3.js, then:
 
-  sqlite3InitModule({module object}).then(
+  initSqlite3Module({module object}).then(
     function(theModule){
       theModule.sqlite3 == an object containing this file's
       deliverables:
@@ -29,7 +29,7 @@
 
   It is up to the caller to provide a module object compatible with
   emcc, but it can be a plain empty object. The object passed to
-  sqlite3InitModule() will get populated by the emscripten-generated
+  initSqlite3Module() will get populated by the emscripten-generated
   bits and, in part, by the code from this file. Specifically, this file
   installs the `theModule.sqlite3` part shown above.
 
@@ -122,27 +122,6 @@ Module.postRun.push(function(namespace/*the module object, the target for
 
     const SQM = namespace/*the sqlite module object */;
 
-    /** Throws a new Error, the message of which is the concatenation
-        all args with a space between each. */
-    const toss = function(){
-        throw new Error(Array.prototype.join.call(arguments, ' '));
-    };
-
-    /**
-       Returns true if v appears to be one of our supported TypedArray types:
-       Uint8Array or Int8Array.
-    */
-    const isSupportedTypedArray = function(v){
-        return v && (undefined!==v.byteLength) && (v.byteLength === v.length);
-    };
-
-    /** Returns true if isSupportedTypedArray(v) does, else throws with a message
-        that v is not a supported TypedArray value. */
-    const affirmSupportedTypedArray = function(v){
-        return isSupportedTypedArray(v)
-            || toss("Value is not of a supported TypedArray type.");
-    };
-
     /** 
       Set up the main sqlite3 binding API here, mimicking the C API as
       closely as we can.
@@ -151,50 +130,45 @@ Module.postRun.push(function(namespace/*the module object, the target for
       follows is strongly influenced by the sql.js implementation.
     */
     const api = {
-        /**
-           Holds state which are specific to the WASM-related
-           infrastructure and glue code. It is not expected that client
-           code will normally need these, but they're exposed here in case it
-           does.
+        /* It is important that the following integer values match
+           those from the C code. Ideally we could fetch them from the
+           C API, e.g., in the form of a JSON object, but getting that
+           JSON string constructed within our current confines is
+           currently not worth the effort.
+
+           Reminder to self: we could probably do so by adding the
+           proverbial level of indirection, calling in to C to get it,
+           and having that C func call an
+           emscripten-installed/JS-implemented library function which
+           builds the result object:
+
+           const obj = {};
+           sqlite3__get_enum(function(key,val){
+               obj[key] = val;
+           });
+
+           but whether or not we can pass a function that way, via a
+           (void*) is as yet unknown.
         */
-        wasm: {
-            /**
-               api.wasm._malloc()'s srcTypedArray.byteLength bytes,
-               populates them with the values from the source array,
-               and returns the pointer to that memory. The pointer
-               must eventually be passed to api.wasm._free() to clean
-               it up.
-
-               As a special case, to avoid further special cases where
-               this is used, if srcTypedArray.byteLength is 0, it
-               allocates a single byte and sets it to the value 0.
-
-               ACHTUNG: this currently only works for Uint8Array and
-               Int8Array types.
-            */
-            mallocFromTypedArray: function(srcTypedArray){
-                affirmSupportedTypedArray(srcTypedArray);
-                const pRet = api.wasm._malloc(srcTypedArray.byteLength || 1);
-                if(srcTypedArray.byteLength){
-                    api.wasm._malloc.HEAP.set(srcTypedArray, pRet);
-                    /* That unfortunately does not behave intuitively
-                       when copying, e.g., the contents of a
-                       Uint16Array, copying only 1 byte of each
-                       entry instead of blitting the whole array
-                       contents over the destination array. A potential TODO
-                       is handle that copying here so that we can support a wider
-                       array (haha) of bindable-as-blob types. */
-                }
-                else api.wasm._malloc.HEAP[pRet] = 0;
-                return pRet;
-            },
-            /**
-               The TypedArray buffer which holds the heap memory
-               managed by the emscripten-installed _malloc().
-            */
-            HEAP8: SQM.HEAP8
-        }
+        /* Minimum subset of sqlite result codes we'll need. */
+        SQLITE_OK: 0,
+        SQLITE_ROW: 100,
+        SQLITE_DONE: 101,
+        /* sqlite data types */
+        SQLITE_INTEGER: 1,
+        SQLITE_FLOAT: 2,
+        SQLITE_TEXT: 3,
+        SQLITE_BLOB: 4,
+        SQLITE_NULL: 5,
+        /* create_function() flags */
+        SQLITE_DETERMINISTIC: 0x000000800,
+        SQLITE_DIRECTONLY: 0x000080000,
+        SQLITE_INNOCUOUS: 0x000200000,
+        /* sqlite encodings, used for creating UDFs, noting that we
+           will only support UTF8. */
+        SQLITE_UTF8: 1
     };
+    const cwrap = SQM.cwrap;
     [/* C-side functions to bind. Each entry is an array with 3 or 4
         elements:
         
@@ -245,8 +219,14 @@ Module.postRun.push(function(namespace/*the module object, the target for
         ["sqlite3_open", "number", ["string", "number"]],
         //["sqlite3_open_v2", "number", ["string", "number", "number", "string"]],
         //^^^^ TODO: add the flags needed for the 3rd arg
-        /* sqlite3_prepare_v2() is handled separately due to us requiring two
-           different sets of semantics for that function. */
+        ["sqlite3_prepare_v2", "number", ["number", "string", "number", "number", "number"]],
+        ["sqlite3_prepare_v2_sqlptr", "sqlite3_prepare_v2",
+         /* Impl which requires that the 2nd argument be a pointer to
+            the SQL string, instead of being converted to a
+            string. This is used for cases where we require a non-NULL
+            value for the final argument (exec()'ing multiple
+            statements from one input string). */
+         "number", ["number", "number", "number", "number", "number"]],
         ["sqlite3_reset", "number", ["number"]],
         ["sqlite3_result_blob",null,["number", "number", "number", "number"]],
         ["sqlite3_result_double",null,["number", "number"]],
@@ -265,127 +245,8 @@ Module.postRun.push(function(namespace/*the module object, the target for
         //["sqlite3_normalized_sql", "string", ["number"]]
     ].forEach(function(a){
         const k = (4==a.length) ? a.shift() : a[0];
-        api[k] = SQM.cwrap.apply(this, a);
+        api[k] = cwrap.apply(this, a);
     });
-
-    /**
-       Proxies for variants of sqlite3_prepare_v2() which have
-       differing JS/WASM binding semantics.
-    */
-    const prepareMethods = {
-        /**
-           This binding expects a JS string as its 2nd argument and
-           null as its final argument. In order to compile multiple
-           statements from a single string, the "full" impl (see
-           below) must be used.
-        */
-        basic: SQM.cwrap('sqlite3_prepare_v2',
-                         "number", ["number", "string", "number"/*MUST always be negative*/,
-                                    "number", "number"/*MUST be 0 or null or undefined!*/]),
-         /* Impl which requires that the 2nd argument be a pointer to
-            the SQL string, instead of being converted to a
-            string. This variant is necessary for cases where we
-            require a non-NULL value for the final argument
-            (exec()'ing multiple statements from one input
-            string). For simpler cases, where only the first statement
-            in the SQL string is required, the wrapper named
-            sqlite3_prepare_v2() is sufficient and easier to use
-            because it doesn't require dealing with pointers.
-
-            TODO: hide both of these methods behind a single hand-written 
-            sqlite3_prepare_v2() wrapper which dispatches to the appropriate impl.
-         */
-        full: SQM.cwrap('sqlite3_prepare_v2',
-                        "number", ["number", "number", "number"/*MUST always be negative*/,
-                                   "number", "number"]),
-    };
-
-    /* Import C-level constants... */
-    //console.log("wasmEnum=",SQM.ccall('sqlite3_wasm_enum_json', 'string', []));
-    const wasmEnum = JSON.parse(SQM.ccall('sqlite3_wasm_enum_json', 'string', []));
-    ['resultCodes','dataTypes','udfFlags',
-     'encodings','blobFinalizers'].forEach(function(t){
-        Object.keys(wasmEnum[t]).forEach(function(k){
-            api[k] = wasmEnum[t][k];
-        });
-    });
-
-    const utf8Decoder = new TextDecoder('utf-8');
-    const typedArrayToString = (str)=>utf8Decoder.decode(str);
-    //const stringToUint8 = (sql)=>new TextEncoder('utf-8').encode(sql);
-
-    /**
-       sqlite3_prepare_v2() binding which handles two different uses
-       with differing JS/WASM semantics:
-
-       1) sqlite3_prepare_v2(pDb, sqlString, -1, ppStmt [, null])
-
-       2) sqlite3_prepare_v2(pDb, sqlPointer, -1, ppStmt, sqlPointerToPointer)
-
-       Note that the SQL length argument (the 3rd argument) must
-       always be negative because it must be a byte length and that
-       value is expensive to calculate from JS (where we get the
-       character length of strings). It is retained in this API's
-       interface for code/documentation compatibility reasons but is
-       currently _always_ ignored. When using the 2nd form of this
-       call, it is critical that the custom-allocated string be
-       terminated with a 0 byte. (Potential TODO: if this value is >0,
-       assume the caller knows precisely what they're doing and pass
-       it on as-is. That approach currently seems fraught with peril.)
-
-       In usage (1), the 2nd argument must be of type string or
-       Uint8Array (which is assumed to hold SQL). If it is, this
-       function assumes case (1) and calls the underling C function
-       with:
-
-       (pDb, sqlAsString, -1, ppStmt, null)
-
-       The pzTail argument is ignored in this case because its result
-       is meaningless when a string-type value is passed through
-       (because the string goes through another level of internal
-       conversion for WASM's sake and the result pointer would refer
-       to that conversion's memory, not the passed-in string).
-
-       If sql is not a string or Uint8Array, it must be a _pointer_ to
-       a string which was allocated via api.wasm.allocateUTF8OnStack()
-       or equivalent (TODO: define "or equivalent"). In that case, the
-       final argument may be 0/null/undefined or must be a pointer to
-       which the "tail" of the compiled SQL is written, as documented
-       for the C-side sqlite3_prepare_v2(). In case (2), the
-       underlying C function is called with:
-
-       (pDb, sqlAsPointer, -1, ppStmt, pzTail)
-
-       It returns its result and compiled statement as documented in
-       the C API. Fetching the output pointers (4th and 5th
-       parameters) requires using api.wasm.getValue().
-    */
-    api.sqlite3_prepare_v2 = function(pDb, sql, sqlLen, ppStmt, pzTail){
-        if(isSupportedTypedArray(sql)) sql = typedArrayToString(sql);
-        switch(typeof sql){
-            case 'string': return prepareMethods.basic(pDb, sql, -1, ppStmt, null);
-            case 'number': return prepareMethods.full(pDb, sql, -1, ppStmt, pzTail);
-            default: toss("Invalid SQL argument type for sqlite3_prepare_v2().");
-        }
-    };
-
-    /** Populate api.wasm with several members of the module object... */
-    ['getValue','setValue', 'stackSave', 'stackRestore', 'stackAlloc',
-     'allocateUTF8OnStack', '_malloc', '_free',
-     'addFunction', 'removeFunction',
-     'intArrayFromString', 'lengthBytesUTF8', 'stringToUTF8Array'
-    ].forEach(function(m){
-        if(undefined === (api.wasm[m] = SQM[m])){
-            toss("Internal init error: Module."+m+" not found.");
-        }
-    });
-    /**
-       The array object which holds the raw bytes managed by the
-       _malloc() binding. Side note: why on earth _malloc() manages
-       HEAP8 (an Int8Array), rather than HEAPU8 (a Uint8Array), is a
-       mystery.
-    */
-    api.wasm._malloc.HEAP = api.wasm.HEAP8;
 
     /* What follows is colloquially known as "OO API #1". It is a
        binding of the sqlite3 API which is designed to be run within
@@ -393,6 +254,14 @@ Module.postRun.push(function(namespace/*the module object, the target for
        sqlite3 WASM binding was initialized. This wrapper cannot use
        the sqlite3 binding if, e.g., the wrapper is in the main thread
        and the sqlite3 API is in a worker. */
+
+    /** Memory for use in some pointer-to-pointer-passing routines. */
+    const pPtrArg = stackAlloc(4);
+    /** Throws a new error, concatenating all args with a space between
+        each. */
+    const toss = function(){
+        throw new Error(Array.prototype.join.call(arguments, ' '));
+    };
 
     /**
        The DB class wraps a sqlite3 db handle.
@@ -453,12 +322,9 @@ Module.postRun.push(function(namespace/*the module object, the target for
             }
             FS.createDataFile("/", fn, buffer, true, true);
         }
-        const stack = api.wasm.stackSave();
-        const ppDb  = api.wasm.stackAlloc(4) /* output (sqlite3**) arg */;
-        api.wasm.setValue(ppDb, 0, "i32");
-        try {this.checkRc(api.sqlite3_open(fn, ppDb));}
-        finally{api.wasm.stackRestore(stack);}
-        this._pDb = api.wasm.getValue(ppDb, "i32");
+        setValue(pPtrArg, 0, "i32");
+        this.checkRc(api.sqlite3_open(fn, pPtrArg));
+        this._pDb = getValue(pPtrArg, "i32");
         this.filename = fn;
         this._statements = {/*map of open Stmt _pointers_ to Stmt*/};
         this._udfs = {/*map of UDF names to wasm function _pointers_*/};
@@ -492,6 +358,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
         this._pStmt = arguments[1];
         this.columnCount = api.sqlite3_column_count(this._pStmt);
         this.parameterCount = api.sqlite3_bind_parameter_count(this._pStmt);
+        this._allocs = [/*list of alloc'd memory blocks for bind() values*/]
     };
 
     /** Throws if the given DB has been closed, else it is returned. */
@@ -503,7 +370,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
     /** Returns true if n is a 32-bit (signed) integer,
         else false. */
     const isInt32 = function(n){
-        return (n===(n|0) && n<0xFFFFFFFF) ? true : undefined;
+        return (n===n|0 && n<0xFFFFFFFF) ? true : undefined;
     };
 
     /**
@@ -511,7 +378,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
        DB.execMulti(). Does the argument processing/validation, throws
        on error, and returns a new object on success:
 
-       { sql: the SQL, opt: optionsObj, cbArg: function}
+       { sql: the SQL, obt: optionsObj, cbArg: function}
 
        cbArg is only set if the opt.callback is set, in which case
        it's a function which expects to be passed the current Stmt
@@ -519,13 +386,12 @@ Module.postRun.push(function(namespace/*the module object, the target for
        the input arguments.
     */
     const parseExecArgs = function(args){
-        const out = {opt:{}};
+        const out = {};
         switch(args.length){
             case 1:
                 if('string'===typeof args[0]){
                     out.sql = args[0];
-                }else if(isSupportedTypedArray(args[0])){
-                    out.sql = args[0];
+                    out.opt = {};
                 }else if(args[0] && 'object'===typeof args[0]){
                     out.opt = args[0];
                     out.sql = out.opt.sql;
@@ -537,13 +403,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
             break;
             default: toss("Invalid argument count for exec().");
         };
-        if(isSupportedTypedArray(out.sql)){
-            out.sql = typedArrayToString(out.sql);
-        }else if(Array.isArray(out.sql)){
-            out.sql = out.sql.join('');
-        }else if('string'!==typeof out.sql){
-            toss("Missing SQL argument.");
-        }
+        if('string'!==typeof out.sql) toss("Missing SQL argument.");
         if(out.opt.callback || out.opt.resultRows){
             switch((undefined===out.opt.rowMode)
                    ? 'stmt' : out.opt.rowMode) {
@@ -593,7 +453,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     delete that._statements[k];
                     if(s && s._pStmt) s.finalize();
                 });
-                Object.values(this._udfs).forEach(api.wasm.removeFunction);
+                Object.values(this._udfs).forEach(SQM.removeFunction);
                 delete this._udfs;
                 delete this._statements;
                 api.sqlite3_close_v2(this._pDb);
@@ -621,21 +481,13 @@ Module.postRun.push(function(namespace/*the module object, the target for
         /**
            Compiles the given SQL and returns a prepared Stmt. This is
            the only way to create new Stmt objects. Throws on error.
-
-           The given SQL must be a string, a Uint8Array holding SQL,
-           or a WASM pointer to memory allocated using
-           api.wasm.allocateUTF8OnStack() (or equivalent (a term which
-           is yet to be defined precisely)).
         */
         prepare: function(sql){
             affirmDbOpen(this);
-            const stack = api.wasm.stackSave();
-            const ppStmt  = api.wasm.stackAlloc(4)/* output (sqlite3_stmt**) arg */;
-            api.wasm.setValue(ppStmt, 0, "i32");
-            try {this.checkRc(api.sqlite3_prepare_v2(this._pDb, sql, -1, ppStmt, null));}
-            finally {api.wasm.stackRestore(stack);}
-            const pStmt = api.wasm.getValue(ppStmt, "i32");
-            if(!pStmt) toss("Cannot prepare empty SQL.");
+            setValue(pPtrArg,0,"i32");
+            this.checkRc(api.sqlite3_prepare_v2(this._pDb, sql, -1, pPtrArg, null));
+            const pStmt = getValue(pPtrArg, "i32");
+            if(!pStmt) toss("Empty SQL is not permitted.");
             const stmt = new Stmt(this, pStmt, BindTypes);
             this._statements[pStmt] = stmt;
             return stmt;
@@ -733,10 +585,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
            properties:
 
            - .sql = the SQL to run (unless it's provided as the first
-             argument). This must be of type string, Uint8Array, or an
-             array of strings (in which case they're concatenated
-             together as-is, with no separator between elements,
-             before evaluation).
+             argument).
 
            - .bind = a single value valid as an argument for
              Stmt.bind(). This is ONLY applied to the FIRST non-empty
@@ -744,13 +593,12 @@ Module.postRun.push(function(namespace/*the module object, the target for
              parameters. (Empty statements are skipped entirely.)
 
            - .callback = a function which gets called for each row of
-             the FIRST statement in the SQL which has result
-             _columns_, but only if that statement has any result
-             _rows_. The second argument passed to the callback is
-             always the current Stmt object (so that the caller may
-             collect column names, or similar). The first argument
-             passed to the callback defaults to the current Stmt
-             object but may be changed with ...
+             the FIRST statement in the SQL (if it has any result
+             rows). The second argument passed to the callback is
+             always the current Stmt object (so that the caller
+             may collect column names, or similar). The first
+             argument passed to the callback defaults to the current
+             Stmt object but may be changed with ...
 
            - .rowMode = a string describing what type of argument
              should be passed as the first argument to the callback. A
@@ -790,27 +638,23 @@ Module.postRun.push(function(namespace/*the module object, the target for
                          ? arguments[0] : parseExecArgs(arguments));
             if(!arg.sql) return this;
             const opt = arg.opt;
-            const stack = api.wasm.stackSave();
+            const stack = stackSave();
             let stmt;
             let bind = opt.bind;
             let rowMode = (
                 (opt.callback && opt.rowMode)
                     ? opt.rowMode : false);
             try{
-                const sql = isSupportedTypedArray(arg.sql)
-                      ? typedArrayToString(arg.sql)
-                      : arg.sql;
-                let pSql = api.wasm.allocateUTF8OnStack(sql)
-                const ppStmt  = api.wasm.stackAlloc(8) /* output (sqlite3_stmt**) arg */;
-                const pzTail = ppStmt + 4 /* final arg to sqlite3_prepare_v2_sqlptr() */;
-                while(api.wasm.getValue(pSql, "i8")){
-                    api.wasm.setValue(ppStmt, 0, "i32");
-                    api.wasm.setValue(pzTail, 0, "i32");
-                    this.checkRc(api.sqlite3_prepare_v2(
-                        this._pDb, pSql, -1, ppStmt, pzTail
+                let pSql = SQM.allocateUTF8OnStack(arg.sql)
+                const pzTail = stackAlloc(4);
+                while(getValue(pSql, "i8")){
+                    setValue(pPtrArg, 0, "i32");
+                    setValue(pzTail, 0, "i32");
+                    this.checkRc(api.sqlite3_prepare_v2_sqlptr(
+                        this._pDb, pSql, -1, pPtrArg, pzTail
                     ));
-                    const pStmt = api.wasm.getValue(ppStmt, "i32");
-                    pSql = api.wasm.getValue(pzTail, "i32");
+                    const pStmt = getValue(pPtrArg, "i32");
+                    pSql = getValue(pzTail, "i32");
                     if(!pStmt) continue;
                     if(opt.saveSql){
                         opt.saveSql.push(api.sqlite3_sql(pStmt).trim());
@@ -820,7 +664,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
                         stmt.bind(bind);
                         bind = null;
                     }
-                    if(opt.callback && null!==rowMode && stmt.columnCount){
+                    if(opt.callback && null!==rowMode){
                         while(stmt.step()){
                             stmt._isLocked = true;
                             callback(arg.cbArg(stmt), stmt);
@@ -839,7 +683,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     delete stmt._isLocked;
                     stmt.finalize();
                 }
-                api.wasm.stackRestore(stack);
+                stackRestore(stack);
             }
             return this;
         }/*execMulti()*/,
@@ -892,6 +736,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
            - .directOnly = SQLITE_DIRECTONLY
            - .innocuous = SQLITE_INNOCUOUS
 
+
            Maintenance reminder: the ability to add new
            WASM-accessible functions to the runtime requires that the
            WASM build is compiled with emcc's `-sALLOW_TABLE_GROWTH`
@@ -924,22 +769,22 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     let i, pVal, valType, arg;
                     const tgt = [];
                     for(i = 0; i < argc; ++i){
-                        pVal = api.wasm.getValue(pArgv + (4 * i), "i32");
+                        pVal = getValue(pArgv + (4 * i), "i32");
                         valType = api.sqlite3_value_type(pVal);
                         switch(valType){
                             case api.SQLITE_INTEGER:
                             case api.SQLITE_FLOAT:
                                 arg = api.sqlite3_value_double(pVal);
                                 break;
-                            case api.SQLITE_TEXT:
+                            case SQLITE_TEXT:
                                 arg = api.sqlite3_value_text(pVal);
                                 break;
-                            case api.SQLITE_BLOB:{
-                                const n = api.sqlite3_value_bytes(pVal);
-                                const pBlob = api.sqlite3_value_blob(pVal);
+                            case SQLITE_BLOB:{
+                                const n = api.sqlite3_value_bytes(ptr);
+                                const pBlob = api.sqlite3_value_blob(ptr);
                                 arg = new Uint8Array(n);
                                 let i;
-                                for(i = 0; i < n; ++i) arg[i] = api.wasm.HEAP8[pBlob+i];
+                                for(i = 0; i < n; ++i) arg[i] = HEAP8[pBlob+i];
                                 break;
                             }
                             default:
@@ -961,17 +806,18 @@ Module.postRun.push(function(namespace/*the module object, the target for
                             break;
                         }
                         case 'string':
-                            api.sqlite3_result_text(pCx, val, -1, api.SQLITE_TRANSIENT);
+                            api.sqlite3_result_text(pCx, val, -1,
+                                                  -1/*==SQLITE_TRANSIENT*/);
                             break;
                         case 'object':
                             if(null===val) {
                                 api.sqlite3_result_null(pCx);
                                 break;
-                            }else if(isSupportedTypedArray(val)){
-                                const pBlob = api.wasm.mallocFromTypedArray(val);
-                                api.sqlite3_result_blob(pCx, pBlob, val.byteLength,
-                                                        api.SQLITE_TRANSIENT);
-                                api.wasm._free(pBlob);
+                            }else if(undefined!==val.length){
+                                const pBlob =
+                                      SQM.allocate(val, SQM.ALLOC_NORMAL);
+                                api.sqlite3_result_blob(pCx, pBlob, val.length, -1/*==SQLITE_TRANSIENT*/);
+                                SQM._free(blobptr);
                                 break;
                             }
                             // else fall through
@@ -987,7 +833,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     api.sqlite3_result_error(pCx, e.message, -1);
                 }
             };
-            const pUdf = api.wasm.addFunction(wrapper, "viii");
+            const pUdf = SQM.addFunction(wrapper, "viii");
             let fFlags = 0;
             if(getOwnOption(opt, 'deterministic')) fFlags |= api.SQLITE_DETERMINISTIC;
             if(getOwnOption(opt, 'directOnly')) fFlags |= api.SQLITE_DIRECTONLY;
@@ -1000,11 +846,11 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     api.SQLITE_UTF8 | fFlags, null/*pApp*/, pUdf,
                     null/*xStep*/, null/*xFinal*/, null/*xDestroy*/));
             }catch(e){
-                api.wasm.removeFunction(pUdf);
+                SQM.removeFunction(pUdf);
                 throw e;
             }
             if(this._udfs.hasOwnProperty(name)){
-                api.wasm.removeFunction(this._udfs[name]);
+                SQM.removeFunction(this._udfs[name]);
             }
             this._udfs[name] = pUdf;
             return this;
@@ -1080,8 +926,8 @@ Module.postRun.push(function(namespace/*the module object, the target for
             case BindTypes.string:
                 return t;
             default:
-                //console.log("isSupportedBindType",t,v);
-                return isSupportedTypedArray(v) ? BindTypes.blob : undefined;
+                if(v instanceof Uint8Array) return BindTypes.blob;
+                return undefined;
         }
     };
 
@@ -1090,8 +936,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
        function returns that value, else it throws.
     */
     const affirmSupportedBindType = function(v){
-        //console.log('affirmSupportedBindType',v);
-        return isSupportedBindType(v) || toss("Unsupported bind() argument type:",typeof v);
+        return isSupportedBindType(v) || toss("Unsupport bind() argument type.");
     };
 
     /**
@@ -1106,7 +951,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
     const affirmParamIndex = function(stmt,key){
         const n = ('number'===typeof key)
               ? key : api.sqlite3_bind_parameter_index(stmt._pStmt, key);
-        if(0===n || !isInt32(n)){
+        if(0===n || (n===key && (n!==(n|0)/*floating point*/))){
             toss("Invalid bind() parameter name: "+key);
         }
         else if(n<1 || n>stmt.parameterCount) toss("Bind index",key,"is out of range.");
@@ -1153,29 +998,11 @@ Module.postRun.push(function(namespace/*the module object, the target for
         if(!f._){
             f._ = {
                 string: function(stmt, ndx, val, asBlob){
-                    if(1){
-                        /* _Hypothetically_ more efficient than the impl in the 'else' block. */
-                        const stack = api.wasm.stackSave();
-                        try{
-                            const n = api.wasm.lengthBytesUTF8(val)+1/*required for NUL terminator*/;
-                            const pStr = api.wasm.stackAlloc(n);
-                            api.wasm.stringToUTF8Array(val, api.wasm.HEAP8, pStr, n);
-                            const f = asBlob ? api.sqlite3_bind_blob : api.sqlite3_bind_text;
-                            return f(stmt._pStmt, ndx, pStr, n-1, api.SQLITE_TRANSIENT);
-                        }finally{
-                            api.wasm.stackRestore(stack);
-                        }
-                    }else{
-                        const bytes = api.wasm.intArrayFromString(val,true);
-                        const pStr = api.wasm._malloc(bytes.length || 1);
-                        api.wasm._malloc.HEAP.set(bytes.length ? bytes : [0], pStr);
-                        try{
-                            const f = asBlob ? api.sqlite3_bind_blob : api.sqlite3_bind_text;
-                            return f(stmt._pStmt, ndx, pStr, bytes.length, api.SQLITE_TRANSIENT);
-                        }finally{
-                            api.wasm._free(pStr);
-                        }
-                    }
+                    const bytes = intArrayFromString(val,true);
+                    const pStr = SQM.allocate(bytes, ALLOC_NORMAL);
+                    stmt._allocs.push(pStr);
+                    const func =  asBlob ? api.sqlite3_bind_blob : api.sqlite3_bind_text;
+                    return func(stmt._pStmt, ndx, pStr, bytes.length, 0);
                 }
             };
         }
@@ -1205,36 +1032,30 @@ Module.postRun.push(function(namespace/*the module object, the target for
             case BindTypes.blob: {
                 if('string'===typeof val){
                     rc = f._.string(stmt, ndx, val, true);
-                }else if(!isSupportedTypedArray(val)){
-                    toss("Binding a value as a blob requires",
-                         "that it be a string, Uint8Array, or Int8Array.");
-                }else if(1){
-                    /* _Hypothetically_ more efficient than the impl in the 'else' block. */
-                    const stack = api.wasm.stackSave();
-                    try{
-                        const pBlob = api.wasm.stackAlloc(val.byteLength || 1);
-                        api.wasm.HEAP8.set(val.byteLength ? val : [0], pBlob)
-                        rc = api.sqlite3_bind_blob(stmt._pStmt, ndx, pBlob, val.byteLength,
-                                                   api.SQLITE_TRANSIENT);
-                    }finally{
-                        api.wasm.stackRestore(stack);
-                    }
                 }else{
-                    const pBlob = api.wasm.mallocFromTypedArray(val);
-                    try{
-                        rc = api.sqlite3_bind_blob(stmt._pStmt, ndx, pBlob, val.byteLength,
-                                                   api.SQLITE_TRANSIENT);
-                    }finally{
-                        api.wasm._free(pBlob);
+                    const len = val.length;
+                    if(undefined===len){
+                        toss("Binding a value as a blob requires",
+                             "that it have a length member.");
                     }
+                    const pBlob = SQM.allocate(val, ALLOC_NORMAL);
+                    stmt._allocs.push(pBlob);
+                    rc = api.sqlite3_bind_blob(stmt._pStmt, ndx, pBlob, len, 0);
                 }
-                break;
             }
-            default:
-                console.warn("Unsupported bind() argument type:",val);
-                toss("Unsupported bind() argument type.");
+            default: toss("Unsupported bind() argument type.");
         }
         if(rc) stmt.db.checkRc(rc);
+        return stmt;
+    };
+
+    /** Frees any memory explicitly allocated for the given
+        Stmt object. Returns stmt. */
+    const freeBindMemory = function(stmt){
+        let m;
+        while(undefined !== (m = stmt._allocs.pop())){
+            SQM._free(m);
+        }
         return stmt;
     };
     
@@ -1248,6 +1069,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
         finalize: function(){
             if(this._pStmt){
                 affirmUnlocked(this,'finalize()');
+                freeBindMemory(this);
                 delete this.db._statements[this._pStmt];
                 api.sqlite3_finalize(this._pStmt);
                 delete this.columnCount;
@@ -1260,7 +1082,9 @@ Module.postRun.push(function(namespace/*the module object, the target for
         /** Clears all bound values. Returns this object.
             Throws if this statement has been finalized. */
         clearBindings: function(){
-            affirmUnlocked(affirmStmtOpen(this), 'clearBindings()')
+            freeBindMemory(
+                affirmUnlocked(affirmStmtOpen(this), 'clearBindings()')
+            );
             api.sqlite3_clear_bindings(this._pStmt);
             this._mayGet = false;
             return this;
@@ -1320,9 +1144,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
            - Strings are bound as strings (use bindAsBlob() to force
              blob binding).
 
-           - Uint8Array and Int8Array instances are bound as blobs.
-           (TODO: support binding other TypedArray types with larger
-           int sizes.)
+           - Uint8Array instances are bound as blobs.
 
            If passed an array, each element of the array is bound at
            the parameter index equal to the array index plus 1
@@ -1333,7 +1155,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
            bindable parameter names, including any `$`, `@`, or `:`
            prefix. Because `$` is a legal identifier chararacter in
            JavaScript, that is the suggested prefix for bindable
-           parameters: `stmt.bind({$a: 1, $b: 2})`.
+           parameters.
 
            It returns this object on success and throws on
            error. Errors include:
@@ -1378,9 +1200,8 @@ Module.postRun.push(function(namespace/*the module object, the target for
                 arg.forEach((v,i)=>bindOne(this, i+1, affirmSupportedBindType(v), v));
                 return this;
             }
-            else if('object'===typeof arg/*null was checked above*/
-                    && !isSupportedTypedArray(arg)){
-                /* Treat each property of arg as a named bound parameter. */
+            else if('object'===typeof arg/*null was checked above*/){
+                /* bind by name */
                 if(1!==arguments.length){
                     toss("When binding an object, an index argument is not permitted.");
                 }
@@ -1390,25 +1211,25 @@ Module.postRun.push(function(namespace/*the module object, the target for
                                         arg[k]));
                 return this;
             }else{
-                return bindOne(this, ndx, affirmSupportedBindType(arg), arg);
+                return bindOne(this, ndx,
+                               affirmSupportedBindType(arg), arg);
             }
             toss("Should not reach this point.");
         },
         /**
-           Special case of bind() which binds the given value using
-           the BLOB binding mechanism instead of the default selected
-           one for the value. The ndx may be a numbered or named bind
-           index. The value must be of type string, null/undefined
-           (both treated as null), or a TypedArray of a type supported
-           by the bind() API.
+           Special case of bind() which binds the given value
+           using the BLOB binding mechanism instead of the default
+           selected one for the value. The ndx may be a numbered
+           or named bind index. The value must be of type string,
+           Uint8Array, or null/undefined (both treated as null).
 
            If passed a single argument, a bind index of 1 is assumed.
         */
         bindAsBlob: function(ndx,arg){
             affirmStmtOpen(this);
             if(1===arguments.length){
-                arg = ndx;
                 ndx = 1;
+                arg = arguments[0];
             }
             const t = affirmSupportedBindType(arg);
             if(BindTypes.string !== t && BindTypes.blob !== t
@@ -1504,7 +1325,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     const n = api.sqlite3_column_bytes(this._pStmt, ndx);
                     const ptr = api.sqlite3_column_blob(this._pStmt, ndx);
                     const rc = new Uint8Array(n);
-                    for(let i = 0; i < n; ++i) rc[i] = api.wasm.HEAP8[ptr + i];
+                    for(let i = 0; i < n; ++i) rc[i] = HEAP8[ptr + i];
                     if(n && this.db._blobXfer instanceof Array){
                         /* This is an optimization soley for the
                            Worker-based API. These values will be
@@ -1606,9 +1427,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
 
            If passed no arguments then it returns an object mapping
            all known compilation options to their compile-time values,
-           or boolean true if they are defined with no value. This
-           result, which is relatively expensive to compute, is cached
-           and returned for future no-argument calls.
+           or boolean true if they are defined with no value.
 
            In all other cases it returns true if the given option was
            active when when compiling the sqlite3 module, else false.
@@ -1619,8 +1438,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
         */
         compileOptionUsed: function f(optName){
             if(!arguments.length){
-                if(f._result) return f._result;
-                else if(!f._opt){
+                if(!f._opt){
                     f._rx = /^([^=]+)=(.+)/;
                     f._rxInt = /^-?\d+$/;
                     f._opt = function(opt, rv){
@@ -1635,14 +1453,16 @@ Module.postRun.push(function(namespace/*the module object, the target for
                     f._opt(k,ov);
                     rc[ov[0]] = ov[1];
                 }
-                return f._result = rc;
-            }else if(Array.isArray(optName)){
+                return rc;
+            }
+            else if(Array.isArray(optName)){
                 const rc = {};
                 optName.forEach((v)=>{
                     rc[v] = api.sqlite3_compileoption_used(v);
                 });
                 return rc;
-            }else if('object' === typeof optName){
+            }
+            else if('object' === typeof optName){
                 Object.keys(optName).forEach((k)=> {
                     optName[k] = api.sqlite3_compileoption_used(k);
                 });
@@ -1661,7 +1481,7 @@ Module.postRun.push(function(namespace/*the module object, the target for
 
     if(self === self.window){
         /* This is running in the main window thread, so we're done. */
-        postMessage({type:'sqlite3-api',data:'loaded'});
+        setTimeout(()=>postMessage({type:'sqlite3-api',data:'loaded'}), 0);
         return;
     }
     /******************************************************************
@@ -1669,15 +1489,14 @@ Module.postRun.push(function(namespace/*the module object, the target for
      in Worker threads.
     ******************************************************************/
 
-    /**
+    /*
       UNDER CONSTRUCTION
 
       We need an API which can proxy the DB API via a Worker message
       interface. The primary quirky factor in such an API is that we
       cannot pass callback functions between the window thread and a
       worker thread, so we have to receive all db results via
-      asynchronous message-passing. That requires an asychronous API
-      with a distinctly different shape that the main OO API.
+      asynchronous message-passing.
 
       Certain important considerations here include:
 
@@ -1958,5 +1777,5 @@ Module.postRun.push(function(namespace/*the module object, the target for
         wState.post(evType, response, wMsgHandler.xfer);
     };
 
-    postMessage({type:'sqlite3-api',data:'loaded'});
-})/*postRun.push(...)*/;
+    setTimeout(()=>postMessage({type:'sqlite3-api',data:'loaded'}), 0);
+});
