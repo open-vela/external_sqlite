@@ -4,10 +4,19 @@
 # Usage:
 #
 proc usage {} {
-  puts stderr "Usage: $::argv0 ?SWITCHES? ?PATTERN? ..."
+  set a0 testrunner.tcl
+
+  puts stderr "Usage: $a0 ?SWITCHES? ?PATTERN? ..."
   puts stderr ""
   puts stderr "where SWITCHES are:"
   puts stderr "    --jobs NUMBER-OF-JOBS"
+  puts stderr ""
+  puts stderr "Examples:"
+  puts stderr "    $a0                    # Run veryquick.test tests"
+  puts stderr "    $a0 all                # Run all tests"
+  puts stderr "    $a0 veryquick rtree%   # Run all test scripts from veryquick.test that match 'rtree%'"
+  puts stderr "    $a0 alter% fts5%       # Run all test scripts that match 'alter%' or 'rtree%'"
+
   exit 1
 }
 #-------------------------------------------------------------------------
