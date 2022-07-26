@@ -3798,7 +3798,6 @@ static Expr *substExpr(
           ifNullRow.op = TK_IF_NULL_ROW;
           ifNullRow.pLeft = pCopy;
           ifNullRow.iTable = pSubst->iNewTable;
-          ifNullRow.iColumn = -99;
           ifNullRow.flags = EP_IfNullRow;
           pCopy = &ifNullRow;
         }
@@ -7419,13 +7418,8 @@ int sqlite3Select(
         sqlite3TreeViewExprList(0, pMinMaxOrderBy, 0, "ORDERBY");
       }
       for(ii=0; ii<pAggInfo->nColumn; ii++){
-        struct AggInfo_col *pCol = &pAggInfo->aCol[ii];
-        sqlite3DebugPrintf(
-           "agg-column[%d] pTab=%s iTable=%d iColumn=%d iMem=%d"
-           " iSorterColumn=%d\n",
-           ii, pCol->pTab ? pCol->pTab->zName : "NULL", 
-           pCol->iTable, pCol->iColumn, pCol->iMem,
-           pCol->iSorterColumn);
+        sqlite3DebugPrintf("agg-column[%d] iMem=%d\n",
+            ii, pAggInfo->aCol[ii].iMem);
         sqlite3TreeViewExpr(0, pAggInfo->aCol[ii].pCExpr, 0);
       }
       for(ii=0; ii<pAggInfo->nFunc; ii++){
