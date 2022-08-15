@@ -575,8 +575,8 @@
             while(stmt.step()){
               stmt._isLocked = true;
               const row = arg.cbArg(stmt);
-              if(resultRows) resultRows.push(row);
               if(callback) callback(row, stmt);
+              if(resultRows) resultRows.push(row);
               stmt._isLocked = false;
             }
             rowMode = undefined;
@@ -820,28 +820,6 @@
     },
 
     /**
-       Starts a transaction, calls the given callback, and then either
-       rolls back or commits the transaction, depending on whether the
-       callback throw. The callback is pass this db object as its only
-       argument.  On success, returns the result of the callback.
-       Throws on error.
-     */
-    callInTransaction: function(callback){
-      affirmDbOpen(this);
-      let err, rc;
-      this.exec("BEGIN");
-      try { rc = callback(this); }
-      catch(e){
-        err = e;
-        throw e;
-      }finally{
-        if(err) this.exec("ROLLBACK");
-        else this.exec("COMMIT");
-      }
-      return rc;
-    },
-
-    /**
        This function currently does nothing and always throws.  It
        WILL BE REMOVED pending other refactoring, to eliminate a hard
        dependency on Emscripten. This feature will be moved into a
@@ -1064,7 +1042,7 @@
           console.warn("Unsupported bind() argument type:",val);
           toss3("Unsupported bind() argument type: "+(typeof val));
     }
-    if(rc) DB.checkRc(stmt.db.pointer, rc);
+    if(rc) checkDbRc(stmt.db.pointer, rc);
     return stmt;
   };
 
@@ -1250,10 +1228,9 @@
       return this;
     },
     /**
-       Steps the statement one time. If the result indicates that a
-       row of data is available, a truthy value is returned.
-       If no row of data is available, a falsy
-       value is returned.  Throws on error.
+       Steps the statement one time. If the result indicates that
+       a row of data is available, true is returned.  If no row of
+       data is available, false is returned.  Throws on error.
     */
     step: function(){
       affirmUnlocked(this, 'step()');
@@ -1265,38 +1242,8 @@
             this._mayGet = false;
             console.warn("sqlite3_step() rc=",rc,"SQL =",
                          capi.sqlite3_sql(this.pointer));
-            DB.checkRc(this.db.pointer, rc);
-      }
-    },
-    /**
-       Functions like step() except that
-       it finalizes this statement immediately after stepping unless
-       the step cannot be performed because the statement is
-       locked. Throws on error, but any error other than the
-       statement-is-locked case will also trigger finalization of this
-       statement.
-
-       On success, it returns true if the step indicated that a row of
-       data was available, else it returns false.
-
-       This is intended to simplify use cases such as:
-
-       ```
-       aDb.prepare("insert in foo(a) values(?)").bind(123).stepFinalize();
-       ```
-    */
-    stepFinalize: function(){
-      affirmUnlocked(this, 'step()');
-      const rc = capi.sqlite3_step(affirmStmtOpen(this).pointer);
-      switch(rc){
-          case capi.SQLITE_DONE: this.finalize(); return false;
-          case capi.SQLITE_ROW: this.finalize(); return true;
-          default:
-            this.finalize();
-            console.warn("sqlite3_step() rc=",rc,"SQL =",
-                         capi.sqlite3_sql(this.pointer));
-            DB.checkRc(this.db.pointer, rc);
-      }
+            checkDbRc(this.db.pointer, rc);
+      };
     },
     /**
        Fetches the value from the given 0-based column index of
