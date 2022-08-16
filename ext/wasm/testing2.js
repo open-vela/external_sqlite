@@ -15,12 +15,12 @@
 'use strict';
 (function(){
   const T = self.SqliteTestUtil;
-  const SW = new Worker("api/sqlite3-worker.js");
+  const SW = new Worker("sqlite3-worker.js");
   const DbState = {
     id: undefined
   };
   const eOutput = document.querySelector('#test-output');
-  const log = console.log.bind(console)
+  const log = console.log.bind(console);
   const logHtml = function(cssClass,...args){
     log.apply(this, args);
     const ln = document.createElement('div');
