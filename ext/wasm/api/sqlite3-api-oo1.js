@@ -80,35 +80,57 @@
      not resolve to real filenames, but "" uses an on-storage
      temporary database and requires that the VFS support that.
 
-     The db is currently opened with a fixed set of flags:
-     (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-     SQLITE_OPEN_EXRESCODE).  This API will change in the future
-     permit the caller to provide those flags via an additional
-     argument.
+     The second argument specifies the open/create mode for the
+     database. It must be string containing a sequence of letters (in
+     any order, but case sensitive) specifying the mode:
+
+     - "c" => create if it does not exist, else fail if it does not
+       exist. Implies the "w" flag.
+
+     - "w" => write. Implies "r": a db cannot be write-only.
+
+     - "r" => read-only if neither "w" nor "c" are provided, else it
+       is ignored.
+
+     If "w" is not provided, the db is implicitly read-only, noting that
+     "rc" is meaningless
+
+     Any other letters are currently ignored. The default is
+     "c". These modes are ignored for the special ":memory:" and ""
+     names.
+
+     The final argument is currently unimplemented but will eventually
+     be used to specify an optional sqlite3 VFS implementation name,
+     as for the final argument to sqlite3_open_v2().
 
      For purposes of passing a DB instance to C-style sqlite3
-     functions, its read-only `pointer` property holds its `sqlite3*`
-     pointer value. That property can also be used to check whether
-     this DB instance is still open.
+     functions, the DB object's read-only `pointer` property holds its
+     `sqlite3*` pointer value. That property can also be used to check
+     whether this DB instance is still open.
   */
-  const DB = function ctor(fn=':memory:'){
+  const DB = function ctor(fn=':memory:', flags='c', vtab="not yet implemented"){
     if('string'!==typeof fn){
       toss3("Invalid filename for DB constructor.");
     }
+    let ptr, oflags = 0;
+    if( flags.indexOf('c')>=0 ){
+      oflags |= capi.SQLITE_OPEN_CREATE | capi.SQLITE_OPEN_READWRITE;
+    }
+    if( flags.indexOf('w')>=0 ) oflags |= capi.SQLITE_OPEN_READWRITE;
+    if( 0===oflags ) oflags |= capi.SQLITE_OPEN_READONLY;
+    oflags |= capi.SQLITE_OPEN_EXRESCODE;
     const stack = capi.wasm.scopedAllocPush();
-    let ptr;
     try {
       const ppDb = capi.wasm.scopedAllocPtr() /* output (sqlite3**) arg */;
-      const rc = capi.sqlite3_open_v2(fn, ppDb, capi.SQLITE_OPEN_READWRITE
-                                      | capi.SQLITE_OPEN_CREATE
-                                      | capi.SQLITE_OPEN_EXRESCODE, null);
+      const rc = capi.sqlite3_open_v2(fn, ppDb, oflags, null);
       ptr = capi.wasm.getMemValue(ppDb, '*');
       ctor.checkRc(ptr, rc);
-    }catch(e){
-      if(ptr) capi.sqlite3_close_v2(ptr);
+    }catch( e ){
+      if( ptr ) capi.sqlite3_close_v2(ptr);
       throw e;
+    }finally{
+      capi.wasm.scopedAllocPop(stack);
     }
-    finally{capi.wasm.scopedAllocPop(stack);}
     this.filename = fn;
     __ptrMap.set(this, ptr);
     __stmtMap.set(this, Object.create(null));
@@ -300,26 +322,24 @@
       }
     },
     /**
-       Similar to this.filename but will return NULL for
-       special names like ":memory:". Not of much use until
-       we have filesystem support. Throws if the DB has
-       been closed. If passed an argument it then it will return
-       the filename of the ATTACHEd db with that name, else it assumes
-       a name of `main`.
+       Similar to this.filename but will return NULL for special names
+       like ":memory:". Not of much use until we have filesystem
+       support. Throws if the DB has been closed. If passed an
+       argument it then it will return the filename of the ATTACHEd db
+       with that name, else it assumes a name of `main`.
     */
-    fileName: function(dbName){
-      return capi.sqlite3_db_filename(affirmDbOpen(this).pointer, dbName||"main");
+    fileName: function(dbName='main'){
+      return capi.sqlite3_db_filename(affirmDbOpen(this).pointer, dbName);
     },
     /**
        Returns true if this db instance has a name which resolves to a
        file. If the name is "" or ":memory:", it resolves to false.
        Note that it is not aware of the peculiarities of URI-style
        names and a URI-style name for a ":memory:" db will fool it.
+       Returns false if this db is closed.
     */
     hasFilename: function(){
-      const fn = this.filename;
-      if(!fn || ':memory'===fn) return false;
-      return true;
+      return this.filename && ':memory'!==this.filename;
     },
     /**
        Returns the name of the given 0-based db number, as documented
@@ -451,14 +471,14 @@
        statement in the SQL which has any bindable
        parameters. (Empty statements are skipped entirely.)
 
-       - .callback = a function which gets called for each row of
-       the FIRST statement in the SQL which has result
-       _columns_, but only if that statement has any result
-       _rows_. The second argument passed to the callback is
-       always the current Stmt object (so that the caller may
-       collect column names, or similar). The first argument
-       passed to the callback defaults to the current Stmt
-       object but may be changed with ...
+       - .callback = a function which gets called for each row of the
+       FIRST statement in the SQL which has result _columns_, but only
+       if that statement has any result _rows_. The callback's "this"
+       is the options object. The second argument passed to the
+       callback is always the current Stmt object (so that the caller
+       may collect column names, or similar). The first argument
+       passed to the callback defaults to the current Stmt object but
+       may be changed with ...
 
        - .rowMode = either a string describing what type of argument
        should be passed as the first argument to the callback or an
@@ -479,12 +499,13 @@
        the FIRST first statement which has result _columns_ is
        appended to the array in the format specified for the `rowMode`
        option, with the exception that the only legal values for
-       `rowMode` in this case are 'array' or 'object', neither of
-       which is the default. It is legal to use both `resultRows` and
-       `callback`, but `resultRows` is likely much simpler to use for
-       small data sets and can be used over a WebWorker-style message
-       interface.  execMulti() throws if `resultRows` is set and
-       `rowMode` is 'stmt' (which is the default!).
+       `rowMode` in this case are 'array', 'object', or an integer,
+       none of which are the default for `rowMode`. It is legal to use
+       both `resultRows` and `callback`, but `resultRows` is likely
+       much simpler to use for small data sets and can be used over a
+       WebWorker-style message interface.  execMulti() throws if
+       `resultRows` is set and `rowMode` is 'stmt' (which is the
+       default!).
 
        - saveSql = an optional array. If set, the SQL of each
        executed statement is appended to this array before the
@@ -575,8 +596,8 @@
             while(stmt.step()){
               stmt._isLocked = true;
               const row = arg.cbArg(stmt);
-              if(callback) callback(row, stmt);
               if(resultRows) resultRows.push(row);
+              if(callback) callback(row, stmt);
               stmt._isLocked = false;
             }
             rowMode = undefined;
@@ -737,7 +758,7 @@
                   capi.sqlite3_result_null(pCx);
                   break;
                 }else if(util.isBindableTypedArray(val)){
-                  const pBlob = capi.wasm.mallocFromTypedArray(val);
+                  const pBlob = capi.wasm.allocFromTypedArray(val);
                   capi.sqlite3_result_blob(pCx, pBlob, val.byteLength,
                                           capi.SQLITE_TRANSIENT);
                   capi.wasm.dealloc(pBlob);
@@ -817,6 +838,28 @@
     */
     openStatementCount: function(){
       return this.pointer ? Object.keys(__stmtMap.get(this)).length : 0;
+    },
+
+    /**
+       Starts a transaction, calls the given callback, and then either
+       rolls back or commits the transaction, depending on whether the
+       callback throw. The callback is pass this db object as its only
+       argument.  On success, returns the result of the callback.
+       Throws on error.
+     */
+    callInTransaction: function(callback){
+      affirmDbOpen(this);
+      let err, rc;
+      this.exec("BEGIN");
+      try { rc = callback(this); }
+      catch(e){
+        err = e;
+        throw e;
+      }finally{
+        if(err) this.exec("ROLLBACK");
+        else this.exec("COMMIT");
+      }
+      return rc;
     },
 
     /**
@@ -1028,7 +1071,7 @@
               capi.wasm.scopedAllocPop(stack);
             }
           }else{
-            const pBlob = capi.wasm.mallocFromTypedArray(val);
+            const pBlob = capi.wasm.allocFromTypedArray(val);
             try{
               rc = capi.sqlite3_bind_blob(stmt.pointer, ndx, pBlob, val.byteLength,
                                          capi.SQLITE_TRANSIENT);
@@ -1042,7 +1085,7 @@
           console.warn("Unsupported bind() argument type:",val);
           toss3("Unsupported bind() argument type: "+(typeof val));
     }
-    if(rc) checkDbRc(stmt.db.pointer, rc);
+    if(rc) DB.checkRc(stmt.db.pointer, rc);
     return stmt;
   };
 
@@ -1059,6 +1102,7 @@
         delete __stmtMap.get(this.db)[this.pointer];
         capi.sqlite3_finalize(this.pointer);
         __ptrMap.delete(this);
+        delete this._mayGet;
         delete this.columnCount;
         delete this.parameterCount;
         delete this.db;
@@ -1228,9 +1272,10 @@
       return this;
     },
     /**
-       Steps the statement one time. If the result indicates that
-       a row of data is available, true is returned.  If no row of
-       data is available, false is returned.  Throws on error.
+       Steps the statement one time. If the result indicates that a
+       row of data is available, a truthy value is returned.
+       If no row of data is available, a falsy
+       value is returned.  Throws on error.
     */
     step: function(){
       affirmUnlocked(this, 'step()');
@@ -1242,8 +1287,51 @@
             this._mayGet = false;
             console.warn("sqlite3_step() rc=",rc,"SQL =",
                          capi.sqlite3_sql(this.pointer));
-            checkDbRc(this.db.pointer, rc);
-      };
+            DB.checkRc(this.db.pointer, rc);
+      }
+    },
+    /**
+       Functions exactly like step() except that...
+
+       1) On success, it calls this.reset() and returns this object.
+       2) On error, it throws and does not call reset().
+
+       This is intended to simplify constructs like:
+
+       ```
+       for(...) {
+         stmt.bind(...).stepReset();
+       }
+       ```
+
+       Note that the reset() call makes it illegal to call this.get()
+       after the step.
+    */
+    stepReset: function(){
+      this.step();
+      return this.reset();
+    },
+    /**
+       Functions like step() except that
+       it finalizes this statement immediately after stepping unless
+       the step cannot be performed because the statement is
+       locked. Throws on error, but any error other than the
+       statement-is-locked case will also trigger finalization of this
+       statement.
+
+       On success, it returns true if the step indicated that a row of
+       data was available, else it returns false.
+
+       This is intended to simplify use cases such as:
+
+       ```
+       aDb.prepare("insert in foo(a) values(?)").bind(123).stepFinalize();
+       ```
+    */
+    stepFinalize: function(){
+      const rc = this.step();
+      this.finalize();
+      return rc;
     },
     /**
        Fetches the value from the given 0-based column index of
@@ -1347,7 +1435,7 @@
           default: toss3("Don't know how to translate",
                          "type of result column #"+ndx+".");
       }
-      abort("Not reached.");
+      toss3("Not reached.");
     },
     /** Equivalent to get(ndx) but coerces the result to an
         integer. */
