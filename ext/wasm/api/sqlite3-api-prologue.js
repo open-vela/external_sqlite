@@ -173,6 +173,36 @@ self.sqlite3ApiBootstrap = function(config){
   */
   const capi = {
     /**
+       An Error subclass which is thrown by this object's alloc() method
+       on OOM.
+    */
+    WasmAllocError: WasmAllocError,
+    /**
+       The API's one single point of access to the WASM-side memory
+       allocator. Works like malloc(3) (and is likely bound to
+       malloc()) but throws an WasmAllocError if allocation fails. It is
+       important that any code which might pass through the sqlite3 C
+       API NOT throw and must instead return SQLITE_NOMEM (or
+       equivalent, depending on the context).
+
+       That said, very few cases in the API can result in
+       client-defined functions propagating exceptions via the C-style
+       API. Most notably, this applies ot User-defined SQL Functions
+       (UDFs) registered via sqlite3_create_function_v2(). For that
+       specific case it is recommended that all UDF creation be
+       funneled through a utility function and that a wrapper function
+       be added around the UDF which catches any exception and sets
+       the error state to OOM. (The overall complexity of registering
+       UDFs essentially requires a helper for doing so!)
+    */
+    alloc: undefined/*installed later*/,
+    /**
+       The API's one single point of access to the WASM-side memory
+       deallocator. Works like free(3) (and is likely bound to
+       free()).
+    */
+    dealloc: undefined/*installed later*/,
+    /**
        When using sqlite3_open_v2() it is important to keep the following
        in mind:
 
@@ -335,33 +365,6 @@ self.sqlite3ApiBootstrap = function(config){
         || toss("API config object requires a WebAssembly.Memory object",
                 "in either config.exports.memory (exported)",
                 "or config.memory (imported)."),
-
-      /**
-         The API's one single point of access to the WASM-side memory
-         allocator. Works like malloc(3) (and is likely bound to
-         malloc()) but throws an WasmAllocError if allocation fails. It is
-         important that any code which might pass through the sqlite3 C
-         API NOT throw and must instead return SQLITE_NOMEM (or
-         equivalent, depending on the context).
-
-         That said, very few cases in the API can result in
-         client-defined functions propagating exceptions via the C-style
-         API. Most notably, this applies ot User-defined SQL Functions
-         (UDFs) registered via sqlite3_create_function_v2(). For that
-         specific case it is recommended that all UDF creation be
-         funneled through a utility function and that a wrapper function
-         be added around the UDF which catches any exception and sets
-         the error state to OOM. (The overall complexity of registering
-         UDFs essentially requires a helper for doing so!)
-      */
-      alloc: undefined/*installed later*/,
-      /**
-         The API's one single point of access to the WASM-side memory
-         deallocator. Works like free(3) (and is likely bound to
-         free()).
-      */
-      dealloc: undefined/*installed later*/
-
       /* Many more wasm-related APIs get installed later on. */
     }/*wasm*/
   }/*capi*/;
@@ -384,7 +387,7 @@ self.sqlite3ApiBootstrap = function(config){
      Int8Array types and will throw if srcTypedArray is of
      any other type.
   */
-  capi.wasm.allocFromTypedArray = function(srcTypedArray){
+  capi.wasm.mallocFromTypedArray = function(srcTypedArray){
     affirmBindableTypedArray(srcTypedArray);
     const pRet = this.alloc(srcTypedArray.byteLength || 1);
     this.heapForSize(srcTypedArray.constructor).set(srcTypedArray.byteLength ? srcTypedArray : [0], pRet);
@@ -397,13 +400,11 @@ self.sqlite3ApiBootstrap = function(config){
     const f = capi.wasm.exports[key];
     if(!(f instanceof Function)) toss("Missing required exports[",key,"] function.");
   }
-
   capi.wasm.alloc = function(n){
     const m = this.exports[keyAlloc](n);
     if(!m) throw new WasmAllocError("Failed to allocate "+n+" bytes.");
     return m;
   }.bind(capi.wasm)
-
   capi.wasm.dealloc = (m)=>capi.wasm.exports[keyDealloc](m);
 
   /**
@@ -553,8 +554,7 @@ self.sqlite3ApiBootstrap = function(config){
     ["sqlite3_value_text", "string", "*"],
     ["sqlite3_value_type", "int", "*"],
     ["sqlite3_vfs_find", "*", "string"],
-    ["sqlite3_vfs_register", "int", "*", "int"],
-    ["sqlite3_wasm_vfs_unlink", "int", "string"]
+    ["sqlite3_vfs_register", "int", "*", "int"]
   ]/*capi.wasm.bindingSignatures*/;
 
   if(false && capi.wasm.compileOptionUsed('SQLITE_ENABLE_NORMALIZE')){
@@ -576,79 +576,8 @@ self.sqlite3ApiBootstrap = function(config){
       ["sqlite3_total_changes64", "i64", ["sqlite3*"]]
   ];
 
-  /** State for sqlite3_web_persistent_dir(). */
-  let __persistentDir;
-  /**
-     An experiment. Do not use.
-
-     If the wasm environment has a persistent storage directory,
-     its path is returned by this function. If it does not then
-     it returns "" (noting that "" is a falsy value).
-
-     The first time this is called, this function inspects the current
-     environment to determine whether persistence filesystem support
-     is available and, if it is, enables it (if needed).
-
-     TODOs and caveats:
-
-     - The directory name (mount point) for persistent storage is
-       currently hard-coded. It needs to be configurable.
-
-     - If persistent storage is available at the root of the virtual
-       filesystem, this interface cannot currently distinguish that
-       from the lack of persistence. That case cannot currently (with
-       WASMFS/OPFS) happen, but it is conceivably possible in future
-       environments or non-browser runtimes (none of which are yet
-       supported targets).
-  */
-  capi.sqlite3_web_persistent_dir = function(){
-    if(undefined !== __persistentDir) return __persistentDir;
-    // If we have no OPFS, there is no persistent dir
-    if(!self.FileSystemHandle || !self.FileSystemDirectoryHandle
-       || !self.FileSystemFileHandle){
-      return __persistentDir = "";
-    }
-    try{
-      if(0===this.wasm.xCall('sqlite3_wasm_init_opfs')){
-        /** OPFS does not support locking and will trigger errors if
-            we try to lock. We don't _really_ want to
-            _unconditionally_ install a non-locking sqlite3 VFS as the
-            default, but we do so here for simplicy's sake for the
-            time being. That said: locking is a no-op on all of the
-            current WASM storage, so this isn't (currently) as bad as
-            it may initially seem. */
-        const pVfs = this.sqlite3_vfs_find("unix-none");
-        if(pVfs){
-          this.sqlite3_vfs_register(pVfs,1);
-          //warn("Installed 'unix-none' as the default sqlite3 VFS.");
-        }
-        return __persistentDir =
-          "/persistent" /* name is hard-coded in sqlite3_wasm_init_opfs()!*/;
-      }else{
-        return __persistentDir = "";
-      }
-    }catch(e){
-      // sqlite3_wasm_init_opfs() is not available
-      return __persistentDir = "";
-    }
-  }.bind(capi);
-
-  /**
-     Returns true if sqlite3.capi.sqlite3_web_persistent_dir() is a
-     non-empty string and the given name has that string as its
-     prefix, else returns false.
-  */
-  capi.sqlite3_web_filename_is_persistent = function(name){
-    const p = this.sqlite3_web_persistent_dir();
-    return (p && name) ? name.startsWith(p) : false;
-  }.bind(capi);
-
   /* The remainder of the API will be set up in later steps. */
   return {
-    /**
-       An Error subclass which is thrown by this.wasm.alloc() on OOM.
-    */
-    WasmAllocError: WasmAllocError,
     capi,
     postInit: [
       /* some pieces of the API may install functions into this array,
@@ -657,6 +586,8 @@ self.sqlite3ApiBootstrap = function(config){
          the current global object and sqlite3 is the object returned
          from sqlite3ApiBootstrap(). This array will be removed at the
          end of the API setup process. */],
+    /** Config is needed downstream for gluing pieces together. It
+        will be removed at the end of the API setup process. */
     config
   };
 }/*sqlite3ApiBootstrap()*/;
