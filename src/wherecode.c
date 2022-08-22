@@ -2109,8 +2109,8 @@ Bitmask sqlite3WhereCodeOneLoopStart(
       }
       nConstraint++;
     }
-    if( zStartAff ) sqlite3DbNNFreeNN(db, zStartAff);
-    if( zEndAff ) sqlite3DbNNFreeNN(db, zEndAff);
+    sqlite3DbFree(db, zStartAff);
+    sqlite3DbFree(db, zEndAff);
 
     /* Top of the loop body */
     if( pLevel->p2==0 ) pLevel->p2 = sqlite3VdbeCurrentAddr(v);

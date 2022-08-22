@@ -1417,7 +1417,7 @@ insert_cleanup:
   sqlite3UpsertDelete(db, pUpsert);
   sqlite3SelectDelete(db, pSelect);
   sqlite3IdListDelete(db, pColumn);
-  if( aRegIdx ) sqlite3DbNNFreeNN(db, aRegIdx);
+  sqlite3DbFree(db, aRegIdx);
 }
 
 /* Make sure "isView" and other macros defined above are undefined. Otherwise
