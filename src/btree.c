@@ -8350,8 +8350,7 @@ static int balance_nonroot(
     aPgOrder[iBest] = 0xffffffff;
     if( iBest!=i ){
       if( iBest>i ){
-        sqlite3PagerRekey(apNew[iBest]->pDbPage, pBt->nPage+iBest+1,
-                          aPgFlags[iBest]);
+        sqlite3PagerRekey(apNew[iBest]->pDbPage, pBt->nPage+iBest+1, 0);
       }
       sqlite3PagerRekey(apNew[i]->pDbPage, pgno, aPgFlags[iBest]);
       apNew[i]->pgno = pgno;
