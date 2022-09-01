@@ -1,5 +1,5 @@
-C Add\snew\sfiles\sfor\san\sextension\sto\srecover\sdata\sfrom\scorrupted\sdatabases.
-D 2022-08-31T20:45:43.730
+C In\sthe\squery\splanner,\sadd\sa\sheuristic\sthat\swill\sreduce\sthe\scost\sof\sa\sfull\ntable\sscan\sfor\sa\smaterialized\sview\sor\ssubquery\sif\sthe\sfull\sscan\sis\sthe\nouter-most\sloop.\s\sThis\sis\sshown\sto\sspeed\sup\ssome\squeries.
+D 2022-09-01T10:29:02.873
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -299,7 +299,7 @@ F ext/misc/closure.c dbfd8543b2a017ae6b1a5843986b22ddf99ff126ec9634a2f4047cd14c8
 F ext/misc/completion.c 6dafd7f4348eecc7be9e920d4b419d1fb2af75d938cd9c59a20cfe8beb2f22b9
 F ext/misc/compress.c 3354c77a7c8e86e07d849916000cdac451ed96500bfb5bd83b20eb61eee012c9
 F ext/misc/csv.c ca8d6dafc5469639de81937cb66ae2e6b358542aba94c4f791910d355a8e7f73
-F ext/misc/dbdata.c f317980cea788e67932828b94a16ee8a8b859e3c2d62859d09ba3d5ca85f87cb
+F ext/misc/dbdata.c e316fba936571584e55abd5b974a32a191727a6b746053a0c9d439bd2cf93940
 F ext/misc/dbdump.c b8592f6f2da292c62991a13864a60d6c573c47a9cc58362131b9e6a64f823e01
 F ext/misc/decimal.c 09f967dcf4a1ee35a76309829308ec278d3648168733f4a1147820e11ebefd12
 F ext/misc/eval.c 04bc9aada78c888394204b4ed996ab834b99726fb59603b0ee3ed6e049755dc1
@@ -387,11 +387,6 @@ F ext/rbu/rbuvacuum4.test a78898e438a44803eb2bc897ba3323373c9f277418e2d6d76e90f2
 F ext/rbu/sqlite3rbu.c 8737cabdfbee84bb25a7851ecef8b1312be332761238da9be6ddb10c62ad4291
 F ext/rbu/sqlite3rbu.h 1dc88ab7bd32d0f15890ea08d23476c4198d3da3056985403991f8c9cd389812
 F ext/rbu/test_rbu.c 03f6f177096a5f822d68d8e4069ad8907fe572c62ff2d19b141f59742821828a
-F ext/recover/recover1.test 861ad5140566102a8c5a3d1f936a7d6da569f34c86597c274de695f597031bac
-F ext/recover/recover_common.tcl 6679af7dffc858e345053a91c9b0a897595b4a13007aceffafca75304ccb137c
-F ext/recover/sqlite3recover.c 594fb45777a14f0b88b944b9fb2ccb3e85a29ef5b17522b8dac3e3944c4c27ea
-F ext/recover/sqlite3recover.h 3255f6491007e57be310aedb72a848c88f79fc14e7222bda4b8d4dab1a2450c3
-F ext/recover/test_recover.c 919f61df54776598b350250057fd2d3ea9cc2cef1aeac0dbb760958d26fe1afb
 F ext/repair/README.md 92f5e8aae749a4dae14f02eea8e1bb42d4db2b6ce5e83dbcdd6b1446997e0c15
 F ext/repair/checkfreelist.c e21f06995ff4efdc1622dcceaea4dcba2caa83ca2f31a1607b98a8509168a996
 F ext/repair/checkindex.c 4383e4469c21e5b9ae321d0d63cec53e981af9d7a6564be6374f0eeb93dfc890
@@ -514,7 +509,7 @@ F ext/wasm/testing2.js d37433c601f88ed275712c1cfc92d3fb36c7c22e1ed8c7396fb2359e4
 F install-sh 9d4de14ab9fb0facae2f48780b874848cbf2f895 x
 F ltmain.sh 3ff0879076df340d2e23ae905484d8c15d5fdea8
 F magic.txt 8273bf49ba3b0c8559cb2774495390c31fd61c60
-F main.mk 8c9965c408aaa8b93d0dd52e83445894835e1a42dc360c77435393f80f8d8d1d
+F main.mk 20801eed419dc58936ff9449b04041edbbbc0488a9fc683e72471dded050e0bb
 F mkso.sh fd21c06b063bb16a5d25deea1752c2da6ac3ed83
 F mptest/config01.test 3c6adcbc50b991866855f1977ff172eb6d901271
 F mptest/config02.test 4415dfe36c48785f751e16e32c20b077c28ae504
@@ -646,7 +641,7 @@ F src/test_server.c a2615049954cbb9cfb4a62e18e2f0616e4dc38fe
 F src/test_sqllog.c 540feaea7280cd5f926168aee9deb1065ae136d0bbbe7361e2ef3541783e187a
 F src/test_superlock.c 4839644b9201da822f181c5bc406c0b2385f672e
 F src/test_syscall.c 1073306ba2e9bfc886771871a13d3de281ed3939
-F src/test_tclsh.c 7dd98be675a1dc0d1fd302b8247bab992c909db384df054381a2279ad76f9b0e
+F src/test_tclsh.c c4065ced25126e25c40122c5ff62dc89902ea617d72cdd27765151cdd7fcc477
 F src/test_tclvar.c 33ff42149494a39c5fbb0df3d25d6fafb2f668888e41c0688d07273dcb268dfc
 F src/test_thread.c 269ea9e1fa5828dba550eb26f619aa18aedbc29fd92f8a5f6b93521fbb74a61c
 F src/test_vdbecov.c f60c6f135ec42c0de013a1d5136777aa328a776d33277f92abac648930453d43
@@ -680,8 +675,8 @@ F src/vxworks.h d2988f4e5a61a4dfe82c6524dd3d6e4f2ce3cdb9
 F src/wal.c b9df133a705093da8977da5eb202eaadb844839f1c7297c08d33471f5491843d
 F src/wal.h c3aa7825bfa2fe0d85bef2db94655f99870a285778baa36307c0a16da32b226a
 F src/walker.c f890a3298418d7cba3b69b8803594fdc484ea241206a8dfa99db6dd36f8cbb3b
-F src/where.c 6d1ee6f6bc048406554176eb6146b27ac16ec96cca018848aa0b9836b2b71143
-F src/whereInt.h b48ca529ffe293c18cbfa8326af18a09e39910de66fb3e96ef788c7cbf8ef3a7
+F src/where.c 424c42590b71968a9b81cd890df2671902028613fee38a50ed4c2f7ca65315d3
+F src/whereInt.h 70cd30de9ed784aa33fa6bd1245f060617de7a00d992469b6d8e419eed915743
 F src/wherecode.c 6bb1cf9d0a4e3e04dab0bf0ea4a8d936a0dcc05a7e2207beeda6c61aea6dd341
 F src/whereexpr.c 55a39f42aaf982574fbf52906371a84cceed98a994422198dfd03db4fce4cc46
 F src/window.c 928e215840e2f2d9a2746e018c9643ef42c66c4ab6630ef0df7fa388fa145e86
@@ -1857,7 +1852,7 @@ F test/win32heap.test 10fd891266bd00af68671e702317726375e5407561d859be1aa04696f2
 F test/win32lock.test e0924eb8daac02bf80e9da88930747bd44dd9b230b7759fed927b1655b467c9c
 F test/win32longpath.test 4baffc3acb2e5188a5e3a895b2b543ed09e62f7c72d713c1feebf76222fe9976
 F test/win32nolock.test ac4f08811a562e45a5755e661f45ca85892bdbbc
-F test/window1.test ae87c4ea4e689725c7e1c826ab2b10704d5b6d31f9b9e5abadded996ba53a1d4
+F test/window1.test 08bac934238ff66987635ea3367c5aed5b4c088c414441beaba426e68a8257c1
 F test/window2.tcl 492c125fa550cda1dd3555768a2303b3effbeceee215293adf8871efc25f1476
 F test/window2.test e466a88bd626d66edc3d352d7d7e1d5531e0079b549ba44efb029d1fbff9fd3c
 F test/window3.tcl acea6e86a4324a210fd608d06741010ca83ded9fde438341cb978c49928faf03
@@ -1881,7 +1876,7 @@ F test/windowfault.test 15094c1529424e62f798bc679e3fe9dfab6e8ba2f7dfe8c923b6248c
 F test/windowpushd.test d8895d08870b7226f7693665bd292eb177e62ca06799184957b3ca7dc03067df
 F test/with1.test 9ad67fdeb2bbd808a5763c9060e214ea232f9b18d846ea3a59756dc38bdc3880
 F test/with2.test a1df41b987198383b9b70bf5e5fda390582e46398653858dbc6ceb24253b28df
-F test/with3.test ad32d13ad50661e6fa305f62a0717649c348792e7b658bf2644976227a9e0373
+F test/with3.test 1e2e8d5e7b1d955342d0d18c250aaaa6e6bcf36ef2a818477bd01cb74f9a5d66
 F test/with4.test 257be66c0c67fee1defbbac0f685c3465e2cad037f21ce65f23f86084f198205
 F test/with5.test 6248213c41fab36290b5b73aa3f937309dfba337004d9d8434c3fabc8c7d4be8
 F test/with6.test c18592592b5a1c5802fd4e933d506f7b34ebbe8fdd585229793e960ae58d433f
@@ -2005,10 +2000,7 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P 5007742886bd20de20be3973737cf46b010359911615eb3da69cd262bd9a2435
-R 563b8320bf923831e4768bc403655fc2
-T *branch * recover-extension
-T *sym-recover-extension *
-T -sym-trunk *
-U dan
-Z 1c7612740eb933f84d589533d182c6df
+R 5af1ce0d7f6d60d5f513975f3a1b9fe9
+U drh
+Z 1d09512c855de39ee2d5b2ad872e6d10
 # Remove this line to create a well-formed Fossil manifest.
