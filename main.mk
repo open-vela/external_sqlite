@@ -444,9 +444,6 @@ TESTSRC2 = \
   $(TOP)/ext/misc/stmt.c \
   $(TOP)/ext/session/sqlite3session.c \
   $(TOP)/ext/session/test_session.c \
-  $(TOP)/ext/recover/sqlite3recover.c \
-  $(TOP)/ext/misc/dbdata.c \
-  $(TOP)/ext/recover/test_recover.c \
   fts5.c
 
 # Header files used by all library source files.
