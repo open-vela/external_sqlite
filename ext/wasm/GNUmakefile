@@ -18,7 +18,6 @@ else
 endif
 fiddle:
 	$(MAKE) -C ../.. fiddle -e emcc_opt=$(fiddle_opt)
-all: fiddle
 
 clean:
 	$(MAKE) -C ../../ clean-fiddle
@@ -46,13 +45,8 @@ SQLITE_OPT = \
   -DSQLITE_OMIT_LOAD_EXTENSION \
   -DSQLITE_OMIT_DEPRECATED \
   -DSQLITE_OMIT_UTF16 \
-  -DSQLITE_OMIT_SHARED_CACHE \
-  -DSQLITE_THREADSAFE=0 \
-  -DSQLITE_TEMP_STORE=3
+  -DSQLITE_THREADSAFE=0
 #SQLITE_OPT += -DSQLITE_ENABLE_MEMSYS5
-# ^^^ MEMSYS5 is hypothetically useful for non-Emscripten builds but
-# requires adding more infrastructure and fixing one spot in the
-# sqlite3 internals which calls malloc() early on.
 $(dir.top)/sqlite3.c:
 	$(MAKE) -C $(dir.top) sqlite3.c
 
@@ -62,13 +56,10 @@ $(dir.top)/sqlite3.c:
 emcc_opt ?= -O0
 .PHONY: release
 release:
-	$(MAKE) 'emcc_opt=-Os -g3 -flto'
+	$(MAKE) 'emcc_opt=-Os -g3'
 # ^^^^^ target-specific vars, e.g.:
 #   release: emcc_opt=...
 # apparently only work for file targets, not PHONY targets?
-#
-# ^^^ -flto improves runtime speed at -O0 considerably but doubles
-# build time.
 #
 # ^^^^ -O3, -Oz, -Os minify symbol names and there appears to be no
 # way around that except to use -g3, but -g3 causes the binary file
@@ -136,11 +127,11 @@ sqlite3-api.jses := \
   $(dir.jacc)/jaccwabyt.js \
   $(dir.api)/sqlite3-api-glue.js \
   $(dir.api)/sqlite3-api-oo1.js \
-  $(dir.api)/sqlite3-api-worker1.js
-#sqlite3-api.jses += $(dir.api)/sqlite3-api-opfs.js 
-sqlite3-api.jses += $(dir.api)/sqlite3-api-cleanup.js
+  $(dir.api)/sqlite3-api-worker.js \
+  $(dir.api)/sqlite3-api-opfs.js \
+  $(dir.api)/sqlite3-api-cleanup.js
 
-sqlite3-api.js := sqlite3-api.js
+sqlite3-api.js := $(dir.api)/sqlite3-api.js
 CLEAN_FILES += $(sqlite3-api.js)
 $(sqlite3-api.js): $(sqlite3-api.jses) $(MAKEFILE)
 	@echo "Making $@..."
@@ -150,7 +141,7 @@ $(sqlite3-api.js): $(sqlite3-api.jses) $(MAKEFILE)
 		echo "/* END FILE: $$i */"; \
 	done > $@
 
-post-js.js := post-js.js
+post-js.js := $(dir.api)/post-js.js
 CLEAN_FILES += $(post-js.js)
 post-jses := \
   $(dir.api)/post-js-header.js \
@@ -167,12 +158,9 @@ $(post-js.js): $(post-jses) $(MAKEFILE)
 
 
 ########################################################################
-# emcc flags for .c/.o/.wasm/.js.
+# emcc flags for .c/.o/.wasm.
 emcc.flags =
 #emcc.flags += -v # _very_ loud but also informative about what it's doing
-# -g is needed to keep -O2 and higher from creating broken JS via
-# minification.
-emcc.flags += -g
 
 ########################################################################
 # emcc flags for .c/.o.
@@ -184,8 +172,8 @@ emcc.cflags += -I. -I$(dir.top) # $(SQLITE_OPT)
 ########################################################################
 # emcc flags specific to building the final .js/.wasm file...
 emcc.jsflags := -fPIC
-emcc.jsflags := --minify 0
 emcc.jsflags += --no-entry
+emcc.jsflags += -sENVIRONMENT=web
 emcc.jsflags += -sMODULARIZE
 emcc.jsflags += -sSTRICT_JS
 emcc.jsflags += -sDYNAMIC_EXECUTION=0
@@ -194,43 +182,31 @@ emcc.jsflags += -sEXPORTED_FUNCTIONS=@$(dir.wasm)/EXPORTED_FUNCTIONS.api
 emcc.jsflags += -sEXPORTED_RUNTIME_METHODS=FS,wasmMemory # wasmMemory==>for -sIMPORTED_MEMORY
 emcc.jsflags += -sUSE_CLOSURE_COMPILER=0
 emcc.jsflags += -sIMPORTED_MEMORY
-emcc.environment := -sENVIRONMENT=web
-ENABLE_WASMFS ?= 0
-ifneq (0,$(ENABLE_WASMFS))
-  emcc.cflags += -pthread
-  emcc.jsflags += -pthread -sWASMFS -sPTHREAD_POOL_SIZE=2
-  emcc.cflags += '-DSQLITE_DEFAULT_UNIX_VFS="unix-none"'
-  emcc.environment := $(emcc.environment),worker
-  emcc.jsflags += -sINITIAL_MEMORY=128450560
-else
-  emcc.jsflags += -sALLOW_MEMORY_GROWTH
-  # emcc: warning: USE_PTHREADS + ALLOW_MEMORY_GROWTH may run non-wasm code
-  #       slowly, see https://github.com/WebAssembly/design/issues/1271
-  #       [-Wpthreads-mem-growth]
-  emcc.jsflags += -sINITIAL_MEMORY=13107200
-  #emcc.jsflags += -sINITIAL_MEMORY=64225280
-  # ^^^^ 64MB is not enough for WASMFS/OPFS test runs using batch-runner.js
-endif
-emcc.jsflags += $(emcc.environment)
+#emcc.jsflags += -sINITIAL_MEMORY=13107200
 #emcc.jsflags += -sTOTAL_STACK=4194304
 emcc.jsflags += -sEXPORT_NAME=sqlite3InitModule
 emcc.jsflags += -sGLOBAL_BASE=4096 # HYPOTHETICALLY keep func table indexes from overlapping w/ heap addr.
-emcc.jsflags += --post-js=$(post-js.js)
+emcc.jsflags +=--post-js=$(post-js.js)
 #emcc.jsflags += -sSTRICT # fails due to missing __syscall_...()
 #emcc.jsflags += -sALLOW_UNIMPLEMENTED_SYSCALLS
 #emcc.jsflags += -sFILESYSTEM=0 # only for experimentation. sqlite3 needs the FS API
 #emcc.jsflags += -sABORTING_MALLOC
+emcc.jsflags += -sALLOW_MEMORY_GROWTH
 emcc.jsflags += -sALLOW_TABLE_GROWTH
 emcc.jsflags += -Wno-limited-postlink-optimizations
 # ^^^^^ it likes to warn when we have "limited optimizations" via the -g3 flag.
+#emcc.jsflags += -sMALLOC=emmalloc
+#emcc.jsflags += -sMALLOC=dlmalloc # a good 8k larger than emmalloc
 #emcc.jsflags += -sSTANDALONE_WASM # causes OOM errors, not sure why
+#emcc.jsflags += --import=foo_bar
+#emcc.jsflags += --no-gc-sections
 # https://lld.llvm.org/WebAssembly.html
 emcc.jsflags += -sERROR_ON_UNDEFINED_SYMBOLS=0
 emcc.jsflags += -sLLD_REPORT_UNDEFINED
 #emcc.jsflags += --allow-undefined
 emcc.jsflags += --import-undefined
 #emcc.jsflags += --unresolved-symbols=import-dynamic --experimental-pic
-#emcc.jsflags += --experimental-pic --unresolved-symbols=ingore-all --import-undefined
+#emcc.jsflags +=  --experimental-pic --unresolved-symbols=ingore-all --import-undefined
 #emcc.jsflags += --unresolved-symbols=ignore-all
 enable_bigint ?= 1
 ifneq (0,$(enable_bigint))
@@ -246,30 +222,22 @@ emcc.jsflags += -sMEMORY64=0
 #  new Uint8Array(heapWrappers().HEAP8U.buffer, ptr, n)
 #
 # because ptr is now a BigInt, so is invalid for passing to arguments
-# which have strict must-be-a-Number requirements.
+# which have strict must-be-a-number requirements.
 ########################################################################
 
 
-########################################################################
-# Maintenance reminder: the output .js and .wasm files of emcc must be
-# in _this_ dir, rather than a subdir, or else parts of the generated
-# code get confused and cannot load property (namely, the
-# sqlite3.worker.js generated in conjunction with -sWASMFS).
-sqlite3.js := sqlite3.js
-sqlite3.wasm := sqlite3.wasm
+sqlite3.js := $(dir.api)/sqlite3.js
+sqlite3.wasm := $(dir.api)/sqlite3.wasm
 $(dir.api)/sqlite3-wasm.o: emcc.cflags += $(SQLITE_OPT)
 $(dir.api)/sqlite3-wasm.o: $(dir.top)/sqlite3.c
 $(dir.api)/wasm_util.o: emcc.cflags += $(SQLITE_OPT)
 sqlite3.wasm.c := $(dir.api)/sqlite3-wasm.c \
     $(dir.jacc)/jaccwabyt_test.c
-# ^^^ FIXME (how?): jaccwabyt_test.c is only needed for the test apps,
-# so we don't really want to include it in release builds. However, we
-# want to test the release builds with those apps, so we cannot simply
-# elide that file in release builds. That component is critical to the
-# VFS bindings so needs to be tested along with the core APIs.
-ifneq (,$(filter -sWASMFS,$(emcc.jsflags)))
-  $(dir.api)/sqlite3-wasm.o: emcc.cflags+=-DSQLITE_WASM_OPFS
-endif
+# ^^^ FIXME (how?): jaccwabyt_test.c is only needed for the test
+# apps. However, we want to test the release builds with those apps,
+# so we cannot simply elide that file in release builds. That
+# component is critical to the VFS bindings so needs to be tested
+# along with the core APIs.
 define WASM_C_COMPILE
 $(1).o := $$(subst .c,.o,$(1))
 sqlite3.wasm.obj += $$($(1).o)
@@ -282,7 +250,7 @@ $(sqlite3.js):
 $(sqlite3.js): $(MAKEFILE) $(sqlite3.wasm.obj) \
     EXPORTED_FUNCTIONS.api \
     $(post-js.js)
-	$(emcc.bin) -o $(sqlite3.js) $(emcc_opt) $(emcc.flags) $(emcc.jsflags) $(sqlite3.wasm.obj)
+	$(emcc.bin) -o $@ $(emcc_opt) $(emcc.flags) $(emcc.jsflags) $(sqlite3.wasm.obj)
 	chmod -x $(sqlite3.wasm)
 ifneq (,$(wasm-strip))
 	$(wasm-strip) $(sqlite3.wasm)
@@ -291,29 +259,9 @@ endif
 
 CLEAN_FILES += $(sqlite3.js) $(sqlite3.wasm)
 all: $(sqlite3.js)
-wasm: $(sqlite3.js)
 # End main Emscripten-based module build
 ########################################################################
 
-########################################################################
-# Bits for use with batch-runner.js...
-dir.sql := sql
-speedtest1 := ../../speedtest1
-speedtest1.sql := $(dir.sql)/speedtest1.sql
-$(speedtest1):
-	$(MAKE) -C ../.. speedtest1
-$(speedtest1.sql): $(speedtest1)
-	$(speedtest1) --script $@
-batch-runner.list: $(MAKEFILE) $(speedtest1.sql) $(dir.sql)/000-mandelbrot.sql
-	bash split-speedtest1-script.sh $(dir.sql)/speedtest1.sql
-	ls -1 $(dir.sql)/*.sql | grep -v speedtest1.sql | sort > $@
-clean-batch:
-	rm -f batch-runner.list $(dir.sql)/speedtest1*.sql
-# ^^^ we don't do this along with 'clean' because we clean/rebuild on
-# a regular basis with different -Ox flags and rebuilding the batch
-# pieces each time is an unnecessary time sink.
-batch: batch-runner.list
-all: batch
 
 ########################################################################
 # fiddle_remote is the remote destination for the fiddle app. It
