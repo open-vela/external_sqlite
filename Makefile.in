@@ -1537,53 +1537,30 @@ wasm_dir_abs = $(TOP)/ext/wasm
 fiddle_dir = $(wasm_dir)/fiddle
 fiddle_dir_abs = $(TOP)/$(fiddle_dir)
 fiddle_module_js = $(fiddle_dir)/fiddle-module.js
-sqlite3_wasm_c = $(wasm_dir)/api/sqlite3-wasm.c
-$(sqlite3_wasm_c): sqlite3.c
 #emcc_opt = -O0
 #emcc_opt = -O1
 #emcc_opt = -O2
 #emcc_opt = -O3
 emcc_opt = -Oz
-emcc_environment = web
-# WASMFS/OPFS currently (2022-08-23) does not work with fiddle
-# because (A) fiddle is primarily implemented as a Worker and (B) the
-# Emscripten-based Worker loading process does not properly handle the
-# case of nested Workers (necessary for it to load the WASMFS-specific
-# Worker thread).
-emcc_flags_wasmfs =
-# To enable WASMFS/OPFS, uncomment these options:
-#emcc_flags_wasmfs += -sWASMFS -pthread
-#emcc_environment = web,worker
-#emcc_flags_wasmfs += -DSQLITE_WASM_OPFS
-#emcc_flags_wasmfs += -sPTHREAD_POOL_SIZE=2
-#emcc_flags_wasmfs += -sPTHREAD_POOL_SIZE_STRICT=2
-# (Thread pool settings may require tweaking.)
-#/end of WASMFS/OPFS options.
 emcc_flags = $(emcc_opt) \
         -sALLOW_TABLE_GROWTH \
         -sABORTING_MALLOC \
         -sSTRICT_JS \
-        -sENVIRONMENT=$(emcc_environment) \
+        -sENVIRONMENT=web \
         -sMODULARIZE \
         -sEXPORTED_RUNTIME_METHODS=@$(wasm_dir_abs)/EXPORTED_RUNTIME_METHODS.fiddle \
         -sDYNAMIC_EXECUTION=0 \
         --minify 0 \
         -I. $(SHELL_OPT) \
-        -DSQLITE_THREADSAFE=0 \
-        -DSQLITE_TEMP_STORE=3 \
-        -DSQLITE_OMIT_UTF16 \
-        -DSQLITE_OMIT_DEPRECATED \
-        -DSQLITE_OMIT_SHARED_CACHE \
-        '-DSQLITE_DEFAULT_UNIX_VFS="unix-none"' \
-        $(emcc_flags_wasmfs)
-$(fiddle_module_js): Makefile $(sqlite3_wasm_c) shell.c \
+        -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_UTF16 -DSQLITE_OMIT_DEPRECATED
+$(fiddle_module_js): Makefile sqlite3.c shell.c \
     $(wasm_dir)/EXPORTED_RUNTIME_METHODS.fiddle \
     $(wasm_dir)/EXPORTED_FUNCTIONS.fiddle
 	emcc -o $@ $(emcc_flags) \
         -sEXPORT_NAME=initFiddleModule \
         -sEXPORTED_FUNCTIONS=@$(wasm_dir_abs)/EXPORTED_FUNCTIONS.fiddle \
         -DSQLITE_SHELL_FIDDLE \
-        $(sqlite3_wasm_c) shell.c
+        sqlite3.c shell.c
 	gzip < $@ > $@.gz
 	gzip < $(fiddle_dir)/fiddle-module.wasm > $(fiddle_dir)/fiddle-module.wasm.gz
 $(fiddle_dir)/fiddle.js.gz: $(fiddle_dir)/fiddle.js
