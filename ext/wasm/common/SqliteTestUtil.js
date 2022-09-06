@@ -122,6 +122,11 @@
      sqlite3InitModule() factory function.
   */
   self.sqlite3TestModule = {
+    /**
+       Array of functions to call after Emscripten has initialized the
+       wasm module. Each gets passed the Emscripten module object
+       (which is _this_ object).
+    */
     postRun: [
       /* function(theModule){...} */
     ],
@@ -135,10 +140,10 @@
       console.error.apply(console, Array.prototype.slice.call(arguments));
     },
     /**
-       Called by the module init bits to report loading
-       progress. It gets passed an empty argument when loading is
-       done (after onRuntimeInitialized() and any this.postRun
-       callbacks have been run).
+       Called by the Emscripten module init bits to report loading
+       progress. It gets passed an empty argument when loading is done
+       (after onRuntimeInitialized() and any this.postRun callbacks
+       have been run).
     */
     setStatus: function f(text){
       if(!f.last){
@@ -168,6 +173,30 @@
         }
         f.ui.status.classList.add('hidden');
       }
+    },
+    /**
+       Config options used by the Emscripten-dependent initialization
+       which happens via this.initSqlite3(). This object gets
+       (indirectly) passed to sqlite3ApiBootstrap() to configure the
+       sqlite3 API.
+    */
+    sqlite3ApiConfig: {
+      persistentDirName: "/persistent"
+    },
+    /**
+       Intended to be called by apps which need to call the
+       Emscripten-installed sqlite3InitModule() routine. This function
+       temporarily installs this.sqlite3ApiConfig into the self
+       object, calls it sqlite3InitModule(), and removes
+       self.sqlite3ApiConfig after initialization is done. Returns the
+       promise from sqlite3InitModule(), and the next then() handler
+       will get the Emscripten module object as its argument. That
+       module has the sqlite3's main namespace object installed as its
+       `sqlite3` property.
+    */
+    initSqlite3: function(){
+      self.sqlite3ApiConfig = this.sqlite3ApiConfig;
+      return self.sqlite3InitModule(this).finally(()=>delete self.sqlite3ApiConfig);
     }
   };
 })(self/*window or worker*/);
