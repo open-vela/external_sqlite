@@ -3690,11 +3690,10 @@ static int multiSelectOrderBy(
   */
   sqlite3VdbeResolveLabel(v, labelEnd);
 
-  /* Reassemble the compound query so that it will be freed correctly
+  /* Reassembly the compound query so that it will be freed correctly
   ** by the calling function */
   if( pSplit->pPrior ){
-    sqlite3ParserAddCleanup(pParse, 
-       (void(*)(sqlite3*,void*))sqlite3SelectDelete, pSplit->pPrior);
+    sqlite3SelectDelete(db, pSplit->pPrior);
   }
   pSplit->pPrior = pPrior;
   pPrior->pNext = pSplit;
