@@ -1,5 +1,5 @@
-C Non-working\scode\stowards\sa\sVFS\sfor\stext\skey/value\sstorage.
-D 2022-09-07T17:29:22.881
+C An\simproved\stechnique\sfor\sensuring\sthat\sthe\sRekey()\soperation\sdoes\snot\noverwrite\san\sexisting\spage\snumber.\s\sThis\sapproach\sdoes\snot\schange\sthe\nsemantics\sof\sthe\sunderlying\spluggable\spcache\sand\sit\sis\seasier\sto\sprove\ncorrect.\s\sThis\sreplaces\sthe\schanges\sat\n[aadd38f99a3e5abc]\sand\s[81cff9f1955874aa].
+D 2022-09-07T19:28:18.399
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -335,7 +335,6 @@ F ext/misc/uint.c 053fed3bce2e89583afcd4bf804d75d659879bbcedac74d0fa9ed548839a03
 F ext/misc/unionvtab.c 36237f0607ca954ac13a4a0e2d2ac40c33bc6e032a5f55f431713061ef1625f9
 F ext/misc/urifuncs.c f71360d14fa9e7626b563f1f781c6148109462741c5235ac63ae0f8917b9c751
 F ext/misc/uuid.c 5bb2264c1b64d163efa46509544fd7500cb8769cb7c16dd52052da8d961505cf
-F ext/misc/vfskv.c aebaf8b59b70a066c2c0ba9344db0494ff50452ff6b4e79c9133e7a2ea112a99
 F ext/misc/vfslog.c 3932ab932eeb2601dbc4447cb14d445aaa9fbe43b863ef5f014401c3420afd20
 F ext/misc/vfsstat.c 474d08efc697b8eba300082cb1eb74a5f0f3df31ed257db1cb07e72ab0e53dfb
 F ext/misc/vtablog.c 5538acd0c8ddaae372331bee11608d76973436b77d6a91e8635cfc9432fba5ae
@@ -579,9 +578,9 @@ F src/os_win.h 7b073010f1451abe501be30d12f6bc599824944a
 F src/pager.c 6176d9752eb580419e8fef4592dc417a6b00ddfd43ee22f818819bf8840ceee8
 F src/pager.h f82e9844166e1585f5786837ddc7709966138ced17f568c16af7ccf946c2baa3
 F src/parse.y 8e67d820030d2655b9942ffe61c1e7e6b96cea2f2f72183533299393907d0564
-F src/pcache.c 22a6ebe498d1d26c85fd1e3bcb246d97b882c060027c1e1688fbea905f5ac3cf
+F src/pcache.c f4268f7f73c6a3db12ce22fd25bc68dc42315d19599414ab1207d7cf32f79197
 F src/pcache.h 4f87acd914cef5016fae3030343540d75f5b85a1877eed1a2a19b9f284248586
-F src/pcache1.c 849a26ea9dc1e6a176b75dc576672a598170b0b46aeef87a981dd25e0af0ccf9
+F src/pcache1.c 5996285f0a1873b1c7925568d1145865105581d588c1671df0c79b43d507174e
 F src/pragma.c 9bf7d8a2a9ad3bc36df3ec0d61817a44c38a1da527d59c26c203047f906e334a
 F src/pragma.h e690a356c18e98414d2e870ea791c1be1545a714ba623719deb63f7f226d8bb7
 F src/prepare.c 971d5819a4bda88038c2283d71fc0a2974ffc3dd480f9bd941341017abacfd1b
@@ -2002,10 +2001,7 @@ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
 P 6b00ecb59fd303f7985902c35a46db9e729201d4beaedea46596b728d9e4b1c8
-R 26f26a2d9ce78c288f974e48234fd3a7
-T *branch * kv-vfs
-T *sym-kv-vfs *
-T -sym-trunk *
+R 8bc604264e2fc000e1d53debee8fb293
 U drh
-Z 68d678ebfc334c4be8e66c0fb69610ed
+Z 8b6d452122c12811257b08bbb3024121
 # Remove this line to create a well-formed Fossil manifest.
