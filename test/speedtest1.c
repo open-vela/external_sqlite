@@ -20,6 +20,7 @@ static const char zHelp[] =
   "  --mmap SZ           MMAP the first SZ bytes of the database file\n"
   "  --multithread       Set multithreaded mode\n"
   "  --nomemstat         Disable memory statistics\n"
+  "  --nomutex           Open db with SQLITE_OPEN_NOMUTEX\n"
   "  --nosync            Set PRAGMA synchronous=OFF\n"
   "  --notnull           Add NOT NULL constraints to table columns\n"
   "  --output FILE       Store SQL output in FILE\n"
@@ -372,10 +373,12 @@ int speedtest1_numbername(unsigned int n, char *zOut, int nOut){
 #define NAMEWIDTH 60
 static const char zDots[] =
   ".......................................................................";
+static int iTestNumber = 0;  /* Current test # for begin/end_test(). */
 void speedtest1_begin_test(int iTestNum, const char *zTestName, ...){
   int n = (int)strlen(zTestName);
   char *zName;
   va_list ap;
+  iTestNumber = iTestNum;
   va_start(ap, zTestName);
   zName = sqlite3_vmprintf(zTestName, ap);
   va_end(ap);
@@ -383,6 +386,11 @@ void speedtest1_begin_test(int iTestNum, const char *zTestName, ...){
   if( n>NAMEWIDTH ){
     zName[NAMEWIDTH] = 0;
     n = NAMEWIDTH;
+  }
+  if( g.pScript ){
+    fprintf(g.pScript,"-- begin test %d %.*s\n", iTestNumber, n, zName)
+      /* maintenance reminder: ^^^ code in ext/wasm expects %d to be
+      ** field #4 (as in: cut -d' ' -f4). */;
   }
   if( g.bSqlOnly ){
     printf("/* %4d - %s%.*s */\n", iTestNum, zName, NAMEWIDTH-n, zDots);
@@ -404,6 +412,10 @@ void speedtest1_exec(const char*,...);
 void speedtest1_end_test(void){
   sqlite3_int64 iElapseTime = speedtest1_timestamp() - g.iStart;
   if( g.doCheckpoint ) speedtest1_exec("PRAGMA wal_checkpoint;");
+  assert( iTestNumber > 0 );
+  if( g.pScript ){
+    fprintf(g.pScript,"-- end test %d\n", iTestNumber);
+  }
   if( !g.bSqlOnly ){
     g.iTotal += iElapseTime;
     printf("%4d.%03ds\n", (int)(iElapseTime/1000), (int)(iElapseTime%1000));
@@ -412,6 +424,7 @@ void speedtest1_end_test(void){
     sqlite3_finalize(g.pStmt);
     g.pStmt = 0;
   }
+  iTestNumber = 0;
 }
 
 /* Report end of testing */
@@ -2180,6 +2193,8 @@ int main(int argc, char **argv){
   int nThread = 0;              /* --threads value */
   int mmapSize = 0;             /* How big of a memory map to use */
   int memDb = 0;                /* --memdb.  Use an in-memory database */
+  int openFlags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+    ;                           /* SQLITE_OPEN_xxx flags. */
   char *zTSet = "main";         /* Which --testset torun */
   int doTrace = 0;              /* True for --trace */
   const char *zEncoding = 0;    /* --utf16be or --utf16le */
@@ -2192,6 +2207,12 @@ int main(int argc, char **argv){
   int i;                        /* Loop counter */
   int rc;                       /* API return code */
 
+#ifdef SQLITE_SPEEDTEST1_WASM
+  /* Resetting all state is important for the WASM build, which may
+  ** call main() multiple times. */
+  memset(&g, 0, sizeof(g));
+  iTestNumber = 0;
+#endif
 #ifdef SQLITE_CKSUMVFS_STATIC
   sqlite3_register_cksumvfs(0);
 #endif
@@ -2254,6 +2275,8 @@ int main(int argc, char **argv){
         if( i>=argc-1 ) fatal_error("missing argument on %s\n", argv[i]);
         mmapSize = integerValue(argv[++i]);
  #endif
+      }else if( strcmp(z,"nomutex")==0 ){
+        openFlags |= SQLITE_OPEN_NOMUTEX;
       }else if( strcmp(z,"nosync")==0 ){
         noSync = 1;
       }else if( strcmp(z,"notnull")==0 ){
@@ -2395,7 +2418,8 @@ int main(int argc, char **argv){
   sqlite3_initialize();
 
   /* Open the database and the input file */
-  if( sqlite3_open(memDb ? ":memory:" : zDbName, &g.db) ){
+  if( sqlite3_open_v2(memDb ? ":memory:" : zDbName, &g.db,
+                      openFlags, 0) ){
     fatal_error("Cannot open database file: %s\n", zDbName);
   }
 #if SQLITE_VERSION_NUMBER>=3006001

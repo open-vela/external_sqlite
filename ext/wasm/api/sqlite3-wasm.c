@@ -411,3 +411,75 @@ const char * sqlite3_wasm_enum_json(void){
 #undef outf
 #undef lenCheck
 }
+
+/*
+** This function is NOT part of the sqlite3 public API. It is strictly
+** for use by the sqlite project's own JS/WASM bindings.
+**
+** This function invokes the xDelete method of the default VFS,
+** passing on the given filename. If zName is NULL, no default VFS is
+** found, or it has no xDelete method, SQLITE_MISUSE is returned, else
+** the result of the xDelete() call is returned.
+*/
+int sqlite3_wasm_vfs_unlink(const char * zName){
+  int rc = SQLITE_MISUSE /* ??? */;
+  sqlite3_vfs * const pVfs = sqlite3_vfs_find(0);
+  if( zName && pVfs && pVfs->xDelete ){
+    rc = pVfs->xDelete(pVfs, zName, 1);
+  }
+  return rc;
+}
+
+#if defined(__EMSCRIPTEN__) && defined(SQLITE_WASM_OPFS)
+#include <emscripten/wasmfs.h>
+#include <emscripten/console.h>
+/*
+** This function is NOT part of the sqlite3 public API. It is strictly
+** for use by the sqlite project's own JS/WASM bindings, specifically
+** only when building with Emscripten's WASMFS support.
+**
+** This function should only be called if the JS side detects the
+** existence of the Origin-Private FileSystem (OPFS) APIs in the
+** client. The first time it is called, this function instantiates a
+** WASMFS backend impl for OPFS. On success, subsequent calls are
+** no-ops.
+**
+** This function may be passed a "mount point" name, which must have a
+** leading "/" and is currently restricted to a single path component,
+** e.g. "/foo" is legal but "/foo/" and "/foo/bar" are not. If it is
+** NULL or empty, it defaults to "/persistent".
+**
+** Returns 0 on success, SQLITE_NOMEM if instantiation of the backend
+** object fails, SQLITE_IOERR if mkdir() of the zMountPoint dir in
+** the virtual FS fails. In builds compiled without SQLITE_WASM_OPFS
+** defined, SQLITE_NOTFOUND is returned without side effects.
+*/
+int sqlite3_wasm_init_opfs(const char *zMountPoint){
+  static backend_t pOpfs = 0;
+  if( !zMountPoint || !*zMountPoint ) zMountPoint = "/persistent";
+  if( !pOpfs ){
+    pOpfs = wasmfs_create_opfs_backend();
+    if( pOpfs ){
+      emscripten_console_log("Created WASMFS OPFS backend.");
+    }
+  }
+  /** It's not enough to instantiate the backend. We have to create a
+      mountpoint in the VFS and attach the backend to it. */
+  if( pOpfs && 0!=access(zMountPoint, F_OK) ){
+    /* mkdir() simply hangs when called from fiddle app. Cause is
+       not yet determined but the hypothesis is an init-order
+       issue. */
+    /* Note that this check and is not robust but it will
+       hypothetically suffice for the transient wasm-based virtual
+       filesystem we're currently running in. */
+    const int rc = wasmfs_create_directory(zMountPoint, 0777, pOpfs);
+    emscripten_console_logf("OPFS mkdir(%s) rc=%d", zMountPoint, rc);
+    if(rc) return SQLITE_IOERR;
+  }
+  return pOpfs ? 0 : SQLITE_NOMEM;
+}
+#else
+int sqlite3_wasm_init_opfs(void){
+  return SQLITE_NOTFOUND;
+}
+#endif /* __EMSCRIPTEN__ && SQLITE_WASM_OPFS */
