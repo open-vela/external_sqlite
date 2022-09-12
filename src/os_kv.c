@@ -527,25 +527,12 @@ static int kvvfsEncode(const char *aData, int nData, char *aOut){
   return j;
 }
 
-static const signed char kvvfsHexValue[256] = {
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-   0,  1,  2,  3,  4,  5,  6,  7,    8,  9, -1, -1, -1, -1, -1, -1,
-  -1, 10, 11, 12, 13, 14, 15, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1,
-  -1, -1, -1, -1, -1, -1, -1, -1,   -1, -1, -1, -1, -1, -1, -1, -1
-};
+/* Convert hex to binary */
+static char kvvfsHexToBinary(char c){
+  if( c>='0' && c<='9' ) return c - '0';
+  if( c>='A' && c<='F' ) return c - 'A' + 10;
+  return 0;
+}
 
 /*
 ** Decode the text encoding back to binary.  The binary content is
@@ -553,35 +540,28 @@ static const signed char kvvfsHexValue[256] = {
 **
 ** The return value is the number of bytes actually written into aOut[].
 */
-static int kvvfsDecode(const char *a, char *aOut, int nOut){
+static int kvvfsDecode(const char *aIn, char *aOut, int nOut){
   int i, j;
   int c;
-  const unsigned char *aIn = (const unsigned char*)a;
   i = 0;
   j = 0;
-  while( 1 ){
-    c = kvvfsHexValue[aIn[i]];
-    if( c<0 ){
+  while( (c = aIn[i])!=0 ){
+    if( c>='a' ){
       int n = 0;
       int mult = 1;
-      c = aIn[i];
-      if( c==0 ) break;
       while( c>='a' && c<='z' ){
         n += (c - 'a')*mult;
         mult *= 26;
         c = aIn[++i];
       }
       if( j+n>nOut ) return -1;
-      memset(&aOut[j], 0, n);
-      j += n;
-      c = aIn[i];
-      if( c==0 ) break;
+      while( n-->0 ){
+        aOut[j++] = 0;
+      }
     }else{
-      aOut[j] = c<<4;
-      c = kvvfsHexValue[aIn[++i]];
-      if( c<0 ) break;
-      aOut[j++] += c;
-      i++;
+      if( j>nOut ) return -1;
+      aOut[j] = kvvfsHexToBinary(aIn[i++])<<4;
+      aOut[j++] += kvvfsHexToBinary(aIn[i++]);
     }
   }
   return j;
@@ -603,7 +583,7 @@ static void kvvfsDecodeJournal(
   const char *zTxt,      /* Text encoding.  Zero-terminated */
   int nTxt               /* Bytes in zTxt, excluding zero terminator */
 ){
-  unsigned int n = 0;
+  unsigned int n;
   int c, i, mult;
   i = 0;
   mult = 1;
@@ -1041,10 +1021,7 @@ static int kvvfsFullPathname(
   int nOut, 
   char *zOut
 ){
-  size_t nPath;
-
-zPath = "local";
-  nPath = strlen(zPath);
+  size_t nPath = strlen(zPath);
   SQLITE_KV_LOG(("xFullPathname(\"%s\")\n", zPath));
   if( nOut<nPath+1 ) nPath = nOut - 1;
   memcpy(zOut, zPath, nPath);

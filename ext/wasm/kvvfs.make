@@ -30,7 +30,7 @@ kvvfs.flags =
 ########################################################################
 # emcc flags for .c/.o.
 kvvfs.cflags :=
-kvvfs.cflags += -std=c99 -fPIC
+kvvfs.cflags += -std=c99 -fPIC -g
 kvvfs.cflags += -I. -I$(dir.top)
 kvvfs.cflags += -DSQLITE_OS_KV=1 $(SQLITE_OPT)
 
@@ -38,6 +38,7 @@ kvvfs.cflags += -DSQLITE_OS_KV=1 $(SQLITE_OPT)
 # emcc flags specific to building the final .js/.wasm file...
 kvvfs.jsflags := -fPIC
 kvvfs.jsflags += --no-entry
+kvvfs.jsflags += --minify 0
 kvvfs.jsflags += -sENVIRONMENT=web
 kvvfs.jsflags += -sMODULARIZE
 kvvfs.jsflags += -sSTRICT_JS
@@ -80,3 +81,4 @@ endif
 	@ls -la $@ $(kvvfs.wasm)
 
 kvvfs: $(kvvfs.js)
+all: kvvfs
