@@ -355,7 +355,6 @@ foreach file {
    hash.c
    opcodes.c
 
-   os_kv.c
    os_unix.c
    os_win.c
    memdb.c

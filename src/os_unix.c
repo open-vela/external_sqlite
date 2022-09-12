@@ -87,11 +87,11 @@
 /*
 ** standard include files.
 */
-#include <sys/types.h>   /* amalgamator: keep */
-#include <sys/stat.h>    /* amalgamator: keep */
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <unistd.h>      /* amalgamator: keep */
+#include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -5855,7 +5855,6 @@ static const char *unixTempFileDir(void){
 static int unixGetTempname(int nBuf, char *zBuf){
   const char *zDir;
   int iLimit = 0;
-  int rc = SQLITE_OK;
 
   /* It's odd to simulate an io-error here, but really this is just
   ** using the io-error infrastructure to test that SQLite handles this
@@ -5864,26 +5863,18 @@ static int unixGetTempname(int nBuf, char *zBuf){
   zBuf[0] = 0;
   SimulateIOError( return SQLITE_IOERR );
 
-  sqlite3_mutex_enter(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_TEMPDIR));
   zDir = unixTempFileDir();
-  if( zDir==0 ){
-    rc = SQLITE_IOERR_GETTEMPPATH;
-  }else{
-    do{
-      u64 r;
-      sqlite3_randomness(sizeof(r), &r);
-      assert( nBuf>2 );
-      zBuf[nBuf-2] = 0;
-      sqlite3_snprintf(nBuf, zBuf, "%s/"SQLITE_TEMP_FILE_PREFIX"%llx%c",
-                       zDir, r, 0);
-      if( zBuf[nBuf-2]!=0 || (iLimit++)>10 ){
-        rc = SQLITE_ERROR;
-        break;
-      }
-    }while( osAccess(zBuf,0)==0 );
-  }
-  sqlite3_mutex_leave(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_TEMPDIR));
-  return rc;
+  if( zDir==0 ) return SQLITE_IOERR_GETTEMPPATH;
+  do{
+    u64 r;
+    sqlite3_randomness(sizeof(r), &r);
+    assert( nBuf>2 );
+    zBuf[nBuf-2] = 0;
+    sqlite3_snprintf(nBuf, zBuf, "%s/"SQLITE_TEMP_FILE_PREFIX"%llx%c",
+                     zDir, r, 0);
+    if( zBuf[nBuf-2]!=0 || (iLimit++)>10 ) return SQLITE_ERROR;
+  }while( osAccess(zBuf,0)==0 );
+  return SQLITE_OK;
 }
 
 #if SQLITE_ENABLE_LOCKING_STYLE && defined(__APPLE__)
