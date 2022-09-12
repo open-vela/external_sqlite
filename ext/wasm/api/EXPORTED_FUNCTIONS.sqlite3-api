@@ -66,7 +66,5 @@ _sqlite3_value_text
 _sqlite3_value_type
 _sqlite3_vfs_find
 _sqlite3_vfs_register
-_sqlite3_wasm_db_error
-_sqlite3_wasm_enum_json
 _malloc
 _free

@@ -19,7 +19,8 @@
   const toss = function(...args){throw new Error(args.join(' '))};
   const debug = console.debug.bind(console);
   const eOutput = document.querySelector('#test-output');
-  const log = console.log.bind(console)
+  const log = console.log.bind(console),
+        warn = console.warn.bind(console);
   const logHtml = function(...args){
     log.apply(this, args);
     const ln = document.createElement('div');
@@ -162,10 +163,10 @@
     }
 
     try {
-      throw new capi.WasmAllocError;
+      throw new sqlite3.WasmAllocError;
     }catch(e){
       T.assert(e instanceof Error)
-        .assert(e instanceof capi.WasmAllocError);
+        .assert(e instanceof sqlite3.WasmAllocError);
     }
 
     try {
@@ -251,7 +252,7 @@
     db.exec({
       sql:new TextEncoder('utf-8').encode([
         // ^^^ testing string-vs-typedarray handling in execMulti()
-        "attach 'foo.db' as foo;",
+        "attach 'session' as foo;" /* name 'session' is magic for kvvfs! */,
         "create table foo.bar(a);",
         "insert into foo.bar(a) values(1),(2),(3);",
         "select a from foo.bar order by a;"
@@ -743,7 +744,7 @@
         .assert('sqlite3_vfs' === dVfs.structName)
         .assert(!!dVfs.structInfo)
         .assert(SB.StructType.hasExternalPointer(dVfs))
-        .assert(3===dVfs.$iVersion)
+        .assert(dVfs.$iVersion>0)
         .assert('number'===typeof dVfs.$zName)
         .assert('number'===typeof dVfs.$xSleep)
         .assert(capi.wasm.functionEntry(dVfs.$xOpen))
@@ -1012,7 +1013,7 @@
           wasm = capi.wasm;
     log("Loaded module:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
     log("Build options:",wasm.compileOptionUsed());
-
+    capi.sqlite3_web_persistent_dir()/*will install OPFS if available, plus a and non-locking VFS*/;
     if(1){
       /* Let's grab those last few lines of test coverage for
          sqlite3-api.js... */
@@ -1045,9 +1046,18 @@
       T.assert(capi.wasm[k] instanceof Function);
     });
 
-    const db = new oo.DB(':memory:'), startTime = performance.now();
+    let dbName = "/testing1.sqlite3";
+    let vfsName = undefined;
+    if(oo.DB.clearKvvfsStorage){
+      dbName = "local";
+      vfsName = 'kvvfs';
+      logHtml("Found kvvfs. Clearing db(s) from sessionStorage and localStorage",
+              "and selecting kvvfs-friendly db name:",dbName);
+      oo.DB.clearKvvfsStorage();
+    }
+    const db = new oo.DB(dbName,'c',vfsName), startTime = performance.now();
     try {
-      log("DB filename:",db.filename,db.fileName());
+      log("db.filename =",db.filename,"db.fileName() =",db.fileName());
       const banner1 = '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>',
             banner2 = '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
       [
@@ -1067,13 +1077,7 @@
     log('capi.wasm.exports',capi.wasm.exports);
   };
 
-  sqlite3InitModule(self.sqlite3TestModule).then(function(theModule){
-    /** Use a timeout so that we are (hopefully) out from under
-        the module init stack when our setup gets run. Just on
-        principle, not because we _need_ to be. */
-    //console.debug("theModule =",theModule);
-    //setTimeout(()=>runTests(theModule), 0);
-    // ^^^ Chrome warns: "VIOLATION: setTimeout() handler took A WHOLE 50ms!"
+  self.sqlite3TestModule.initSqlite3().then(function(theModule){
     self._MODULE = theModule /* this is only to facilitate testing from the console */
     runTests(theModule);
   });
