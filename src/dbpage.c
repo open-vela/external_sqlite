@@ -288,7 +288,7 @@ static int dbpageColumn(
       break;
     }
   }
-  return rc;
+  return SQLITE_OK;
 }
 
 static int dbpageRowid(sqlite3_vtab_cursor *pCursor, sqlite_int64 *pRowid){
