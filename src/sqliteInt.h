@@ -199,6 +199,11 @@
 #include "sqlite3.h"
 
 /*
+** Reuse the STATIC_LRU for mutex access to sqlite3_temp_directory.
+*/
+#define SQLITE_MUTEX_STATIC_TEMPDIR SQLITE_MUTEX_STATIC_VFS1
+
+/*
 ** Include the configuration header output by 'configure' if we're using the
 ** autoconf-based build
 */
@@ -1263,11 +1268,11 @@ typedef int VList;
 ** "BusyHandler" typedefs. vdbe.h also requires a few of the opaque
 ** pointer types (i.e. FuncDef) defined above.
 */
+#include "os.h"
 #include "pager.h"
 #include "btree.h"
 #include "vdbe.h"
 #include "pcache.h"
-#include "os.h"
 #include "mutex.h"
 
 /* The SQLITE_EXTRA_DURABLE compile-time option used to set the default
