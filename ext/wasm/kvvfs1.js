@@ -19,25 +19,12 @@
   const toss = function(...args){throw new Error(args.join(' '))};
   const debug = console.debug.bind(console);
   const eOutput = document.querySelector('#test-output');
-  const logC = console.log.bind(console)
-  const logE = function(domElement){
-    eOutput.append(domElement);
-  };
-  const logHtml = function(cssClass,...args){
+  const log = console.log.bind(console)
+  const logHtml = function(...args){
+    log.apply(this, args);
     const ln = document.createElement('div');
-    if(cssClass) ln.classList.add(cssClass);
     ln.append(document.createTextNode(args.join(' ')));
-    logE(ln);
-  }
-  const log = function(...args){
-    logC(...args);
-    logHtml('',...args);
-  };
-  const warn = function(...args){
-    logHtml('warning',...args);
-  };
-  const error = function(...args){
-    logHtml('error',...args);
+    eOutput.append(ln);
   };
 
   const runTests = function(Module){
@@ -47,67 +34,46 @@
           oo = sqlite3.oo1,
           wasm = capi.wasm;
     log("Loaded module:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
-    T.assert( 0 !== capi.sqlite3_vfs_find(null) );
-    if(!oo.DB.clearKvvfsStorage){
-      warn("This build is not kvvfs-capable.");
-      return;
-    }
-    
-    const dbStorage = 1 ? ':sessionStorage:' : ':localStorage:';
-    const theStore = 's'===dbStorage[1] ? sessionStorage : localStorage;
-    /**
-       The names ':sessionStorage:' and ':localStorage:' are handled
-       via the DB class constructor, not the C level. In the C API,
-       the names "local" and "session" are the current (2022-09-12)
-       names for those keys, but that is subject to change.
-    */
-    const db = new oo.DB( dbStorage );
-
-    document.querySelector('#btn-clear-storage').addEventListener('click',function(){
-      oo.DB.clearKvvfsStorage();
-      log("kvvfs localStorage and sessionStorage cleared.");
-    });
-    document.querySelector('#btn-clear-log').addEventListener('click',function(){
-      eOutput.innerText = '';
-    });
-    document.querySelector('#btn-init-db').addEventListener('click',function(){
-      const saveSql = [];
-      try{
-        db.exec({
-          sql:["drop table if exists t;",
-               "create table if not exists t(a);",
-               "insert into t(a) values(?),(?),(?)"],
-          bind: [performance.now() >> 0,
-                 (performance.now() * 2) >> 0,
-                 (performance.now() / 2) >> 0],
-          saveSql
-        });
-        console.log("saveSql =",saveSql,theStore);
-        log("DB (re)initialized.");
-      }catch(e){
-        error(e.message);
+    log("Build options:",wasm.compileOptionUsed());
+    self.S = sqlite3;
+    T.assert(0 === capi.sqlite3_vfs_find(null));
+    S.capi.sqlite3_initialize();
+    T.assert( Number.isFinite( capi.sqlite3_vfs_find(null) ) );
+    const stores = {
+      local: localStorage,
+      session: sessionStorage
+    };
+    const cleanupStore = function(n){
+      const s = stores[n];
+      const isKv = (key)=>key.startsWith('kvvfs-'+n);
+      let i, k, toRemove = [];
+      for( i = 0; (k = s.key(i)); ++i) {
+        if(isKv(k)) toRemove.push(k);
       }
-    });
-    const btnSelect = document.querySelector('#btn-select1');
-    btnSelect.addEventListener('click',function(){
-      log("DB rows:");
-      try{
+      toRemove.forEach((k)=>s.removeItem(k));
+    };
+    const dbStorage = 1 ? 'session' : 'local';
+    const db = new oo.DB(dbStorage);
+    try {
+      db.exec("create table if not exists t(a)");
+      if(undefined===db.selectValue("select a from t limit 1")){
+        log("New db. Populating..");
+        db.exec("insert into t(a) values(1),(2),(3)");
+      }else{
+        log("Found existing table data:");
         db.exec({
           sql: "select * from t order by a",
           rowMode: 0,
-          callback: (v)=>log(v)
+          callback: function(v){log(v)}
         });
-      }catch(e){
-        error(e.message);
       }
-    });
-    log("Storage backend:",db.filename /* note that the name was internally translated */);
-    if(0===db.selectValue('select count(*) from sqlite_master')){
-      log("DB is empty. Use the init button to populate it.");
-    }else{
-      log("DB contains data from a previous session. Use the Clear Ctorage button to delete it.");
-      btnSelect.click();
+    }finally{
+      const n = db.filename;
+      db.close();
+      //cleanupStore(n);
     }
+    
+    log("Init done. Proceed from the dev console.");
   };
 
   sqlite3InitModule(self.sqlite3TestModule).then(function(theModule){
