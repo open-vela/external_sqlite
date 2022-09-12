@@ -7,6 +7,7 @@ static const char zHelp[] =
   "Usage: %s [--options] DATABASE\n"
   "Options:\n"
   "  --autovacuum        Enable AUTOVACUUM mode\n"
+  "  --big-transactions  Add BEGIN/END around large tests which normally don't\n"
   "  --cachesize N       Set the cache size to N\n"
   "  --checkpoint        Run PRAGMA wal_checkpoint after each test case\n"
   "  --exclusive         Enable locking_mode=EXCLUSIVE\n"
@@ -20,6 +21,7 @@ static const char zHelp[] =
   "  --mmap SZ           MMAP the first SZ bytes of the database file\n"
   "  --multithread       Set multithreaded mode\n"
   "  --nomemstat         Disable memory statistics\n"
+  "  --nomutex           Open db with SQLITE_OPEN_NOMUTEX\n"
   "  --nosync            Set PRAGMA synchronous=OFF\n"
   "  --notnull           Add NOT NULL constraints to table columns\n"
   "  --output FILE       Store SQL output in FILE\n"
@@ -97,6 +99,7 @@ static struct Global {
   int nRepeat;               /* Repeat selects this many times */
   int doCheckpoint;          /* Run PRAGMA wal_checkpoint after each trans */
   int nReserve;              /* Reserve bytes */
+  int doBigTransactions;     /* Enable transactions on tests 410 and 510 */
   const char *zWR;           /* Might be WITHOUT ROWID */
   const char *zNN;           /* Might be NOT NULL */
   const char *zPK;           /* Might be UNIQUE or PRIMARY KEY */
@@ -372,10 +375,12 @@ int speedtest1_numbername(unsigned int n, char *zOut, int nOut){
 #define NAMEWIDTH 60
 static const char zDots[] =
   ".......................................................................";
+static int iTestNumber = 0;  /* Current test # for begin/end_test(). */
 void speedtest1_begin_test(int iTestNum, const char *zTestName, ...){
   int n = (int)strlen(zTestName);
   char *zName;
   va_list ap;
+  iTestNumber = iTestNum;
   va_start(ap, zTestName);
   zName = sqlite3_vmprintf(zTestName, ap);
   va_end(ap);
@@ -383,6 +388,11 @@ void speedtest1_begin_test(int iTestNum, const char *zTestName, ...){
   if( n>NAMEWIDTH ){
     zName[NAMEWIDTH] = 0;
     n = NAMEWIDTH;
+  }
+  if( g.pScript ){
+    fprintf(g.pScript,"-- begin test %d %.*s\n", iTestNumber, n, zName)
+      /* maintenance reminder: ^^^ code in ext/wasm expects %d to be
+      ** field #4 (as in: cut -d' ' -f4). */;
   }
   if( g.bSqlOnly ){
     printf("/* %4d - %s%.*s */\n", iTestNum, zName, NAMEWIDTH-n, zDots);
@@ -404,6 +414,10 @@ void speedtest1_exec(const char*,...);
 void speedtest1_end_test(void){
   sqlite3_int64 iElapseTime = speedtest1_timestamp() - g.iStart;
   if( g.doCheckpoint ) speedtest1_exec("PRAGMA wal_checkpoint;");
+  assert( iTestNumber > 0 );
+  if( g.pScript ){
+    fprintf(g.pScript,"-- end test %d\n", iTestNumber);
+  }
   if( !g.bSqlOnly ){
     g.iTotal += iElapseTime;
     printf("%4d.%03ds\n", (int)(iElapseTime/1000), (int)(iElapseTime%1000));
@@ -412,6 +426,7 @@ void speedtest1_end_test(void){
     sqlite3_finalize(g.pStmt);
     g.pStmt = 0;
   }
+  iTestNumber = 0;
 }
 
 /* Report end of testing */
@@ -1105,11 +1120,23 @@ void testset_main(void){
   speedtest1_exec("COMMIT");
   speedtest1_end_test();
   speedtest1_begin_test(410, "%d SELECTS on an IPK", n);
+  if( g.doBigTransactions ){
+    /* Historical note: tests 410 and 510 have historically not used
+    ** explicit transactions. The --big-transactions flag was added
+    ** 2022-09-08 to support the WASM/OPFS build, as the run-times
+    ** approach 1 minute for each of these tests if they're not in an
+    ** explicit transaction. The run-time effect of --big-transaciions
+    ** on native builds is negligible. */
+    speedtest1_exec("BEGIN");
+  }
   speedtest1_prepare("SELECT b FROM t5 WHERE a=?1; --  %d times",n);
   for(i=1; i<=n; i++){
     x1 = swizzle(i,maxb);
     sqlite3_bind_int(g.pStmt, 1, (sqlite3_int64)x1);
     speedtest1_run();
+  }
+  if( g.doBigTransactions ){
+    speedtest1_exec("COMMIT");
   }
   speedtest1_end_test();
 
@@ -1132,12 +1159,19 @@ void testset_main(void){
   speedtest1_exec("COMMIT");
   speedtest1_end_test();
   speedtest1_begin_test(510, "%d SELECTS on a TEXT PK", n);
+  if( g.doBigTransactions ){
+    /* See notes for test 410. */
+    speedtest1_exec("BEGIN");
+  }
   speedtest1_prepare("SELECT b FROM t6 WHERE a=?1; --  %d times",n);
   for(i=1; i<=n; i++){
     x1 = swizzle(i,maxb);
     speedtest1_numbername(x1, zNum, sizeof(zNum));
     sqlite3_bind_text(g.pStmt, 1, zNum, -1, SQLITE_STATIC);
     speedtest1_run();
+  }
+  if( g.doBigTransactions ){
+    speedtest1_exec("COMMIT");
   }
   speedtest1_end_test();
   speedtest1_begin_test(520, "%d SELECT DISTINCT", n);
@@ -2180,6 +2214,8 @@ int main(int argc, char **argv){
   int nThread = 0;              /* --threads value */
   int mmapSize = 0;             /* How big of a memory map to use */
   int memDb = 0;                /* --memdb.  Use an in-memory database */
+  int openFlags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+    ;                           /* SQLITE_OPEN_xxx flags. */
   char *zTSet = "main";         /* Which --testset torun */
   int doTrace = 0;              /* True for --trace */
   const char *zEncoding = 0;    /* --utf16be or --utf16le */
@@ -2192,6 +2228,12 @@ int main(int argc, char **argv){
   int i;                        /* Loop counter */
   int rc;                       /* API return code */
 
+#ifdef SQLITE_SPEEDTEST1_WASM
+  /* Resetting all state is important for the WASM build, which may
+  ** call main() multiple times. */
+  memset(&g, 0, sizeof(g));
+  iTestNumber = 0;
+#endif
 #ifdef SQLITE_CKSUMVFS_STATIC
   sqlite3_register_cksumvfs(0);
 #endif
@@ -2212,6 +2254,8 @@ int main(int argc, char **argv){
       do{ z++; }while( z[0]=='-' );
       if( strcmp(z,"autovacuum")==0 ){
         doAutovac = 1;
+      }else if( strcmp(z,"big-transactions")==0 ){
+        g.doBigTransactions = 1;
       }else if( strcmp(z,"cachesize")==0 ){
         if( i>=argc-1 ) fatal_error("missing argument on %s\n", argv[i]);
         i++;
@@ -2254,6 +2298,8 @@ int main(int argc, char **argv){
         if( i>=argc-1 ) fatal_error("missing argument on %s\n", argv[i]);
         mmapSize = integerValue(argv[++i]);
  #endif
+      }else if( strcmp(z,"nomutex")==0 ){
+        openFlags |= SQLITE_OPEN_NOMUTEX;
       }else if( strcmp(z,"nosync")==0 ){
         noSync = 1;
       }else if( strcmp(z,"notnull")==0 ){
@@ -2395,7 +2441,8 @@ int main(int argc, char **argv){
   sqlite3_initialize();
 
   /* Open the database and the input file */
-  if( sqlite3_open(memDb ? ":memory:" : zDbName, &g.db) ){
+  if( sqlite3_open_v2(memDb ? ":memory:" : zDbName, &g.db,
+                      openFlags, 0) ){
     fatal_error("Cannot open database file: %s\n", zDbName);
   }
 #if SQLITE_VERSION_NUMBER>=3006001
