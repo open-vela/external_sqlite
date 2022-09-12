@@ -602,7 +602,7 @@ static void kvvfsDecodeJournal(
   const char *zTxt,      /* Text encoding.  Zero-terminated */
   int nTxt               /* Bytes in zTxt, excluding zero terminator */
 ){
-  unsigned int n;
+  unsigned int n = 0;
   int c, i, mult;
   i = 0;
   mult = 1;
