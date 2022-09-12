@@ -35,21 +35,29 @@
           wasm = capi.wasm;
     log("Loaded module:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
     log("Build options:",wasm.compileOptionUsed());
-    T.assert( 0 !== capi.sqlite3_vfs_find(null) );
-
-    const dbStorage = 1 ? ':sessionStorage:' : ':localStorage:';
-    /**
-       The names ':sessionStorage:' and ':localStorage:' are handled
-       via the DB class constructor, not the C level. In the C API,
-       the names "local" and "session" are the current (2022-09-12)
-       names for those keys, but that is subject to change.
-    */
-    const db = new oo.DB( dbStorage );
-    log("Storage backend:",db.filename /* note that the name was internally translated */);
+    self.S = sqlite3;
+    T.assert(0 === capi.sqlite3_vfs_find(null));
+    S.capi.sqlite3_initialize();
+    T.assert( Number.isFinite( capi.sqlite3_vfs_find(null) ) );
+    const stores = {
+      local: localStorage,
+      session: sessionStorage
+    };
+    const cleanupStore = function(n){
+      const s = stores[n];
+      const isKv = (key)=>key.startsWith('kvvfs-'+n);
+      let i, k, toRemove = [];
+      for( i = 0; (k = s.key(i)); ++i) {
+        if(isKv(k)) toRemove.push(k);
+      }
+      toRemove.forEach((k)=>s.removeItem(k));
+    };
+    const dbStorage = 1 ? 'session' : 'local';
+    const db = new oo.DB(dbStorage);
     try {
       db.exec("create table if not exists t(a)");
       if(undefined===db.selectValue("select a from t limit 1")){
-        log("New db. Populating. This DB will persist across page reloads.");
+        log("New db. Populating..");
         db.exec("insert into t(a) values(1),(2),(3)");
       }else{
         log("Found existing table data:");
@@ -60,9 +68,12 @@
         });
       }
     }finally{
+      const n = db.filename;
       db.close();
+      //cleanupStore(n);
     }
-    log("End of demo.");
+    
+    log("Init done. Proceed from the dev console.");
   };
 
   sqlite3InitModule(self.sqlite3TestModule).then(function(theModule){
