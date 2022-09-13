@@ -25,7 +25,6 @@ _sqlite3_compileoption_used
 _sqlite3_create_function_v2
 _sqlite3_data_count
 _sqlite3_db_filename
-_sqlite3_db_handle
 _sqlite3_db_name
 _sqlite3_errmsg
 _sqlite3_error_offset
@@ -34,7 +33,6 @@ _sqlite3_exec
 _sqlite3_expanded_sql
 _sqlite3_extended_errcode
 _sqlite3_extended_result_codes
-_sqlite3_file_control
 _sqlite3_finalize
 _sqlite3_initialize
 _sqlite3_interrupt
@@ -68,5 +66,7 @@ _sqlite3_value_text
 _sqlite3_value_type
 _sqlite3_vfs_find
 _sqlite3_vfs_register
+_sqlite3_wasm_db_error
+_sqlite3_wasm_enum_json
 _malloc
 _free

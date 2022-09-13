@@ -1119,26 +1119,26 @@ static void pcache1Rekey(
   PCache1 *pCache = (PCache1 *)p;
   PgHdr1 *pPage = (PgHdr1 *)pPg;
   PgHdr1 **pp;
-  unsigned int hOld, hNew; 
+  unsigned int h; 
   assert( pPage->iKey==iOld );
   assert( pPage->pCache==pCache );
   assert( iOld!=iNew );               /* The page number really is changing */
 
   pcache1EnterMutex(pCache->pGroup);
-
+  
   assert( pcache1FetchNoMutex(p, iOld, 0)==pPage ); /* pPg really is iOld */
-  hOld = iOld%pCache->nHash;
-  pp = &pCache->apHash[hOld];
+  h = iOld%pCache->nHash;
+  pp = &pCache->apHash[h];
   while( (*pp)!=pPage ){
     pp = &(*pp)->pNext;
   }
   *pp = pPage->pNext;
 
-  assert( pcache1FetchNoMutex(p, iNew, 0)==0 ); /* iNew not in cache */
-  hNew = iNew%pCache->nHash;
+  assert( pcache1FetchNoMutex(p, iNew, 0)==0 ); /* iNew not previously used */
+  h = iNew%pCache->nHash;
   pPage->iKey = iNew;
-  pPage->pNext = pCache->apHash[hNew];
-  pCache->apHash[hNew] = pPage;
+  pPage->pNext = pCache->apHash[h];
+  pCache->apHash[h] = pPage;
   if( iNew>pCache->iMaxKey ){
     pCache->iMaxKey = iNew;
   }
