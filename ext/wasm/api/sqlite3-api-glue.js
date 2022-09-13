@@ -16,9 +16,23 @@
   initializes the main API pieces so that the downstream components
   (e.g. sqlite3-api-oo1.js) have all that they need.
 */
-self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
+(function(self){
   'use strict';
   const toss = (...args)=>{throw new Error(args.join(' '))};
+
+  self.sqlite3 = self.sqlite3ApiBootstrap({
+    Module: Module /* ==> Emscripten-style Module object. Currently
+                      needs to be exposed here for test code. NOT part
+                      of the public API. */,
+    exports: Module['asm'],
+    memory: Module.wasmMemory /* gets set if built with -sIMPORT_MEMORY */,
+    bigIntEnabled: !!self.BigInt64Array,
+    allocExportName: 'malloc',
+    deallocExportName: 'free'
+  });
+  delete self.sqlite3ApiBootstrap;
+
+  const sqlite3 = self.sqlite3;
   const capi = sqlite3.capi, wasm = capi.wasm, util = capi.util;
   self.WhWasmUtilInstaller(capi.wasm);
   delete self.WhWasmUtilInstaller;
@@ -43,7 +57,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       return oldP(v);
     };
     wasm.xWrap.argAdapter('.pointer', adapter);
-  } /* ".pointer" xWrap() argument adapter */
+  }
 
   // WhWasmUtil.xWrap() bindings...
   {
@@ -63,11 +77,8 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     for(const e of wasm.bindingSignatures){
       capi[e[0]] = wasm.xWrap.apply(null, e);
     }
-    for(const e of wasm.bindingSignatures.wasm){
-      capi.wasm[e[0]] = wasm.xWrap.apply(null, e);
-    }
 
-    /* For C API functions which cannot work properly unless
+    /* For functions which cannot work properly unless
        wasm.bigIntEnabled is true, install a bogus impl which
        throws if called when bigIntEnabled is false. */
     const fI64Disabled = function(fname){
@@ -117,7 +128,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   */
   __prepare.basic = wasm.xWrap('sqlite3_prepare_v3',
                                "int", ["sqlite3*", "string",
-                                       "int"/*ignored for this impl!*/,
+                                       "int"/*MUST always be negative*/,
                                        "int", "**",
                                        "**"/*MUST be 0 or null or undefined!*/]);
   /**
@@ -137,10 +148,19 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 
   /* Documented in the api object's initializer. */
   capi.sqlite3_prepare_v3 = function f(pDb, sql, sqlLen, prepFlags, ppStmt, pzTail){
+    /* 2022-07-08: xWrap() 'string' arg handling may be able do this
+       special-case handling for us. It needs to be tested. Or maybe
+       not: we always want to treat pzTail as null when passed a
+       non-pointer SQL string and the argument adapters don't have
+       enough state to know that. Maybe they could/should, by passing
+       the currently-collected args as an array as the 2nd arg to the
+       argument adapters? Or maybe we collect all args in an array,
+       pass that to an optional post-args-collected callback, and give
+       it a chance to manipulate the args before we pass them on? */
     if(util.isSQLableTypedArray(sql)) sql = util.typedArrayToString(sql);
     switch(typeof sql){
         case 'string': return __prepare.basic(pDb, sql, -1, prepFlags, ppStmt, null);
-        case 'number': return __prepare.full(pDb, sql, sqlLen, prepFlags, ppStmt, pzTail);
+        case 'number': return __prepare.full(pDb, sql, sqlLen||-1, prepFlags, ppStmt, pzTail);
         default:
           return util.sqlite3_wasm_db_error(
             pDb, capi.SQLITE_MISUSE,
@@ -187,4 +207,5 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       capi[s.name] = sqlite3.StructBinder(s);
     }
   }
-});
+
+})(self);
