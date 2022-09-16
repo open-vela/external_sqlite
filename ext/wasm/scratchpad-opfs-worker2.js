@@ -1,5 +1,5 @@
 /*
-  2022-07-22
+  2022-05-22
 
   The author disclaims copyright to this source code.  In place of a
   legal notice, here is a blessing:
@@ -10,30 +10,42 @@
 
   ***********************************************************************
 
-  This file contains extensions to the sqlite3 WASM API related to the
-  Origin-Private FileSystem (OPFS). It is intended to be appended to
-  the main JS deliverable somewhere after sqlite3-api-glue.js and
-  before sqlite3-api-cleanup.js.
-
-  Significant notes and limitations:
-
-  - As of this writing, OPFS is still very much in flux and only
-    available in bleeding-edge versions of Chrome (v102+, noting that
-    that number will increase as the OPFS API matures).
-
-  - The _synchronous_ family of OPFS features (which is what this API
-    requires) are only available in non-shared Worker threads. This
-    file tries to detect that case and becomes a no-op if those
-    features do not seem to be available.
+  An experiment for wasmfs/opfs. This file MUST be in the same dir as
+  the sqlite3.js emscripten module or that module won't be able to
+  resolve the relative URIs (importScript()'s relative URI handling
+  is, quite frankly, broken).
 */
+'use strict';
 
-// FileSystemHandle
-// FileSystemDirectoryHandle
-// FileSystemFileHandle
-// FileSystemFileHandle.prototype.createSyncAccessHandle
-self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
-  const warn = console.warn.bind(console),
-        error = console.error.bind(console);
+const toss = function(...args){throw new Error(args.join(' '))};
+/**
+   Posts a message in the form {type,data} unless passed more than 2
+   args, in which case it posts {type, data:[arg1...argN]}.
+*/
+const wMsg = function(type,data){
+  postMessage({
+    type,
+    data: arguments.length<3
+      ? data
+      : Array.prototype.slice.call(arguments,1)
+  });
+};
+
+const stdout = function(...args){
+  wMsg('stdout',args);
+  console.log(...args);
+};
+const stderr = function(...args){
+  wMsg('stderr',args);
+  console.error(...args);
+};
+
+const log = console.log.bind(console);
+const warn = console.warn.bind(console);
+const error = console.error.bind(console);
+
+
+const initOpfsBits = async function(sqlite3){
   if(!self.importScripts || !self.FileSystemFileHandle){
     //|| !self.FileSystemFileHandle.prototype.createSyncAccessHandle){
     // ^^^ sync API is not required with WASMFS/OPFS backend.
@@ -45,7 +57,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   }
   //warn('self.FileSystemFileHandle =',self.FileSystemFileHandle);
   //warn('self.FileSystemFileHandle.prototype =',self.FileSystemFileHandle.prototype);
-  const toss = (...args)=>{throw new Error(args.join(' '))};
   const capi = sqlite3.capi,
         wasm = capi.wasm;
   const sqlite3_vfs = capi.sqlite3_vfs
@@ -169,6 +180,10 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   */
   const __opfsHandles = Object.create(null);
 
+  /**
+     Generates a random ASCII string len characters long, intended for
+     use as a temporary file name.
+  */
   const randomFilename = function f(len=16){
     if(!f._chars){
       f._chars = "abcdefghijklmnopqrstuvwxyz"+
@@ -185,7 +200,8 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     return a.join('');
   };
 
-  //const rootDir = await navigator.storage.getDirectory();
+  const rootDir = await navigator.storage.getDirectory();
+  log("rootDir =",rootDir);
   
   ////////////////////////////////////////////////////////////////////////
   // Set up OPFS VFS methods...
@@ -198,7 +214,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     if(flags & capi.SQLITE_OPEN_DELETEONCLOSE){
       f.deleteOnClose = true;
     }
-    f.filename = zName ? wasm.cstringToJs(zName) : randomFilename();
+    f.filename = zName ? wasm.cstringToJs(zName) : 'sqlite3-xOpen-'+randomFilename();
     error("OPFS sqlite3_vfs::xOpen is not yet full implemented.");
     return capi.SQLITE_IOERR;
   })
@@ -225,6 +241,8 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   })
   ('xDelete', function(pVfs, zName, doSyncDir){
     error("OPFS sqlite3_vfs::xDelete is not yet implemented.");
+    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/file_system_access/file_system_handle.idl
+    // ==> remove()
     return capi.SQLITE_IOERR;
   })
   ('xGetLastError', function(pVfs,nOut,pOut){
@@ -391,4 +409,86 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   capi.sqlite3_vfs_register.addReference(oVfs, oIom);
   warn("End of (very incomplete) OPFS setup.", oVfs);
   //oVfs.dispose()/*only because we can't yet do anything with it*/;
-});
+
+}/*initOpfsBits()*/;
+
+(async function(){
+  importScripts('sqlite3.js');
+
+  const test1 = function(db){
+    db.exec("create table if not exists t(a);")
+      .transaction(function(db){
+        db.prepare("insert into t(a) values(?)")
+          .bind(new Date().getTime())
+          .stepFinalize();
+        stdout("Number of values in table t:",
+            db.selectValue("select count(*) from t"));
+      });
+  };
+
+  const runTests = async function(Module){
+    //stdout("Module",Module);
+    self._MODULE = Module /* this is only to facilitate testing from the console */;
+    const sqlite3 = Module.sqlite3,
+          capi = sqlite3.capi,
+          oo = sqlite3.oo1,
+          wasm = capi.wasm;
+    stdout("Loaded sqlite3:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
+
+    if(1){
+      let errCount = 0;
+      [
+        'FileSystemHandle', 'FileSystemFileHandle', 'FileSystemDirectoryHandle',
+        'FileSystemSyncAccessHandle'
+      ].forEach(function(n){
+        const f = self[n];
+        if(f){
+          warn(n,f);
+          warn(n+'.prototype',f.prototype);
+        }else{
+          stderr("MISSING",n);
+          ++errCount;
+        }
+      });
+      if(errCount) return;
+    }
+    warn('self',self);
+    await initOpfsBits(sqlite3);
+
+    if(1) return;
+    
+    let persistentDir;
+    if(1){
+      persistentDir = '';
+    }else{
+      persistentDir = capi.sqlite3_web_persistent_dir();
+      if(persistentDir){
+        stderr("Persistent storage dir:",persistentDir);
+      }else{
+        stderr("No persistent storage available.");
+        return;
+      }
+    }
+    const startTime = performance.now();
+    let db;
+    try {
+      db = new oo.DB(persistentDir+'/foo.db');
+      stdout("DB filename:",db.filename,db.fileName());
+      const banner1 = '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>',
+            banner2 = '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+      [
+        test1
+      ].forEach((f)=>{
+        const n = performance.now();
+        stdout(banner1,"Running",f.name+"()...");
+        f(db, sqlite3, Module);
+        stdout(banner2,f.name+"() took ",(performance.now() - n),"ms");
+      });
+    }finally{
+      if(db) db.close();
+    }
+    stdout("Total test time:",(performance.now() - startTime),"ms");
+  };
+
+  sqlite3InitModule(self.sqlite3TestModule).then(runTests);
+})();
