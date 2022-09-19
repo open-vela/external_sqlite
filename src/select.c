@@ -4181,8 +4181,9 @@ static void renumberCursors(
 **        See also (3) for restrictions on LEFT JOIN.
 **
 **  (27)  The subquery may not contain a FULL or RIGHT JOIN unless it
-**        is the first element of the parent query.  Two subcases:
-**        (27a) the subquery is not a compound query.
+**        is the first element of the parent query.  This must be the
+**        the case if:
+**        (27a) the subquery is not compound query, and
 **        (27b) the subquery is a compound query and the RIGHT JOIN occurs
 **              in any arm of the compound query.  (See also (17g).)
 **
@@ -4316,10 +4317,8 @@ static int flattenSubquery(
 
   /* Restriction (29): 
   **
-  ** We do not want two constraints on the same FROM-clause term of the
-  ** flattened query where one constraint has the EP_InnerON flag and the
-  ** other has the EP_OuterON flag.
-  **
+  ** We do not want two constraints on the same term of the flattened
+  ** query where one constraint has EP_InnerON and the other is EP_OuterON.
   ** To prevent this, one or the other of the following conditions must be
   ** false:
   **
@@ -4327,7 +4326,11 @@ static int flattenSubquery(
   **          must not be part of an outer join.
   **
   **   (29b)  The subquery itself must not be the right operand of a 
-  **          NATURAL join or a join that has an ON or USING clause.
+  **          NATURAL join or a join that as an ON or USING clause.
+  **
+  ** These conditions are sufficient to keep an EP_OuterON from being
+  ** flattened into an EP_InnerON.  Restrictions (3a) and (27a) prevent
+  ** an EP_InnerON from being flattened into an EP_OuterON.
   */
   if( pSubSrc->nSrc>=2
    && (pSubSrc->a[pSubSrc->nSrc-1].fg.jointype & JT_OUTER)!=0
