@@ -19,8 +19,7 @@
   const toss = function(...args){throw new Error(args.join(' '))};
   const debug = console.debug.bind(console);
   const eOutput = document.querySelector('#test-output');
-  const log = console.log.bind(console),
-        warn = console.warn.bind(console);
+  const log = console.log.bind(console)
   const logHtml = function(...args){
     log.apply(this, args);
     const ln = document.createElement('div');
@@ -33,8 +32,6 @@
     return v1>=(v2-factor) && v1<=(v2+factor);
   };
 
-  let sqlite3;
-  
   const testBasicSanity = function(db,sqlite3){
     const capi = sqlite3.capi;
     log("Basic sanity tests...");
@@ -165,10 +162,10 @@
     }
 
     try {
-      throw new sqlite3.WasmAllocError;
+      throw new capi.WasmAllocError;
     }catch(e){
       T.assert(e instanceof Error)
-        .assert(e instanceof sqlite3.WasmAllocError);
+        .assert(e instanceof capi.WasmAllocError);
     }
 
     try {
@@ -254,7 +251,7 @@
     db.exec({
       sql:new TextEncoder('utf-8').encode([
         // ^^^ testing string-vs-typedarray handling in execMulti()
-        "attach 'session' as foo;" /* name 'session' is magic for kvvfs! */,
+        "attach 'foo.db' as foo;",
         "create table foo.bar(a);",
         "insert into foo.bar(a) values(1),(2),(3);",
         "select a from foo.bar order by a;"
@@ -746,7 +743,7 @@
         .assert('sqlite3_vfs' === dVfs.structName)
         .assert(!!dVfs.structInfo)
         .assert(SB.StructType.hasExternalPointer(dVfs))
-        .assert(dVfs.$iVersion>0)
+        .assert(3===dVfs.$iVersion)
         .assert('number'===typeof dVfs.$zName)
         .assert('number'===typeof dVfs.$xSleep)
         .assert(capi.wasm.functionEntry(dVfs.$xOpen))
@@ -1007,22 +1004,15 @@
     }
   }/*testWasmUtil()*/;
 
-  const clearKvvfs = function(){
-    const sz = sqlite3.capi.sqlite3_web_kvvfs_size();
-    const n = sqlite3.capi.sqlite3_web_kvvfs_clear('');
-    log("Cleared kvvfs local/sessionStorage:",
-        n,"entries totaling approximately",sz,"bytes.");
-  };
-
   const runTests = function(Module){
     //log("Module",Module);
-    sqlite3 = Module.sqlite3;
-    const capi = sqlite3.capi,
+    const sqlite3 = Module.sqlite3,
+          capi = sqlite3.capi,
           oo = sqlite3.oo1,
           wasm = capi.wasm;
     log("Loaded module:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
     log("Build options:",wasm.compileOptionUsed());
-    capi.sqlite3_web_persistent_dir()/*will install OPFS if available, plus a and non-locking VFS*/;
+
     if(1){
       /* Let's grab those last few lines of test coverage for
          sqlite3-api.js... */
@@ -1055,19 +1045,9 @@
       T.assert(capi.wasm[k] instanceof Function);
     });
 
-    let dbName = "/testing1.sqlite3";
-    let vfsName = undefined;
-    if(capi.sqlite3_web_db_uses_vfs(0,"kvvfs")){
-      dbName = "local";
-      vfsName = 'kvvfs';
-      logHtml("Found kvvfs. Clearing db(s) from sessionStorage and localStorage",
-              "and selecting kvvfs-friendly db name:",dbName);
-      clearKvvfs();
-    }
-    const db = new oo.DB(dbName,'c',vfsName), startTime = performance.now();
-    log("db is kvvfs?",capi.sqlite3_web_db_uses_vfs(db.pointer,"kvvfs"));
+    const db = new oo.DB(':memory:'), startTime = performance.now();
     try {
-      log("db.filename =",db.filename,"db.fileName() =",db.getFilename());
+      log("DB filename:",db.filename,db.fileName());
       const banner1 = '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>',
             banner2 = '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
       [
@@ -1082,13 +1062,18 @@
       });
     }finally{
       db.close();
-      if('kvvfs'===vfsName) clearKvvfs();
     }
     logHtml("Total Test count:",T.counter,"in",(performance.now() - startTime),"ms");
     log('capi.wasm.exports',capi.wasm.exports);
   };
 
-  self.sqlite3TestModule.initSqlite3().then(function(theModule){
+  sqlite3InitModule(self.sqlite3TestModule).then(function(theModule){
+    /** Use a timeout so that we are (hopefully) out from under
+        the module init stack when our setup gets run. Just on
+        principle, not because we _need_ to be. */
+    //console.debug("theModule =",theModule);
+    //setTimeout(()=>runTests(theModule), 0);
+    // ^^^ Chrome warns: "VIOLATION: setTimeout() handler took A WHOLE 50ms!"
     self._MODULE = theModule /* this is only to facilitate testing from the console */
     runTests(theModule);
   });
