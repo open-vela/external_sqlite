@@ -1,38 +1,4 @@
-/*
-** This file requires access to sqlite3.c static state in order to
-** implement certain WASM-specific features. Unlike the rest of
-** sqlite3.c, this file requires compiling with -std=c99 (or
-** equivalent, or a later C version) because it makes use of features
-** not available in C89.
-*/
 #include "sqlite3.c"
-
-/*
-** WASM_KEEP is identical to EMSCRIPTEN_KEEPALIVE but is not
-** Emscripten-specific. It explicitly marks functions for export into
-** the target wasm file without requiring explicit listing of those
-** functions in Emscripten's -sEXPORTED_FUNCTIONS=... list (or
-** equivalent in other build platforms). Any function with neither
-** this attribute nor which is listed as an explicit export will not
-** be exported from the wasm file (but may still be used internally
-** within the wasm file).
-**
-** The functions in this file (sqlite3-wasm.c) which require exporting
-** are marked with this flag. They may also be added to any explicit
-** build-time export list but need not be. All of these APIs are
-** intended for use only within the project's own JS/WASM code, and
-** not by client code, so an argument can be made for reducing their
-** visibility by not including them in any build-time export lists.
-**
-** 2022-09-11: it's not yet _proven_ that this approach works in
-** non-Emscripten builds. If not, such builds will need to export
-** those using the --export=... wasm-ld flag (or equivalent). As of
-** this writing we are tied to Emscripten for various reasons
-** and cannot test the library with other build environments.
-*/
-#define WASM_KEEP __attribute__((used,visibility("default")))
-// See also:
-//__attribute__((export_name("theExportedName"), used, visibility("default")))
 
 /*
 ** This function is NOT part of the sqlite3 public API. It is strictly
@@ -48,8 +14,8 @@
 **
 ** Returns err_code.
 */
-WASM_KEEP
-int sqlite3_wasm_db_error(sqlite3*db, int err_code, const char *zMsg){
+int sqlite3_wasm_db_error(sqlite3*db, int err_code,
+                          const char *zMsg){
   if(0!=zMsg){
     const int nMsg = sqlite3Strlen30(zMsg);
     sqlite3ErrorWithMsg(db, err_code, "%.*s", nMsg, zMsg);
@@ -74,9 +40,8 @@ int sqlite3_wasm_db_error(sqlite3*db, int err_code, const char *zMsg){
 ** buffer is not large enough for the generated JSON. In debug builds
 ** that will trigger an assert().
 */
-WASM_KEEP
 const char * sqlite3_wasm_enum_json(void){
-  static char strBuf[1024 * 12] = {0} /* where the JSON goes */;
+  static char strBuf[1024 * 8] = {0} /* where the JSON goes */;
   int n = 0, childCount = 0, structCount = 0
     /* output counters for figuring out where commas go */;
   char * pos = &strBuf[1] /* skip first byte for now to help protect
@@ -259,8 +224,7 @@ const char * sqlite3_wasm_enum_json(void){
   } _DefGroup;
 
   DefGroup(openFlags) {
-    /* Noting that not all of these will have any effect in
-    ** WASM-space. */
+    /* Noting that not all of these will have any effect in WASM-space. */
     DefInt(SQLITE_OPEN_READONLY);
     DefInt(SQLITE_OPEN_READWRITE);
     DefInt(SQLITE_OPEN_CREATE);
@@ -321,49 +285,6 @@ const char * sqlite3_wasm_enum_json(void){
     DefInt(SQLITE_IOCAP_POWERSAFE_OVERWRITE);
     DefInt(SQLITE_IOCAP_IMMUTABLE);
     DefInt(SQLITE_IOCAP_BATCH_ATOMIC);
-  } _DefGroup;
-
-  DefGroup(fcntl) {
-    DefInt(SQLITE_FCNTL_LOCKSTATE);
-    DefInt(SQLITE_FCNTL_GET_LOCKPROXYFILE);
-    DefInt(SQLITE_FCNTL_SET_LOCKPROXYFILE);
-    DefInt(SQLITE_FCNTL_LAST_ERRNO);
-    DefInt(SQLITE_FCNTL_SIZE_HINT);
-    DefInt(SQLITE_FCNTL_CHUNK_SIZE);
-    DefInt(SQLITE_FCNTL_FILE_POINTER);
-    DefInt(SQLITE_FCNTL_SYNC_OMITTED);
-    DefInt(SQLITE_FCNTL_WIN32_AV_RETRY);
-    DefInt(SQLITE_FCNTL_PERSIST_WAL);
-    DefInt(SQLITE_FCNTL_OVERWRITE);
-    DefInt(SQLITE_FCNTL_VFSNAME);
-    DefInt(SQLITE_FCNTL_POWERSAFE_OVERWRITE);
-    DefInt(SQLITE_FCNTL_PRAGMA);
-    DefInt(SQLITE_FCNTL_BUSYHANDLER);
-    DefInt(SQLITE_FCNTL_TEMPFILENAME);
-    DefInt(SQLITE_FCNTL_MMAP_SIZE);
-    DefInt(SQLITE_FCNTL_TRACE);
-    DefInt(SQLITE_FCNTL_HAS_MOVED);
-    DefInt(SQLITE_FCNTL_SYNC);
-    DefInt(SQLITE_FCNTL_COMMIT_PHASETWO);
-    DefInt(SQLITE_FCNTL_WIN32_SET_HANDLE);
-    DefInt(SQLITE_FCNTL_WAL_BLOCK);
-    DefInt(SQLITE_FCNTL_ZIPVFS);
-    DefInt(SQLITE_FCNTL_RBU);
-    DefInt(SQLITE_FCNTL_VFS_POINTER);
-    DefInt(SQLITE_FCNTL_JOURNAL_POINTER);
-    DefInt(SQLITE_FCNTL_WIN32_GET_HANDLE);
-    DefInt(SQLITE_FCNTL_PDB);
-    DefInt(SQLITE_FCNTL_BEGIN_ATOMIC_WRITE);
-    DefInt(SQLITE_FCNTL_COMMIT_ATOMIC_WRITE);
-    DefInt(SQLITE_FCNTL_ROLLBACK_ATOMIC_WRITE);
-    DefInt(SQLITE_FCNTL_LOCK_TIMEOUT);
-    DefInt(SQLITE_FCNTL_DATA_VERSION);
-    DefInt(SQLITE_FCNTL_SIZE_LIMIT);
-    DefInt(SQLITE_FCNTL_CKPT_DONE);
-    DefInt(SQLITE_FCNTL_RESERVE_BYTES);
-    DefInt(SQLITE_FCNTL_CKPT_START);
-    DefInt(SQLITE_FCNTL_EXTERNAL_READER);
-    DefInt(SQLITE_FCNTL_CKSM_FILE);
   } _DefGroup;
 
   DefGroup(access){
@@ -490,82 +411,3 @@ const char * sqlite3_wasm_enum_json(void){
 #undef outf
 #undef lenCheck
 }
-
-/*
-** This function is NOT part of the sqlite3 public API. It is strictly
-** for use by the sqlite project's own JS/WASM bindings.
-**
-** This function invokes the xDelete method of the default VFS,
-** passing on the given filename. If zName is NULL, no default VFS is
-** found, or it has no xDelete method, SQLITE_MISUSE is returned, else
-** the result of the xDelete() call is returned.
-*/
-WASM_KEEP
-int sqlite3_wasm_vfs_unlink(const char * zName){
-  int rc = SQLITE_MISUSE /* ??? */;
-  sqlite3_vfs * const pVfs = sqlite3_vfs_find(0);
-  if( zName && pVfs && pVfs->xDelete ){
-    rc = pVfs->xDelete(pVfs, zName, 1);
-  }
-  return rc;
-}
-
-#if defined(__EMSCRIPTEN__) && defined(SQLITE_WASM_WASMFS)
-#include <emscripten/wasmfs.h>
-#include <emscripten/console.h>
-
-/*
-** This function is NOT part of the sqlite3 public API. It is strictly
-** for use by the sqlite project's own JS/WASM bindings, specifically
-** only when building with Emscripten's WASMFS support.
-**
-** This function should only be called if the JS side detects the
-** existence of the Origin-Private FileSystem (OPFS) APIs in the
-** client. The first time it is called, this function instantiates a
-** WASMFS backend impl for OPFS. On success, subsequent calls are
-** no-ops.
-**
-** This function may be passed a "mount point" name, which must have a
-** leading "/" and is currently restricted to a single path component,
-** e.g. "/foo" is legal but "/foo/" and "/foo/bar" are not. If it is
-** NULL or empty, it defaults to "/persistent".
-**
-** Returns 0 on success, SQLITE_NOMEM if instantiation of the backend
-** object fails, SQLITE_IOERR if mkdir() of the zMountPoint dir in
-** the virtual FS fails. In builds compiled without SQLITE_WASM_WASMFS
-** defined, SQLITE_NOTFOUND is returned without side effects.
-*/
-WASM_KEEP
-int sqlite3_wasm_init_wasmfs(const char *zMountPoint){
-  static backend_t pOpfs = 0;
-  if( !zMountPoint || !*zMountPoint ) zMountPoint = "/persistent";
-  if( !pOpfs ){
-    pOpfs = wasmfs_create_opfs_backend();
-    if( pOpfs ){
-      emscripten_console_log("Created WASMFS OPFS backend.");
-    }
-  }
-  /** It's not enough to instantiate the backend. We have to create a
-      mountpoint in the VFS and attach the backend to it. */
-  if( pOpfs && 0!=access(zMountPoint, F_OK) ){
-    /* mkdir() simply hangs when called from fiddle app. Cause is
-       not yet determined but the hypothesis is an init-order
-       issue. */
-    /* Note that this check and is not robust but it will
-       hypothetically suffice for the transient wasm-based virtual
-       filesystem we're currently running in. */
-    const int rc = wasmfs_create_directory(zMountPoint, 0777, pOpfs);
-    emscripten_console_logf("OPFS mkdir(%s) rc=%d", zMountPoint, rc);
-    if(rc) return SQLITE_IOERR;
-  }
-  return pOpfs ? 0 : SQLITE_NOMEM;
-}
-#else
-WASM_KEEP
-int sqlite3_wasm_init_wasmfs(void){
-  return SQLITE_NOTFOUND;
-}
-#endif /* __EMSCRIPTEN__ && SQLITE_WASM_WASMFS */
-
-
-#undef WASM_KEEP
