@@ -14,10 +14,9 @@
   WASM build. It requires that sqlite3-api-glue.js has already run
   and it installs its deliverable as self.sqlite3.oo1.
 */
-(function(self){
+self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   const toss = (...args)=>{throw new Error(args.join(' '))};
 
-  const sqlite3 = self.sqlite3 || toss("Missing main sqlite3 object.");
   const capi = sqlite3.capi, util = capi.util;
   /* What follows is colloquially known as "OO API #1". It is a
      binding of the sqlite3 API which is designed to be run within
@@ -59,14 +58,146 @@
      enabling clients to unambiguously identify such exceptions.
   */
   class SQLite3Error extends Error {
+    /**
+       Constructs this object with a message equal to all arguments
+       concatenated with a space between each one.
+    */
     constructor(...args){
-      super(...args);
+      super(args.join(' '));
       this.name = 'SQLite3Error';
     }
   };
-  const toss3 = (...args)=>{throw new SQLite3Error(args)};
+  const toss3 = (...args)=>{throw new SQLite3Error(...args)};
   sqlite3.SQLite3Error = SQLite3Error;
 
+  // Documented in DB.checkRc()
+  const checkSqlite3Rc = function(dbPtr, sqliteResultCode){
+    if(sqliteResultCode){
+      if(dbPtr instanceof DB) dbPtr = dbPtr.pointer;
+      throw new SQLite3Error(
+        "sqlite result code",sqliteResultCode+":",
+        (dbPtr
+         ? capi.sqlite3_errmsg(dbPtr)
+         : capi.sqlite3_errstr(sqliteResultCode))
+      );
+    }
+  };
+
+  /**
+     A proxy for DB class constructors. It must be called with the
+     being-construct DB object as its "this". See the DB constructor
+     for the argument docs. This is split into a separate function
+     in order to enable simple creation of special-case DB constructors,
+     e.g. a hypothetical LocalStorageDB or OpfsDB.
+
+     Expects to be passed a configuration object with the following
+     properties:
+
+     - `.filename`: the db filename. It may be a special name like ":memory:"
+       or "".
+
+     - `.flags`: as documented in the DB constructor.
+
+     - `.vfs`: as documented in the DB constructor.
+
+     It also accepts those as the first 3 arguments.
+  */
+  const dbCtorHelper = function ctor(...args){
+    if(!ctor._name2vfs){
+      /**
+         Map special filenames which we handle here (instead of in C)
+         to some helpful metadata...
+
+         As of 2022-09-20, the C API supports the names :localStorage:
+         and :sessionStorage: for kvvfs. However, C code cannot
+         determine (without embedded JS code, e.g. via Emscripten's
+         EM_JS()) whether the kvvfs is legal in the current browser
+         context (namely the main UI thread). In order to help client
+         code fail early on, instead of it being delayed until they
+         try to read or write a kvvfs-backed db, we'll check for those
+         names here and throw if they're not legal in the current
+         context.
+      */
+      ctor._name2vfs = Object.create(null);
+      const isWorkerThread = ('function'===typeof importScripts/*===running in worker thread*/)
+            ? (n)=>toss3("The VFS for",n,"is only available in the main window thread.")
+            : false;
+      ctor._name2vfs[':localStorage:'] = {
+        vfs: 'kvvfs',
+        filename: isWorkerThread || (()=>'local')
+      };
+      ctor._name2vfs[':sessionStorage:'] = {
+        vfs: 'kvvfs',
+        filename: isWorkerThread || (()=>'session')
+      };
+    }
+    const opt = ctor.normalizeArgs(...args);
+    let fn = opt.filename, vfsName = opt.vfs, flagsStr = opt.flags;
+    if(('string'!==typeof fn && 'number'!==typeof fn)
+       || 'string'!==typeof flagsStr
+       || (vfsName && ('string'!==typeof vfsName && 'number'!==typeof vfsName))){
+      console.error("Invalid DB ctor args",opt,arguments);
+      toss3("Invalid arguments for DB constructor.");
+    }
+    let fnJs = ('number'===typeof fn) ? capi.wasm.cstringToJs(fn) : fn;
+    const vfsCheck = ctor._name2vfs[fnJs];
+    if(vfsCheck){
+      vfsName = vfsCheck.vfs;
+      fn = fnJs = vfsCheck.filename(fnJs);
+    }
+    let ptr, oflags = 0;
+    if( flagsStr.indexOf('c')>=0 ){
+      oflags |= capi.SQLITE_OPEN_CREATE | capi.SQLITE_OPEN_READWRITE;
+    }
+    if( flagsStr.indexOf('w')>=0 ) oflags |= capi.SQLITE_OPEN_READWRITE;
+    if( 0===oflags ) oflags |= capi.SQLITE_OPEN_READONLY;
+    oflags |= capi.SQLITE_OPEN_EXRESCODE;
+    const stack = capi.wasm.scopedAllocPush();
+    try {
+      const ppDb = capi.wasm.scopedAllocPtr() /* output (sqlite3**) arg */;
+      const pVfsName = vfsName ? (
+        ('number'===typeof vfsName ? vfsName : capi.wasm.scopedAllocCString(vfsName))
+      ): 0;
+      const rc = capi.sqlite3_open_v2(fn, ppDb, oflags, pVfsName);
+      ptr = capi.wasm.getPtrValue(ppDb);
+      checkSqlite3Rc(ptr, rc);
+    }catch( e ){
+      if( ptr ) capi.sqlite3_close_v2(ptr);
+      throw e;
+    }finally{
+      capi.wasm.scopedAllocPop(stack);
+    }
+    this.filename = fnJs;
+    __ptrMap.set(this, ptr);
+    __stmtMap.set(this, Object.create(null));
+    __udfMap.set(this, Object.create(null));
+  };
+
+  /**
+     A helper for DB constructors. It accepts either a single
+     config-style object or up to 3 arguments (filename, dbOpenFlags,
+     dbVfsName). It returns a new object containing:
+
+     { filename: ..., flags: ..., vfs: ... }
+
+     If passed an object, any additional properties it has are copied
+     as-is into the new object.
+  */
+  dbCtorHelper.normalizeArgs = function(filename,flags = 'c',vfs = null){
+    const arg = {};
+    if(1===arguments.length && 'object'===typeof arguments[0]){
+      const x = arguments[0];
+      Object.keys(x).forEach((k)=>arg[k] = x[k]);
+      if(undefined===arg.flags) arg.flags = 'c';
+      if(undefined===arg.vfs) arg.vfs = null;
+    }else{
+      arg.filename = filename;
+      arg.flags = flags;
+      arg.vfs = vfs;
+    }
+    return arg;
+  };
+  
   /**
      The DB class provides a high-level OO wrapper around an sqlite3
      db handle.
@@ -80,39 +211,59 @@
      not resolve to real filenames, but "" uses an on-storage
      temporary database and requires that the VFS support that.
 
-     The db is currently opened with a fixed set of flags:
-     (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-     SQLITE_OPEN_EXRESCODE).  This API will change in the future
-     permit the caller to provide those flags via an additional
-     argument.
+     The second argument specifies the open/create mode for the
+     database. It must be string containing a sequence of letters (in
+     any order, but case sensitive) specifying the mode:
+
+     - "c" => create if it does not exist, else fail if it does not
+       exist. Implies the "w" flag.
+
+     - "w" => write. Implies "r": a db cannot be write-only.
+
+     - "r" => read-only if neither "w" nor "c" are provided, else it
+       is ignored.
+
+     If "w" is not provided, the db is implicitly read-only, noting that
+     "rc" is meaningless
+
+     Any other letters are currently ignored. The default is
+     "c". These modes are ignored for the special ":memory:" and ""
+     names.
+
+     The final argument is analogous to the final argument of
+     sqlite3_open_v2(): the name of an sqlite3 VFS. Pass a falsy value,
+     or not at all, to use the default. If passed a value, it must
+     be the string name of a VFS
+
+     The constructor optionally (and preferably) takes its arguments
+     in the form of a single configuration object with the following
+     properties:
+
+     - `.filename`: database file name
+     - `.flags`: open-mode flags
+     - `.vfs`: the VFS fname
+
+     The `filename` and `vfs` arguments may be either JS strings or
+     C-strings allocated via WASM.
 
      For purposes of passing a DB instance to C-style sqlite3
-     functions, its read-only `pointer` property holds its `sqlite3*`
-     pointer value. That property can also be used to check whether
-     this DB instance is still open.
+     functions, the DB object's read-only `pointer` property holds its
+     `sqlite3*` pointer value. That property can also be used to check
+     whether this DB instance is still open.
+
+
+     EXPERIMENTAL: in the main window thread, the filenames
+     ":localStorage:" and ":sessionStorage:" are special: they cause
+     the db to use either localStorage or sessionStorage for storing
+     the database. In this mode, only a single database is permitted
+     in each storage object. This feature is experimental and subject
+     to any number of changes (including outright removal). This
+     support requires the kvvfs sqlite3 VFS, the existence of which
+     can be determined at runtime by checking for a non-0 return value
+     from sqlite3.capi.sqlite3_vfs_find("kvvfs").
   */
-  const DB = function ctor(fn=':memory:'){
-    if('string'!==typeof fn){
-      toss3("Invalid filename for DB constructor.");
-    }
-    const stack = capi.wasm.scopedAllocPush();
-    let ptr;
-    try {
-      const ppDb = capi.wasm.scopedAllocPtr() /* output (sqlite3**) arg */;
-      const rc = capi.sqlite3_open_v2(fn, ppDb, capi.SQLITE_OPEN_READWRITE
-                                      | capi.SQLITE_OPEN_CREATE
-                                      | capi.SQLITE_OPEN_EXRESCODE, null);
-      ptr = capi.wasm.getMemValue(ppDb, '*');
-      ctor.checkRc(ptr, rc);
-    }catch(e){
-      if(ptr) capi.sqlite3_close_v2(ptr);
-      throw e;
-    }
-    finally{capi.wasm.scopedAllocPop(stack);}
-    this.filename = fn;
-    __ptrMap.set(this, ptr);
-    __stmtMap.set(this, Object.create(null));
-    __udfMap.set(this, Object.create(null));
+  const DB = function(...args){
+    dbCtorHelper.apply(this, args);
   };
 
   /**
@@ -141,6 +292,15 @@
      For purposes of passing a Stmt instance to C-style sqlite3
      functions, its read-only `pointer` property holds its `sqlite3_stmt*`
      pointer value.
+
+     Other non-function properties include:
+
+     - `db`: the DB object which created the statement.
+
+     - `columnCount`: the number of result columns in the query, or 0 for
+     queries which cannot return results.
+
+     - `parameterCount`: the number of bindable paramters in the query.
   */
   const Stmt = function(){
     if(BindTypes!==arguments[2]){
@@ -163,7 +323,7 @@
 
       Reminder: this will also fail after the statement is finalized
       but the resulting error will be about an out-of-bounds column
-      index.
+      index rather than a statement-is-finalized error.
   */
   const affirmColIndex = function(stmt,ndx){
     if((ndx !== (ndx|0)) || ndx<0 || ndx>=stmt.columnCount){
@@ -173,16 +333,20 @@
   };
 
   /**
-     Expects to be passed (arguments) from DB.exec() and
-     DB.execMulti(). Does the argument processing/validation, throws
-     on error, and returns a new object on success:
+     Expects to be passed the `arguments` object from DB.exec(). Does
+     the argument processing/validation, throws on error, and returns
+     a new object on success:
 
      { sql: the SQL, opt: optionsObj, cbArg: function}
 
-     cbArg is only set if the opt.callback is set, in which case
-     it's a function which expects to be passed the current Stmt
-     and returns the callback argument of the type indicated by
-     the input arguments.
+     The opt object is a normalized copy of any passed to this
+     function. The sql will be converted to a string if it is provided
+     in one of the supported non-string formats.
+
+     cbArg is only set if the opt.callback or opt.resultRows are set,
+     in which case it's a function which expects to be passed the
+     current Stmt and returns the callback argument of the type
+     indicated by the input arguments.
   */
   const parseExecArgs = function(args){
     const out = Object.create(null);
@@ -194,6 +358,8 @@
           }else if(args[0] && 'object'===typeof args[0]){
             out.opt = args[0];
             out.sql = out.opt.sql;
+          }else if(Array.isArray(args[0])){
+            out.sql = args[0];
           }
           break;
         case 2:
@@ -211,14 +377,14 @@
     }
     if(out.opt.callback || out.opt.resultRows){
       switch((undefined===out.opt.rowMode)
-             ? 'stmt' : out.opt.rowMode) {
-          case 'object': out.cbArg = (stmt)=>stmt.get({}); break;
+             ? 'array' : out.opt.rowMode) {
+          case 'object': out.cbArg = (stmt)=>stmt.get(Object.create(null)); break;
           case 'array': out.cbArg = (stmt)=>stmt.get([]); break;
           case 'stmt':
             if(Array.isArray(out.opt.resultRows)){
-              toss3("Invalid rowMode for resultRows array: must",
+              toss3("exec(): invalid rowMode for a resultRows array: must",
                     "be one of 'array', 'object',",
-                    "or a result column number.");
+                    "a result column number, or column name reference.");
             }
             out.cbArg = (stmt)=>stmt;
             break;
@@ -226,6 +392,19 @@
             if(util.isInt32(out.opt.rowMode)){
               out.cbArg = (stmt)=>stmt.get(out.opt.rowMode);
               break;
+            }else if('string'===typeof out.opt.rowMode && out.opt.rowMode.length>1){
+              /* "$X", ":X", and "@X" fetch column named "X" (case-sensitive!) */
+              const prefix = out.opt.rowMode[0];
+              if(':'===prefix || '@'===prefix || '$'===prefix){
+                out.cbArg = function(stmt){
+                  const rc = stmt.get(this.obj)[this.colName];
+                  return (undefined===rc) ? toss3("exec(): unknown result column:",this.colName) : rc;
+                }.bind({
+                  obj:Object.create(null),
+                  colName: out.opt.rowMode.substr(1)
+                });
+                break;
+              }
             }
             toss3("Invalid rowMode:",out.opt.rowMode);
       }
@@ -234,24 +413,17 @@
   };
 
   /**
-     Expects to be given a DB instance or an `sqlite3*` pointer, and an
-     sqlite3 API result code. If the result code is not falsy, this
-     function throws an SQLite3Error with an error message from
-     sqlite3_errmsg(), using dbPtr as the db handle. Note that if it's
-     passed a non-error code like SQLITE_ROW or SQLITE_DONE, it will
-     still throw but the error string might be "Not an error."  The
-     various non-0 non-error codes need to be checked for in client
-     code where they are expected.
+     Expects to be given a DB instance or an `sqlite3*` pointer (may
+     be null) and an sqlite3 API result code. If the result code is
+     not falsy, this function throws an SQLite3Error with an error
+     message from sqlite3_errmsg(), using dbPtr as the db handle, or
+     sqlite3_errstr() if dbPtr is falsy. Note that if it's passed a
+     non-error code like SQLITE_ROW or SQLITE_DONE, it will still
+     throw but the error string might be "Not an error."  The various
+     non-0 non-error codes need to be checked for in
+     client code where they are expected.
   */
-  DB.checkRc = function(dbPtr, sqliteResultCode){
-    if(sqliteResultCode){
-      if(dbPtr instanceof DB) dbPtr = dbPtr.pointer;
-      throw new SQLite3Error([
-        "sqlite result code",sqliteResultCode+":",
-        capi.sqlite3_errmsg(dbPtr) || "Unknown db error."
-      ].join(' '));
-    }
-  };
+  DB.checkRc = checkSqlite3Rc;
 
   DB.prototype = {
     /**
@@ -260,12 +432,31 @@
        closed. After calling close(), `this.pointer` will resolve to
        `undefined`, so that can be used to check whether the db
        instance is still opened.
+
+       If this.onclose.before is a function then it is called before
+       any close-related cleanup.
+
+       If this.onclose.after is a function then it is called after the
+       db is closed but before auxiliary state like this.filename is
+       cleared.
+
+       Both onclose handlers are passed this object. If this db is not
+       opened, neither of the handlers are called. Any exceptions the
+       handlers throw are ignored because "destructors must not
+       throw."
+
+       Note that garbage collection of a db handle, if it happens at
+       all, will never trigger close(), so onclose handlers are not a
+       reliable way to implement close-time cleanup or maintenance of
+       a db.
     */
     close: function(){
       if(this.pointer){
+        if(this.onclose && (this.onclose.before instanceof Function)){
+          try{this.onclose.before(this)}
+          catch(e){/*ignore*/}
+        }
         const pDb = this.pointer;
-        let s;
-        const that = this;
         Object.keys(__stmtMap.get(this)).forEach((k,s)=>{
           if(s && s.pointer) s.finalize();
         });
@@ -276,6 +467,10 @@
         __stmtMap.delete(this);
         __udfMap.delete(this);
         capi.sqlite3_close_v2(pDb);
+        if(this.onclose && (this.onclose.after instanceof Function)){
+          try{this.onclose.after(this)}
+          catch(e){/*ignore*/}
+        }
         delete this.filename;
       }
     },
@@ -300,26 +495,24 @@
       }
     },
     /**
-       Similar to this.filename but will return NULL for
-       special names like ":memory:". Not of much use until
-       we have filesystem support. Throws if the DB has
-       been closed. If passed an argument it then it will return
-       the filename of the ATTACHEd db with that name, else it assumes
-       a name of `main`.
+       Similar to this.filename but will return a falsy value for
+       special names like ":memory:". Throws if the DB has been
+       closed. If passed an argument it then it will return the
+       filename of the ATTACHEd db with that name, else it assumes a
+       name of `main`.
     */
-    fileName: function(dbName){
-      return capi.sqlite3_db_filename(affirmDbOpen(this).pointer, dbName||"main");
+    getFilename: function(dbName='main'){
+      return capi.sqlite3_db_filename(affirmDbOpen(this).pointer, dbName);
     },
     /**
        Returns true if this db instance has a name which resolves to a
        file. If the name is "" or ":memory:", it resolves to false.
        Note that it is not aware of the peculiarities of URI-style
        names and a URI-style name for a ":memory:" db will fool it.
+       Returns false if this db is closed.
     */
     hasFilename: function(){
-      const fn = this.filename;
-      if(!fn || ':memory'===fn) return false;
-      return true;
+      return this.filename && ':memory'!==this.filename;
     },
     /**
        Returns the name of the given 0-based db number, as documented
@@ -343,9 +536,8 @@
        required to check `stmt.pointer` after calling `prepare()` in
        order to determine whether the Stmt instance is empty or not.
        Long-time practice (with other sqlite3 script bindings)
-       suggests that the empty-prepare case is sufficiently rare (and
-       useless) that supporting it here would simply hurt overall
-       usability.
+       suggests that the empty-prepare case is sufficiently rare that
+       supporting it here would simply hurt overall usability.
     */
     prepare: function(sql){
       affirmDbOpen(this);
@@ -354,7 +546,7 @@
       try{
         ppStmt = capi.wasm.scopedAllocPtr()/* output (sqlite3_stmt**) arg */;
         DB.checkRc(this, capi.sqlite3_prepare_v2(this.pointer, sql, -1, ppStmt, null));
-        pStmt = capi.wasm.getMemValue(ppStmt, '*');
+        pStmt = capi.wasm.getPtrValue(ppStmt);
       }
       finally {capi.wasm.scopedAllocPop(stack)}
       if(!pStmt) toss3("Cannot prepare empty SQL.");
@@ -362,70 +554,6 @@
       __stmtMap.get(this)[pStmt] = stmt;
       return stmt;
     },
-    /**
-       This function works like execMulti(), and takes most of the
-       same arguments, but is more efficient (performs much less
-       work) when the input SQL is only a single statement. If
-       passed a multi-statement SQL, it only processes the first
-       one.
-
-       This function supports the following additional options not
-       supported by execMulti():
-
-       - .multi: if true, this function acts as a proxy for
-       execMulti() and behaves identically to that function.
-
-       - .columnNames: if this is an array and the query has
-       result columns, the array is passed to
-       Stmt.getColumnNames() to append the column names to it
-       (regardless of whether the query produces any result
-       rows). If the query has no result columns, this value is
-       unchanged.
-
-       The following options to execMulti() are _not_ supported by
-       this method (they are simply ignored):
-
-       - .saveSql
-    */
-    exec: function(/*(sql [,optionsObj]) or (optionsObj)*/){
-      affirmDbOpen(this);
-      const arg = parseExecArgs(arguments);
-      if(!arg.sql) return this;
-      else if(arg.opt.multi){
-        return this.execMulti(arg, undefined, BindTypes);
-      }
-      const opt = arg.opt;
-      let stmt, rowTarget;
-      try {
-        if(Array.isArray(opt.resultRows)){
-          rowTarget = opt.resultRows;
-        }
-        stmt = this.prepare(arg.sql);
-        if(stmt.columnCount && Array.isArray(opt.columnNames)){
-          stmt.getColumnNames(opt.columnNames);
-        }
-        if(opt.bind) stmt.bind(opt.bind);
-        if(opt.callback || rowTarget){
-          while(stmt.step()){
-            const row = arg.cbArg(stmt);
-            if(rowTarget) rowTarget.push(row);
-            if(opt.callback){
-              stmt._isLocked = true;
-              opt.callback(row, stmt);
-              stmt._isLocked = false;
-            }
-          }
-        }else{
-          stmt.step();
-        }
-      }finally{
-        if(stmt){
-          delete stmt._isLocked;
-          stmt.finalize();
-        }
-      }
-      return this;
-    }/*exec()*/,
     /**
        Executes one or more SQL statements in the form of a single
        string. Its arguments must be either (sql,optionsObject) or
@@ -440,92 +568,128 @@
        The optional options object may contain any of the following
        properties:
 
-       - .sql = the SQL to run (unless it's provided as the first
-       argument). This must be of type string, Uint8Array, or an
-       array of strings (in which case they're concatenated
-       together as-is, with no separator between elements,
-       before evaluation).
+       - `.sql` = the SQL to run (unless it's provided as the first
+       argument). This must be of type string, Uint8Array, or an array
+       of strings. In the latter case they're concatenated together
+       as-is, _with no separator_ between elements, before evaluation.
+       The array form is often simpler for long hand-written queries.
 
-       - .bind = a single value valid as an argument for
-       Stmt.bind(). This is ONLY applied to the FIRST non-empty
-       statement in the SQL which has any bindable
-       parameters. (Empty statements are skipped entirely.)
+       - `.bind` = a single value valid as an argument for
+       Stmt.bind(). This is _only_ applied to the _first_ non-empty
+       statement in the SQL which has any bindable parameters. (Empty
+       statements are skipped entirely.)
 
-       - .callback = a function which gets called for each row of
-       the FIRST statement in the SQL which has result
-       _columns_, but only if that statement has any result
-       _rows_. The second argument passed to the callback is
-       always the current Stmt object (so that the caller may
-       collect column names, or similar). The first argument
-       passed to the callback defaults to the current Stmt
-       object but may be changed with ...
-
-       - .rowMode = either a string describing what type of argument
-       should be passed as the first argument to the callback or an
-       integer representing a result column index. A `rowMode` of
-       'object' causes the results of `stmt.get({})` to be passed to
-       the `callback` and/or appended to `resultRows`. A value of
-       'array' causes the results of `stmt.get([])` to be passed to
-       passed on.  A value of 'stmt' is equivalent to the default,
-       passing the current Stmt to the callback (noting that it's
-       always passed as the 2nd argument), but this mode will trigger
-       an exception if `resultRows` is an array. If `rowMode` is an
-       integer, only the single value from that result column will be
-       passed on. Any other value for the option triggers an
-       exception.
-
-       - .resultRows: if this is an array, it functions similarly to
-       the `callback` option: each row of the result set (if any) of
-       the FIRST first statement which has result _columns_ is
-       appended to the array in the format specified for the `rowMode`
-       option, with the exception that the only legal values for
-       `rowMode` in this case are 'array' or 'object', neither of
-       which is the default. It is legal to use both `resultRows` and
-       `callback`, but `resultRows` is likely much simpler to use for
-       small data sets and can be used over a WebWorker-style message
-       interface.  execMulti() throws if `resultRows` is set and
-       `rowMode` is 'stmt' (which is the default!).
-
-       - saveSql = an optional array. If set, the SQL of each
+       - `.saveSql` = an optional array. If set, the SQL of each
        executed statement is appended to this array before the
-       statement is executed (but after it is prepared - we
-       don't have the string until after that). Empty SQL
-       statements are elided.
+       statement is executed (but after it is prepared - we don't have
+       the string until after that). Empty SQL statements are elided.
 
-       See also the exec() method, which is a close cousin of this
-       one.
+       ==================================================================
+       The following options apply _only_ to the _first_ statement
+       which has a non-zero result column count, regardless of whether
+       the statement actually produces any result rows.
+       ==================================================================
 
-       ACHTUNG #1: The callback MUST NOT modify the Stmt
-       object. Calling any of the Stmt.get() variants,
-       Stmt.getColumnName(), or similar, is legal, but calling
-       step() or finalize() is not. Routines which are illegal
-       in this context will trigger an exception.
+       - `.columnNames`: if this is an array, the column names of the
+       result set are stored in this array before the callback (if
+       any) is triggered (regardless of whether the query produces any
+       result rows). If no statement has result columns, this value is
+       unchanged. Achtung: an SQL result may have multiple columns
+       with identical names.
 
-       ACHTUNG #2: The semantics of the `bind` and `callback`
-       options may well change or those options may be removed
-       altogether for this function (but retained for exec()).
-       Generally speaking, neither bind parameters nor a callback
-       are generically useful when executing multi-statement SQL.
+       - `.callback` = a function which gets called for each row of
+       the result set, but only if that statement has any result
+       _rows_. The callback's "this" is the options object, noting
+       that this function synthesizes one if the caller does not pass
+       one to exec(). The second argument passed to the callback is
+       always the current Stmt object, as it's needed if the caller
+       wants to fetch the column names or some such (noting that they
+       could also be fetched via `this.columnNames`, if the client
+       provides the `columnNames` option).
+
+       ACHTUNG: The callback MUST NOT modify the Stmt object. Calling
+       any of the Stmt.get() variants, Stmt.getColumnName(), or
+       similar, is legal, but calling step() or finalize() is
+       not. Member methods which are illegal in this context will
+       trigger an exception.
+
+       The first argument passed to the callback defaults to an array of
+       values from the current result row but may be changed with ...
+
+       - `.rowMode` = specifies the type of he callback's first argument.
+       It may be any of...
+
+       A) A string describing what type of argument should be passed
+       as the first argument to the callback:
+
+         A.1) `'array'` (the default) causes the results of
+         `stmt.get([])` to be passed to the `callback` and/or appended
+         to `resultRows`.
+
+         A.2) `'object'` causes the results of
+         `stmt.get(Object.create(null))` to be passed to the
+         `callback` and/or appended to `resultRows`.  Achtung: an SQL
+         result may have multiple columns with identical names. In
+         that case, the right-most column will be the one set in this
+         object!
+
+         A.3) `'stmt'` causes the current Stmt to be passed to the
+         callback, but this mode will trigger an exception if
+         `resultRows` is an array because appending the statement to
+         the array would be downright unhelpful.
+
+       B) An integer, indicating a zero-based column in the result
+       row. Only that one single value will be passed on.
+
+       C) A string with a minimum length of 2 and leading character of
+       ':', '$', or '@' will fetch the row as an object, extract that
+       one field, and pass that field's value to the callback. Note
+       that these keys are case-sensitive so must match the case used
+       in the SQL. e.g. `"select a A from t"` with a `rowMode` of
+       `'$A'` would work but `'$a'` would not. A reference to a column
+       not in the result set will trigger an exception on the first
+       row (as the check is not performed until rows are fetched).
+       Note also that `$` is a legal identifier character in JS so
+       need not be quoted. (Design note: those 3 characters were
+       chosen because they are the characters support for naming bound
+       parameters.)
+
+       Any other `rowMode` value triggers an exception.
+
+       - `.resultRows`: if this is an array, it functions similarly to
+       the `callback` option: each row of the result set (if any),
+       with the exception that the `rowMode` 'stmt' is not legal. It
+       is legal to use both `resultRows` and `callback`, but
+       `resultRows` is likely much simpler to use for small data sets
+       and can be used over a WebWorker-style message interface.
+       exec() throws if `resultRows` is set and `rowMode` is 'stmt'.
+
+
+       Potential TODOs:
+
+       - `.bind`: permit an array of arrays/objects to bind. The first
+       sub-array would act on the first statement which has bindable
+       parameters (as it does now). The 2nd would act on the next such
+       statement, etc.
+
+       - `.callback` and `.resultRows`: permit an array entries with
+       semantics similar to those described for `.bind` above.
+
     */
-    execMulti: function(/*(sql [,obj]) || (obj)*/){
+    exec: function(/*(sql [,obj]) || (obj)*/){
       affirmDbOpen(this);
       const wasm = capi.wasm;
-      const arg = (BindTypes===arguments[2]
-                   /* ^^^ Being passed on from exec() */
-                   ? arguments[0] : parseExecArgs(arguments));
-      if(!arg.sql) return this;
+      const arg = parseExecArgs(arguments);
+      if(!arg.sql){
+        return (''===arg.sql) ? this : toss3("exec() requires an SQL string.");
+      }
       const opt = arg.opt;
       const callback = opt.callback;
-      const resultRows = (Array.isArray(opt.resultRows)
+      let resultRows = (Array.isArray(opt.resultRows)
                           ? opt.resultRows : undefined);
-      if(resultRows && 'stmt'===opt.rowMode){
-        toss3("rowMode 'stmt' is not valid in combination",
-              "with a resultRows array.");
-      }
-      let rowMode = (((callback||resultRows) && (undefined!==opt.rowMode))
-                     ? opt.rowMode : undefined);
       let stmt;
       let bind = opt.bind;
+      let evalFirstResult = !!(arg.cbArg || opt.columnNames) /* true to evaluate the first result-returning query */;
       const stack = wasm.scopedAllocPush();
       try{
         const isTA = util.isSQLableTypedArray(arg.sql)
@@ -544,21 +708,21 @@
         if(isTA) wasm.heap8().set(arg.sql, pSql);
         else wasm.jstrcpy(arg.sql, wasm.heap8(), pSql, sqlByteLen, false);
         wasm.setMemValue(pSql + sqlByteLen, 0/*NUL terminator*/);
-        while(wasm.getMemValue(pSql, 'i8')
-              /* Maintenance reminder:   ^^^^ _must_ be i8 or else we
+        while(pSql && wasm.getMemValue(pSql, 'i8')
+              /* Maintenance reminder:^^^ _must_ be 'i8' or else we
                  will very likely cause an endless loop. What that's
                  doing is checking for a terminating NUL byte. If we
                  use i32 or similar then we read 4 bytes, read stuff
                  around the NUL terminator, and get stuck in and
                  endless loop at the end of the SQL, endlessly
                  re-preparing an empty statement. */ ){
-          wasm.setMemValue(ppStmt, 0, wasm.ptrIR);
-          wasm.setMemValue(pzTail, 0, wasm.ptrIR);
-          DB.checkRc(this, capi.sqlite3_prepare_v2(
-            this.pointer, pSql, sqlByteLen, ppStmt, pzTail
+          wasm.setPtrValue(ppStmt, 0);
+          wasm.setPtrValue(pzTail, 0);
+          DB.checkRc(this, capi.sqlite3_prepare_v3(
+            this.pointer, pSql, sqlByteLen, 0, ppStmt, pzTail
           ));
-          const pStmt = wasm.getMemValue(ppStmt, wasm.ptrIR);
-          pSql = wasm.getMemValue(pzTail, wasm.ptrIR);
+          const pStmt = wasm.getPtrValue(ppStmt);
+          pSql = wasm.getPtrValue(pzTail);
           sqlByteLen = pSqlEnd - pSql;
           if(!pStmt) continue;
           if(Array.isArray(opt.saveSql)){
@@ -569,28 +733,30 @@
             stmt.bind(bind);
             bind = null;
           }
-          if(stmt.columnCount && undefined!==rowMode){
+          if(evalFirstResult && stmt.columnCount){
             /* Only forward SELECT results for the FIRST query
                in the SQL which potentially has them. */
-            while(stmt.step()){
+            evalFirstResult = false;
+            if(Array.isArray(opt.columnNames)){
+              stmt.getColumnNames(opt.columnNames);
+            }
+            while(!!arg.cbArg && stmt.step()){
               stmt._isLocked = true;
               const row = arg.cbArg(stmt);
-              if(callback) callback(row, stmt);
               if(resultRows) resultRows.push(row);
+              if(callback) callback.apply(opt,[row,stmt]);
               stmt._isLocked = false;
             }
-            rowMode = undefined;
           }else{
-            // Do we need to while(stmt.step()){} here?
             stmt.step();
           }
           stmt.finalize();
           stmt = null;
         }
-      }catch(e){
-        console.warn("DB.execMulti() is propagating exception",opt,e);
+      }/*catch(e){
+        console.warn("DB.exec() is propagating exception",opt,e);
         throw e;
-      }finally{
+      }*/finally{
         if(stmt){
           delete stmt._isLocked;
           stmt.finalize();
@@ -598,7 +764,7 @@
         wasm.scopedAllocPop(stack);
       }
       return this;
-    }/*execMulti()*/,
+    }/*exec()*/,
     /**
        Creates a new scalar UDF (User-Defined Function) which is
        accessible via SQL code. This function may be called in any
@@ -680,8 +846,7 @@
           let i, pVal, valType, arg;
           const tgt = [];
           for(i = 0; i < argc; ++i){
-            pVal = capi.wasm.getMemValue(pArgv + (capi.wasm.ptrSizeof * i),
-                                        capi.wasm.ptrIR);
+            pVal = capi.wasm.getPtrValue(pArgv + (capi.wasm.ptrSizeof * i));
             /**
                Curiously: despite ostensibly requiring 8-byte
                alignment, the pArgv array is parcelled into chunks of
@@ -737,7 +902,7 @@
                   capi.sqlite3_result_null(pCx);
                   break;
                 }else if(util.isBindableTypedArray(val)){
-                  const pBlob = capi.wasm.mallocFromTypedArray(val);
+                  const pBlob = capi.wasm.allocFromTypedArray(val);
                   capi.sqlite3_result_blob(pCx, pBlob, val.byteLength,
                                           capi.SQLITE_TRANSIENT);
                   capi.wasm.dealloc(pBlob);
@@ -819,6 +984,49 @@
       return this.pointer ? Object.keys(__stmtMap.get(this)).length : 0;
     },
 
+    /**
+       Starts a transaction, calls the given callback, and then either
+       rolls back or commits the savepoint, depending on whether the
+       callback throws. The callback is passed this db object as its
+       only argument. On success, returns the result of the
+       callback. Throws on error.
+
+       Note that transactions may not be nested, so this will throw if
+       it is called recursively. For nested transactions, use the
+       savepoint() method or manually manage SAVEPOINTs using exec().
+     */
+    transaction: function(callback){
+      affirmDbOpen(this).exec("BEGIN");
+      try {
+        const rc = callback(this);
+        this.exec("COMMIT");
+        return rc;
+      }catch(e){
+        this.exec("ROLLBACK");
+        throw e;
+      }
+    },
+
+    /**
+       This works similarly to transaction() but uses sqlite3's SAVEPOINT
+       feature. This function starts a savepoint (with an unspecified name)
+       and calls the given callback function, passing it this db object.
+       If the callback returns, the savepoint is released (committed). If
+       the callback throws, the savepoint is rolled back. If it does not
+       throw, it returns the result of the callback.
+    */
+    savepoint: function(callback){
+      affirmDbOpen(this).exec("SAVEPOINT oo1");
+      try {
+        const rc = callback(this);
+        this.exec("RELEASE oo1");
+        return rc;
+      }catch(e){
+        this.exec("ROLLBACK to SAVEPOINT oo1; RELEASE SAVEPOINT oo1");
+        throw e;
+      }
+    },
+    
     /**
        This function currently does nothing and always throws.  It
        WILL BE REMOVED pending other refactoring, to eliminate a hard
@@ -1028,7 +1236,7 @@
               capi.wasm.scopedAllocPop(stack);
             }
           }else{
-            const pBlob = capi.wasm.mallocFromTypedArray(val);
+            const pBlob = capi.wasm.allocFromTypedArray(val);
             try{
               rc = capi.sqlite3_bind_blob(stmt.pointer, ndx, pBlob, val.byteLength,
                                          capi.SQLITE_TRANSIENT);
@@ -1042,7 +1250,7 @@
           console.warn("Unsupported bind() argument type:",val);
           toss3("Unsupported bind() argument type: "+(typeof val));
     }
-    if(rc) checkDbRc(stmt.db.pointer, rc);
+    if(rc) DB.checkRc(stmt.db.pointer, rc);
     return stmt;
   };
 
@@ -1059,6 +1267,7 @@
         delete __stmtMap.get(this.db)[this.pointer];
         capi.sqlite3_finalize(this.pointer);
         __ptrMap.delete(this);
+        delete this._mayGet;
         delete this.columnCount;
         delete this.parameterCount;
         delete this.db;
@@ -1228,9 +1437,10 @@
       return this;
     },
     /**
-       Steps the statement one time. If the result indicates that
-       a row of data is available, true is returned.  If no row of
-       data is available, false is returned.  Throws on error.
+       Steps the statement one time. If the result indicates that a
+       row of data is available, a truthy value is returned.
+       If no row of data is available, a falsy
+       value is returned.  Throws on error.
     */
     step: function(){
       affirmUnlocked(this, 'step()');
@@ -1242,8 +1452,50 @@
             this._mayGet = false;
             console.warn("sqlite3_step() rc=",rc,"SQL =",
                          capi.sqlite3_sql(this.pointer));
-            checkDbRc(this.db.pointer, rc);
-      };
+            DB.checkRc(this.db.pointer, rc);
+      }
+    },
+    /**
+       Functions exactly like step() except that...
+
+       1) On success, it calls this.reset() and returns this object.
+       2) On error, it throws and does not call reset().
+
+       This is intended to simplify constructs like:
+
+       ```
+       for(...) {
+         stmt.bind(...).stepReset();
+       }
+       ```
+
+       Note that the reset() call makes it illegal to call this.get()
+       after the step.
+    */
+    stepReset: function(){
+      this.step();
+      return this.reset();
+    },
+    /**
+       Functions like step() except that it finalizes this statement
+       immediately after stepping unless the step cannot be performed
+       because the statement is locked. Throws on error, but any error
+       other than the statement-is-locked case will also trigger
+       finalization of this statement.
+
+       On success, it returns true if the step indicated that a row of
+       data was available, else it returns false.
+
+       This is intended to simplify use cases such as:
+
+       ```
+       aDb.prepare("insert in foo(a) values(?)").bind(123).stepFinalize();
+       ```
+    */
+    stepFinalize: function(){
+      const rc = this.step();
+      this.finalize();
+      return rc;
     },
     /**
        Fetches the value from the given 0-based column index of
@@ -1347,7 +1599,7 @@
           default: toss3("Don't know how to translate",
                          "type of result column #"+ndx+".");
       }
-      abort("Not reached.");
+      toss3("Not reached.");
     },
     /** Equivalent to get(ndx) but coerces the result to an
         integer. */
@@ -1433,6 +1685,9 @@
       ooApi: "0.1"
     },
     DB,
-    Stmt
-  }/*SQLite3 object*/;
-})(self);
+    Stmt,
+    dbCtorHelper
+  }/*oo1 object*/;
+
+});
+
