@@ -14,7 +14,7 @@
   sqlite3.js, initializes the module, and postMessage()'s a message
   after the module is initialized:
 
-  {type: 'sqlite3-api', result: 'worker1-ready'}
+  {type: 'sqlite3-api', data: 'worker-ready'}
 
   This seemingly superfluous level of indirection is necessary when
   loading sqlite3.js via a Worker. Instantiating a worker with new
@@ -28,9 +28,4 @@
 */
 "use strict";
 importScripts('sqlite3.js');
-sqlite3InitModule().then((EmscriptenModule)=>{
-  EmscriptenModule.sqlite3.asyncPostInit().then((sqlite3)=>{
-    sqlite3.capi.sqlite3_wasmfs_opfs_dir();
-    sqlite3.initWorker1API();
-  });
-});
+sqlite3InitModule().then((EmscriptenModule)=>EmscriptenModule.sqlite3.initWorkerAPI());
