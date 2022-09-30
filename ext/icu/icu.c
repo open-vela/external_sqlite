@@ -299,9 +299,8 @@ static void icuRegexpFunc(sqlite3_context *p, int nArg, sqlite3_value **apArg){
 
     if( U_SUCCESS(status) ){
       sqlite3_set_auxdata(p, 0, pExpr, icuRegexpDelete);
-      pExpr = sqlite3_get_auxdata(p, 0);
-    }
-    if( !pExpr ){
+    }else{
+      assert(!pExpr);
       icuFunctionError(p, "uregex_open", status);
       return;
     }
