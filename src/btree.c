@@ -1547,7 +1547,7 @@ static int defragmentPage(MemPage *pPage, int nMaxFrag){
           if( iFree2+sz2 > usableSize ) return SQLITE_CORRUPT_PAGE(pPage);
           memmove(&data[iFree+sz+sz2], &data[iFree+sz], iFree2-(iFree+sz));
           sz += sz2;
-        }else if( iFree+sz>usableSize ){
+        }else if( NEVER(iFree+sz>usableSize) ){
           return SQLITE_CORRUPT_PAGE(pPage);
         }
 
@@ -8774,11 +8774,6 @@ static int balance(BtCursor *pCur){
       }else{
         break;
       }
-    }else if( sqlite3PagerPageRefcount(pPage->pDbPage)>1 ){
-      /* The page being written is not a root page, and there is currently
-      ** more than one reference to it. This only happens if the page is one 
-      ** of its own ancestor pages. Corruption. */
-      rc = SQLITE_CORRUPT_BKPT;
     }else{
       MemPage * const pParent = pCur->apPage[iPage-1];
       int const iIdx = pCur->aiIdx[iPage-1];
