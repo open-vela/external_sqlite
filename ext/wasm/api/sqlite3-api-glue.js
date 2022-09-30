@@ -16,9 +16,23 @@
   initializes the main API pieces so that the downstream components
   (e.g. sqlite3-api-oo1.js) have all that they need.
 */
-self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
+(function(self){
   'use strict';
   const toss = (...args)=>{throw new Error(args.join(' '))};
+
+  self.sqlite3 = self.sqlite3ApiBootstrap({
+    Module: Module /* ==> Emscripten-style Module object. Currently
+                      needs to be exposed here for test code. NOT part
+                      of the public API. */,
+    exports: Module['asm'],
+    memory: Module.wasmMemory /* gets set if built with -sIMPORT_MEMORY */,
+    bigIntEnabled: !!self.BigInt64Array,
+    allocExportName: 'malloc',
+    deallocExportName: 'free'
+  });
+  delete self.sqlite3ApiBootstrap;
+
+  const sqlite3 = self.sqlite3;
   const capi = sqlite3.capi, wasm = capi.wasm, util = capi.util;
   self.WhWasmUtilInstaller(capi.wasm);
   delete self.WhWasmUtilInstaller;
@@ -27,11 +41,11 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     /*  "The problem" is that the following isn't type-safe.
         OTOH, nothing about WASM pointers is. */
     /**
-       Add the `.pointer` xWrap() signature entry to extend the
-       `pointer` arg handler to check for a `pointer` property. This
-       can be used to permit, e.g., passing an sqlite3.oo1.DB instance
-       to a C-style sqlite3_xxx function which takes an `sqlite3*`
-       argument.
+       Add the `.pointer` xWrap() signature entry to extend
+       the `pointer` arg handler to check for a `pointer`
+       property. This can be used to permit, e.g., passing
+       an SQLite3.DB instance to a C-style sqlite3_xxx function
+       which takes an `sqlite3*` argument.
     */
     const oldP = wasm.xWrap.argAdapter('pointer');
     const adapter = function(v){
@@ -43,7 +57,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       return oldP(v);
     };
     wasm.xWrap.argAdapter('.pointer', adapter);
-  } /* ".pointer" xWrap() argument adapter */
+  }
 
   // WhWasmUtil.xWrap() bindings...
   {
@@ -55,7 +69,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     */
     const aPtr = wasm.xWrap.argAdapter('*');
     wasm.xWrap.argAdapter('sqlite3*', aPtr)('sqlite3_stmt*', aPtr);
-    wasm.xWrap.resultAdapter('sqlite3*', aPtr)('sqlite3_stmt*', aPtr);
 
     /**
        Populate api object with sqlite3_...() by binding the "raw" wasm
@@ -64,11 +77,8 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     for(const e of wasm.bindingSignatures){
       capi[e[0]] = wasm.xWrap.apply(null, e);
     }
-    for(const e of wasm.bindingSignatures.wasm){
-      capi.wasm[e[0]] = wasm.xWrap.apply(null, e);
-    }
 
-    /* For C API functions which cannot work properly unless
+    /* For functions which cannot work properly unless
        wasm.bigIntEnabled is true, install a bogus impl which
        throws if called when bigIntEnabled is false. */
     const fI64Disabled = function(fname){
@@ -118,7 +128,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   */
   __prepare.basic = wasm.xWrap('sqlite3_prepare_v3',
                                "int", ["sqlite3*", "string",
-                                       "int"/*ignored for this impl!*/,
+                                       "int"/*MUST always be negative*/,
                                        "int", "**",
                                        "**"/*MUST be 0 or null or undefined!*/]);
   /**
@@ -138,10 +148,19 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 
   /* Documented in the api object's initializer. */
   capi.sqlite3_prepare_v3 = function f(pDb, sql, sqlLen, prepFlags, ppStmt, pzTail){
+    /* 2022-07-08: xWrap() 'string' arg handling may be able do this
+       special-case handling for us. It needs to be tested. Or maybe
+       not: we always want to treat pzTail as null when passed a
+       non-pointer SQL string and the argument adapters don't have
+       enough state to know that. Maybe they could/should, by passing
+       the currently-collected args as an array as the 2nd arg to the
+       argument adapters? Or maybe we collect all args in an array,
+       pass that to an optional post-args-collected callback, and give
+       it a chance to manipulate the args before we pass them on? */
     if(util.isSQLableTypedArray(sql)) sql = util.typedArrayToString(sql);
     switch(typeof sql){
         case 'string': return __prepare.basic(pDb, sql, -1, prepFlags, ppStmt, null);
-        case 'number': return __prepare.full(pDb, sql, sqlLen, prepFlags, ppStmt, pzTail);
+        case 'number': return __prepare.full(pDb, sql, sqlLen||-1, prepFlags, ppStmt, pzTail);
         default:
           return util.sqlite3_wasm_db_error(
             pDb, capi.SQLITE_MISUSE,
@@ -175,31 +194,18 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     wasm.ctype = JSON.parse(wasm.cstringToJs(cJson));
     //console.debug('wasm.ctype length =',wasm.cstrlen(cJson));
     for(const t of ['access', 'blobFinalizers', 'dataTypes',
-                    'encodings', 'fcntl', 'flock', 'ioCap',
+                    'encodings', 'flock', 'ioCap',
                     'openFlags', 'prepareFlags', 'resultCodes',
-                    'serialize', 'syncFlags', 'udfFlags',
-                    'version'
+                    'syncFlags', 'udfFlags', 'version'
                    ]){
-      for(const e of Object.entries(wasm.ctype[t])){
-        // ^^^ [k,v] there triggers a buggy code transormation via one
-        // of the Emscripten-driven optimizers.
-        capi[e[0]] = e[1];
+      for(const [k,v] of Object.entries(wasm.ctype[t])){
+        capi[k] = v;
       }
     }
-    const __rcMap = Object.create(null);
-    for(const t of ['resultCodes']){
-      for(const e of Object.entries(wasm.ctype[t])){
-        __rcMap[e[1]] = e[0];
-      }
-    }
-    /**
-       For the given integer, returns the SQLITE_xxx result code as a
-       string, or undefined if no such mapping is found.
-    */
-    capi.sqlite3_wasm_rc_str = (rc)=>__rcMap[rc];
     /* Bind all registered C-side structs... */
     for(const s of wasm.ctype.structs){
       capi[s.name] = sqlite3.StructBinder(s);
     }
-  }/*end C constant imports*/
-});
+  }
+
+})(self);
