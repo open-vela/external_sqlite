@@ -746,9 +746,7 @@ static int sqlite3Prepare(
     }
   }
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-  if( db->pDisconnect ) sqlite3VtabUnlockList(db);
-#endif
+  sqlite3VtabUnlockList(db);
 
   if( nBytes>=0 && (nBytes==0 || zSql[nBytes-1]!=0) ){
     char *zSqlCopy;
