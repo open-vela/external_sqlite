@@ -1,5 +1,5 @@
-C Code\sclean-up\sfor\sthe\sintegrity_check\senhancement.
-D 2022-10-10T21:21:04.220
+C Enhance\sthe\s"PRAGMA\sintegrity_check"\sstatement\sso\sthat\sit\sverifies\sdatatype\nconstraints\son\snon-STRICT\stables:\s\s(1)\sColumns\swith\sTEXT\saffinity\sshould\snot\ncontain\snumeric\svalues,\sand\s(2)\scolumns\swith\sNUMERIC\saffinity\sshould\snot\ncontain\sTEXT\svalues\sthat\scould\sbe\sconverted\sinto\snumbers.
+D 2022-10-10T23:54:17.674
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2002,8 +2002,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P dbab9d52a842085da67f5d0b8e96c665adc16331accf380b4c234e9b05bdb7fb
+P 327965bc71023d9380a9d6805062659108dab4bfcd386b7aba813754f270d33a a140173102febe9ef8064ee9b95bee489db54caba149e577d69e4d75161bf390
 R 27cc3a1e54ea78f4322ce43e3f2008e7
+T +closed a140173102febe9ef8064ee9b95bee489db54caba149e577d69e4d75161bf390
 U drh
-Z 5bcdf356b09ea5213e990a91977b44f5
+Z e702316a9b12d63d22f572b11832de1b
 # Remove this line to create a well-formed Fossil manifest.
