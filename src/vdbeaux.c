@@ -1157,7 +1157,7 @@ void sqlite3VdbeChangeP5(Vdbe *p, u16 p5){
 
 /*
 ** If the previous opcode is an OP_Column that delivers results
-** into register iDest, then add the OPFLAG_TYPEOF flag to that
+** into register iDest, then add the OPFLAG_TYPEOFARG flag to that
 ** opcode.
 */
 void sqlite3VdbeTypeofColumn(Vdbe *p, int iDest){
