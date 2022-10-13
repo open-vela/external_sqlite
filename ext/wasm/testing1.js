@@ -94,6 +94,7 @@
            "INSERT INTO t(a,b) VALUES(1,2),(3,4),",
            "(?,?),('blob',X'6869')"/*intentionally missing semicolon to test for
                                      off-by-one bug in string-to-WASM conversion*/],
+      multi: true,
       saveSql: list,
       bind: [5,6]
     });
@@ -257,6 +258,7 @@
         "insert into foo.bar(a) values(1),(2),(3);",
         "select a from foo.bar order by a;"
       ].join('')),
+      multi: true,
       rowMode: 0,
       resultRows
     });
@@ -1081,7 +1083,7 @@
     }finally{
       P.restore(stack);
     }
-  }/*testPstack()*/;
+}/*testPstack()*/;
 
   const clearKvvfs = function(){
     const sz = sqlite3.capi.sqlite3_web_kvvfs_size();
