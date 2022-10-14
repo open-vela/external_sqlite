@@ -59,14 +59,11 @@ static void updateVirtualTable(
 ** it has been converted into REAL.
 */
 void sqlite3ColumnDefault(Vdbe *v, Table *pTab, int i, int iReg){
-  Column *pCol;
   assert( pTab!=0 );
-  assert( pTab->nCol>i );
-  pCol = &pTab->aCol[i];
-  if( pCol->iDflt ){
+  if( !IsView(pTab) ){
     sqlite3_value *pValue = 0;
     u8 enc = ENC(sqlite3VdbeDb(v));
-    assert( !IsView(pTab) );
+    Column *pCol = &pTab->aCol[i];
     VdbeComment((v, "%s.%s", pTab->zName, pCol->zCnName));
     assert( i<pTab->nCol );
     sqlite3ValueFromExpr(sqlite3VdbeDb(v), 
@@ -77,7 +74,7 @@ void sqlite3ColumnDefault(Vdbe *v, Table *pTab, int i, int iReg){
     }
   }
 #ifndef SQLITE_OMIT_FLOATING_POINT
-  if( pCol->affinity==SQLITE_AFF_REAL && !IsVirtual(pTab) ){
+  if( pTab->aCol[i].affinity==SQLITE_AFF_REAL && !IsVirtual(pTab) ){
     sqlite3VdbeAddOp1(v, OP_RealAffinity, iReg);
   }
 #endif
