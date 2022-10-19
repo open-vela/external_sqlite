@@ -1158,6 +1158,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   */
   capi.sqlite3_web_db_export = function(pDb){
     if(!pDb) toss('Invalid sqlite3* argument.');
+    const wasm = wasm;
     if(!wasm.bigIntEnabled) toss('BigInt64 support is not enabled.');
     const stack = wasm.pstack.pointer;
     let pOut;
@@ -1281,17 +1282,6 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     capi,
     config,
     /**
-       Holds the version info of the sqlite3 source tree from which
-       the generated sqlite3-api.js gets built. Note that its version
-       may well differ from that reported by sqlite3_libversion(), but
-       that should be considered a source file mismatch, as the JS and
-       WASM files are intended to be built and distributed together.
-
-       This object is initially a placeholder which gets replaced by a
-       build-generated object.
-    */
-    version: Object.create(null),
-    /**
        Performs any optional asynchronous library-level initialization
        which might be required. This function returns a Promise which
        resolves to the sqlite3 namespace object. Any error in the
@@ -1334,20 +1324,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
       //while(lip.length) p = p.then(lip.shift());
       //return p.then(()=>sqlite3);
       return Promise.all(lip).then(()=>sqlite3);
-    },
-    /**
-       scriptInfo ideally gets injected into this object by the
-       infrastructure which assembles the JS/WASM module. It contains
-       state which must be collected before sqlite3ApiBootstrap() can
-       be declared. It is not necessarily available to any
-       sqlite3ApiBootstrap.initializers but "should" be in place (if
-       it's added at all) by the time that
-       sqlite3ApiBootstrap.initializersAsync is processed.
-
-       This state is not part of the public API, only intended for use
-       with the sqlite3 API bootstrapping and wasm-loading process.
-    */
-    scriptInfo: undefined
+    }
   };
   try{
     sqlite3ApiBootstrap.initializers.forEach((f)=>{
@@ -1423,4 +1400,3 @@ self.sqlite3ApiBootstrap.defaultConfig = Object.create(null);
    value which will be stored here.
 */
 self.sqlite3ApiBootstrap.sqlite3 = undefined;
-

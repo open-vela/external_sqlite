@@ -688,4 +688,9 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     }
   }/*kvvfs*/
 
+  sqlite3.version = Object.assign(Object.create(null),{
+    library: sqlite3.capi.sqlite3_libversion(),
+    sourceId: sqlite3.capi.sqlite3_sourceid()
+  });
 });
+
