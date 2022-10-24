@@ -467,7 +467,9 @@ struct WhereInfo {
 #if WHERETRACE_ENABLED
   Expr *pWhere;             /* The complete WHERE clause */
 #endif
-  Select *pSelect;          /* The entire SELECT statement containing WHERE */
+#ifndef SQLITE_OMIT_VIRTUALTABLE
+  Select *pLimit;           /* Used to access LIMIT expr/registers for vtabs */
+#endif
   int aiCurOnePass[2];      /* OP_OpenWrite cursors for the ONEPASS opt */
   int iContinue;            /* Jump here to continue with next record */
   int iBreak;               /* Jump here to break out of the loop */
