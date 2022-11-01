@@ -199,11 +199,25 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
 
       A very few exceptions require an additional level of proxy
       function or may otherwise require special attention in the WASM
-      environment, and all such cases are document here. Those not
-      documented otherwise are installed as 1-to-1 proxies for their
+      environment, and all such cases are documented somewhere below
+      in this file or in sqlite3-api-glue.js. capi members which are
+      not documented are installed as 1-to-1 proxies for their
       C-side counterparts.
   */
   const capi = Object.create(null);
+  /**
+     Holds state which are specific to the WASM-related
+     infrastructure and glue code. It is not expected that client
+     code will normally need these, but they're exposed here in case
+     it does. These APIs are _not_ to be considered an
+     official/stable part of the sqlite3 WASM API. They may change
+     as the developers' experience suggests appropriate changes.
+
+     Note that a number of members of this object are injected
+     dynamically after the api object is fully constructed, so
+     not all are documented in this file.
+  */
+  const wasm = Object.create(null);
 
   /**
      Functionally equivalent to the SQLite3Error constructor but may
@@ -339,11 +353,13 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   /**
      If v is-a Array, its join('') result is returned.  If
      isSQLableTypedArray(v) is true then typedArrayToString(v) is
+     returned. If it looks like a WASM pointer, wasm.cstringToJs(v) is
      returned. Else v is returned as-is.
   */
   const flexibleString = function(v){
     if(isSQLableTypedArray(v)) return typedArrayToString(v);
     else if(Array.isArray(v)) return v.join('');
+    else if(wasm.isPtr(v)) v = wasm.cstringToJs(v);
     return v;
   };
 
@@ -615,19 +631,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     typedArrayPart
   };
     
-  /**
-     Holds state which are specific to the WASM-related
-     infrastructure and glue code. It is not expected that client
-     code will normally need these, but they're exposed here in case
-     it does. These APIs are _not_ to be considered an
-     official/stable part of the sqlite3 WASM API. They may change
-     as the developers' experience suggests appropriate changes.
-
-     Note that a number of members of this object are injected
-     dynamically after the api object is fully constructed, so
-     not all are documented inline here.
-  */
-  const wasm = {
+  Object.assign(wasm, {
     /**
        Emscripten APIs have a deep-seated assumption that all pointers
        are 32 bits. We'll remain optimistic that that won't always be
@@ -695,7 +699,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     dealloc: undefined/*installed later*/
 
     /* Many more wasm-related APIs get installed later on. */
-  }/*wasm*/;
+  }/*wasm*/);
 
   /**
      wasm.alloc()'s srcTypedArray.byteLength bytes,
@@ -1187,14 +1191,15 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   }
 
   /**
-     Given an `sqlite3*`, an sqlite3_vfs name, and an optional db
-     name, returns a truthy value (see below) if that db handle uses
-     that VFS, else returns false. If pDb is falsy then the 3rd
-     argument is ignored and this function returns a truthy value if
-     the default VFS name matches that of the 2nd argument. Results
-     are undefined if pDb is truthy but refers to an invalid
-     pointer. The 3rd argument specifies the database name of the
-     given database connection to check, defaulting to the main db.
+     Given an `sqlite3*`, an sqlite3_vfs name, and an optional db name
+     (defaulting to "main"), returns a truthy value (see below) if
+     that db uses that VFS, else returns false. If pDb is falsy then
+     the 3rd argument is ignored and this function returns a truthy
+     value if the default VFS name matches that of the 2nd
+     argument. Results are undefined if pDb is truthy but refers to an
+     invalid pointer. The 3rd argument specifies the database name of
+     the given database connection to check, defaulting to the main
+     db.
 
      The 2nd and 3rd arguments may either be a JS string or a WASM
      C-string. If the 2nd argument is a NULL WASM pointer, the default
@@ -1209,14 +1214,14 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
      bad arguments cause a conversion error when passing into
      wasm-space, false is returned.
   */
-  capi.sqlite3_js_db_uses_vfs = function(pDb,vfsName,dbName="main"){
+  capi.sqlite3_js_db_uses_vfs = function(pDb,vfsName,dbName=0){
     try{
       const pK = capi.sqlite3_vfs_find(vfsName);
       if(!pK) return false;
       else if(!pDb){
         return pK===capi.sqlite3_vfs_find(0) ? pK : false;
       }else{
-        return pK===capi.sqlite3_js_db_vfs(pDb) ? pK : false;
+        return pK===capi.sqlite3_js_db_vfs(pDb,dbName) ? pK : false;
       }
     }catch(e){
       /* Ignore - probably bad args to a wasm-bound function. */
