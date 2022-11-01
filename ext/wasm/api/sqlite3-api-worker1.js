@@ -188,8 +188,6 @@
       See the sqlite3.oo1.DB constructor for peculiarities and
       transformations,
 
-      vfs: sqlite3_vfs name. Ignored if filename is ":memory:" or "".
-           This may change how the given filename is resolved.
     }
   }
   ```
@@ -214,7 +212,6 @@
       persistent: true if the given filename resides in the
       known-persistent storage, else false.
 
-      vfs: name of the VFS the "main" db is using.
    }
   }
   ```
@@ -365,7 +362,7 @@ sqlite3.initWorker1API = function(){
     /** Temp holder for "transferable" postMessage() state. */
     xfer: [],
     open: function(opt){
-      const db = new DB(opt);
+      const db = new DB(opt.filename);
       this.dbs[getDbId(db)] = db;
       if(this.dbList.indexOf(db)<0) this.dbList.push(db);
       return db;
@@ -445,14 +442,12 @@ sqlite3.initWorker1API = function(){
         oargs.filename = args.filename || '';
       }else{
         oargs.filename = args.filename;
-        oargs.vfs = args.vfs;
       }
       const db = wState.open(oargs);
       rc.filename = db.filename;
       rc.persistent = (!!pDir && db.filename.startsWith(pDir+'/'))
         || !!sqlite3.capi.sqlite3_js_db_uses_vfs(db.pointer, "opfs");
       rc.dbId = getDbId(db);
-      rc.vfs = db.dbVfsName();
       return rc;
     },
 
@@ -533,7 +528,6 @@ sqlite3.initWorker1API = function(){
       rc.wasmfsOpfsEnabled = !!sqlite3.capi.sqlite3_wasmfs_opfs_dir();
       rc.version = sqlite3.version;
       rc.vfsList = sqlite3.capi.sqlite3_js_vfs_list();
-      rc.opfsEnabled = !!sqlite3.opfs;
       return rc;
     },
 
@@ -548,6 +542,11 @@ sqlite3.initWorker1API = function(){
        }
     */
     export: function(ev){
+      /**
+         We need to reimplement this to use the Emscripten FS
+         interface. That part used to be in the OO#1 API but that
+         dependency was removed from that level of the API.
+      */
       const db = getMsgDb(ev);
       const response = {
         bytearray: sqlite3.capi.sqlite3_js_db_export(db.pointer),
@@ -560,23 +559,17 @@ sqlite3.initWorker1API = function(){
 
     toss: function(ev){
       toss("Testing worker exception");
-    },
-
-    'opfs-tree': async function(ev){
-      if(!sqlite3.opfs) toss("OPFS support is unavailable.");
-      const response = await sqlite3.opfs.treeList();
-      return response;
     }
   }/*wMsgHandler*/;
 
-  self.onmessage = async function(ev){
+  self.onmessage = function(ev){
     ev = ev.data;
     let result, dbId = ev.dbId, evType = ev.type;
     const arrivalTime = performance.now();
     try {
       if(wMsgHandler.hasOwnProperty(evType) &&
          wMsgHandler[evType] instanceof Function){
-        result = await wMsgHandler[evType](ev);
+        result = wMsgHandler[evType](ev);
       }else{
         toss("Unknown db worker message type:",ev.type);
       }
