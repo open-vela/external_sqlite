@@ -1,5 +1,5 @@
-C Rework\sautomatically\sacquired\sOPFS\slocks\sto\sbe\sreleased\sduring\sidle\stime.\sThis\seliminates\sthe\sperformance\shit\sreported\sin\s[46304ba057707c].
-D 2022-11-10T13:14:30.548
+C Automatically\srelinquish\simplicitly-acquired\sOPFS\sfile\slocks\sduring\sVFS\sidle\stime\sin\san\sattempt\sto\shelp\salleviate\scross-tab\slocking\scontention\slike\sthat\sdescribed\sin\s[forum:58a377083cd24a|forum\spost\s58a377083cd24a].
+D 2022-11-10T13:22:35.705
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2055,8 +2055,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 46304ba057707c3b072b6e7bb8c4af774f653aa5814099f0866cd87b2b73abeb
+P ae43e97087a3207a5ca3ffae75fbe7a33c01f4a38ce0d1d7eed8591ae3083617 a7fe91afca473fe55c983bc81d214df4ef3699863c7423fa4b6b9cde23d6a3b4
 R 4034304670d7219ca07133486e9bbed5
+T +closed a7fe91afca473fe55c983bc81d214df4ef3699863c7423fa4b6b9cde23d6a3b4 Closed\sby\sintegrate-merge.
 U stephan
-Z 9cbc867c57797caf44094dc93d412778
+Z 9ded40c19ad046a311beff933b79ea4d
 # Remove this line to create a well-formed Fossil manifest.
