@@ -235,8 +235,7 @@ $(foreach X,$(SOAP.js) $(sqlite3-worker1.js) $(sqlite3-worker1-promiser.js),\
 all: $(sqlite3-api.ext.jses)
 
 sqlite3-api.js := $(dir.tmp)/sqlite3-api.js
-sqlite3-api.c-pp.js := $(dir.tmp)/sqlite3-api.c-pp.js
-$(sqlite3-api.c-pp.js): $(sqlite3-api.jses) $(MAKEFILE)
+$(sqlite3-api.js): $(sqlite3-api.jses) $(MAKEFILE)
 	@echo "Making $@..."
 	@for i in $(sqlite3-api.jses); do \
 		echo "/* BEGIN FILE: $$i */"; \
@@ -257,7 +256,7 @@ $(sqlite3-api-build-version.js): $(bin.version-info) $(MAKEFILE)
 ########################################################################
 # --post-js and --pre-js are emcc flags we use to append/prepend JS to
 # the generated emscripten module file.
-pre-js.js := $(dir.tmp)/pre-js.js
+pre-js.js := $(dir.api)/pre-js.js
 post-js.js := $(dir.tmp)/post-js.js
 post-jses := \
   $(dir.api)/post-js-header.js \
@@ -288,51 +287,6 @@ $(sqlite3-license-version.js): $(sqlite3.h) $(sqlite3-license-version-header.js)
         -e '/define SQLITE_SOURCE_ID/{$$1=""; print "**" $$0}' $(sqlite3.h); \
     echo '*/'; \
    } > $@
-
-########################################################################
-# Transform $(1) to $(2) via ./c-pp -f $(1) ...
-#
-# Historical notes:
-#
-# - We first attempted to use gcc and/or clang to preprocess JS files
-#   in the same way we would normally do C files, but C-specific quirks
-#   of each makes that untennable.
-#
-# - We implemented c-pp.c (the C-Minus Pre-processor) as a custom
-#   generic/file-format-agnostic preprocessor to enable us to pack
-#   code for different target builds into the same JS files. Most
-#   notably, some ES6 module (a.k.a. ESM) features cannot legally be
-#   referenced at all in non-ESM code, e.g.  the "import" and "export"
-#   keywords. This preprocessing step permits us to swap out sections
-#   of code where necessary for ESM and non-ESM (a.k.a. vanilla JS)
-#   require different implementations. The alternative to such
-#   preprocessing, would be to have separate source files for ES6
-#   builds, which would have a higher maintenance burden than c-pp.c
-#   seems likely to.
-#
-# c-pp.c was written specifically for the sqlite project's JavaScript
-# builds but is maintained as a standalone project:
-# https://fossil.wanderinghorse.net/r/c-pp
-bin.c-pp := ./c-pp
-$(bin.c-pp): c-pp.c $(sqlite3.c) $(MAKEFILE)
-	$(CC) -O0 -o $@ c-pp.c $(sqlite3.c) '-DCMPP_DEFAULT_DELIM="//#"' -I$(dir.top)
-ifneq (,$(filter esm,$(MAKECMDGOALS)))
-js.cpp.defines ?= -DSQLITE_JS_ESM
-esm: $(filter-out esm,$(MAKECMDGOALS))
-else
-js.cpp.defines ?=
-endif
-define C-PP_JS
-# $1 = X.js. $2 = output file to generate by filtering $(1) through
-# $(bin.cpp) -E -CC.
-$(2): $(1) $$(MAKEFILE) $$(bin.c-pp)
-	$$(bin.c-pp) $(js.cpp.defines) -f $(1) -o $$@
-CLEAN_FILES += $(2)
-endef
-$(eval $(call C-PP_JS,$(dir.tmp)/sqlite3-api.c-pp.js,$(dir.tmp)/sqlite3-api.js))
-$(eval $(call C-PP_JS,$(dir.api)/pre-js.js,$(dir.tmp)/pre-js.js))
-# /end CPP-of-JS bits
-########################################################################
 
 ########################################################################
 # call-make-pre-js creates rules for pre-js-$(1).js. $1 = the base
