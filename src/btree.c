@@ -1900,62 +1900,67 @@ static int freeSpace(MemPage *pPage, u16 iStart, u16 iSize){
 ** Only the following combinations are supported.  Anything different
 ** indicates a corrupt database files:
 **
-**         PTF_ZERODATA
-**         PTF_ZERODATA | PTF_LEAF
-**         PTF_LEAFDATA | PTF_INTKEY
-**         PTF_LEAFDATA | PTF_INTKEY | PTF_LEAF
+**         PTF_ZERODATA                             (0x02,  2)
+**         PTF_LEAFDATA | PTF_INTKEY                (0x05,  5)
+**         PTF_ZERODATA | PTF_LEAF                  (0x0a, 10)
+**         PTF_LEAFDATA | PTF_INTKEY | PTF_LEAF     (0x0d, 13)
 */
 static int decodeFlags(MemPage *pPage, int flagByte){
   BtShared *pBt;     /* A copy of pPage->pBt */
 
   assert( pPage->hdrOffset==(pPage->pgno==1 ? 100 : 0) );
   assert( sqlite3_mutex_held(pPage->pBt->mutex) );
-  pPage->leaf = (u8)(flagByte>>3);  assert( PTF_LEAF == 1<<3 );
-  flagByte &= ~PTF_LEAF;
-  pPage->childPtrSize = 4-4*pPage->leaf;
   pBt = pPage->pBt;
-  if( flagByte==(PTF_LEAFDATA | PTF_INTKEY) ){
-    /* EVIDENCE-OF: R-07291-35328 A value of 5 (0x05) means the page is an
-    ** interior table b-tree page. */
-    assert( (PTF_LEAFDATA|PTF_INTKEY)==5 );
-    /* EVIDENCE-OF: R-26900-09176 A value of 13 (0x0d) means the page is a
-    ** leaf table b-tree page. */
-    assert( (PTF_LEAFDATA|PTF_INTKEY|PTF_LEAF)==13 );
-    pPage->intKey = 1;
-    if( pPage->leaf ){
+  pPage->max1bytePayload = pBt->max1bytePayload;
+  if( flagByte>=(PTF_ZERODATA | PTF_LEAF) ){
+    pPage->childPtrSize = 0;
+    pPage->leaf = 1;
+    if( flagByte==(PTF_LEAFDATA | PTF_INTKEY | PTF_LEAF) ){
       pPage->intKeyLeaf = 1;
       pPage->xCellSize = cellSizePtrTableLeaf;
       pPage->xParseCell = btreeParseCellPtr;
+      pPage->intKey = 1;
+      pPage->maxLocal = pBt->maxLeaf;
+      pPage->minLocal = pBt->minLeaf;
+    }else if( flagByte==(PTF_ZERODATA | PTF_LEAF) ){
+      pPage->intKey = 0;
+      pPage->intKeyLeaf = 0;
+      pPage->xCellSize = cellSizePtr;
+      pPage->xParseCell = btreeParseCellPtrIndex;
+      pPage->maxLocal = pBt->maxLocal;
+      pPage->minLocal = pBt->minLocal;
     }else{
+      pPage->intKey = 0;
+      pPage->intKeyLeaf = 0;
+      pPage->xCellSize = cellSizePtr;
+      pPage->xParseCell = btreeParseCellPtrIndex;
+      return SQLITE_CORRUPT_PAGE(pPage);
+    }
+  }else{
+    pPage->childPtrSize = 4;
+    pPage->leaf = 0;
+    if( flagByte==(PTF_ZERODATA) ){
+      pPage->intKey = 0;
+      pPage->intKeyLeaf = 0;
+      pPage->xCellSize = cellSizePtr;
+      pPage->xParseCell = btreeParseCellPtrIndex;
+      pPage->maxLocal = pBt->maxLocal;
+      pPage->minLocal = pBt->minLocal;
+    }else if( flagByte==(PTF_LEAFDATA | PTF_INTKEY) ){
       pPage->intKeyLeaf = 0;
       pPage->xCellSize = cellSizePtrNoPayload;
       pPage->xParseCell = btreeParseCellPtrNoPayload;
+      pPage->intKey = 1;
+      pPage->maxLocal = pBt->maxLeaf;
+      pPage->minLocal = pBt->minLeaf;
+    }else{
+      pPage->intKey = 0;
+      pPage->intKeyLeaf = 0;
+      pPage->xCellSize = cellSizePtr;
+      pPage->xParseCell = btreeParseCellPtrIndex;
+      return SQLITE_CORRUPT_PAGE(pPage);
     }
-    pPage->maxLocal = pBt->maxLeaf;
-    pPage->minLocal = pBt->minLeaf;
-  }else if( flagByte==PTF_ZERODATA ){
-    /* EVIDENCE-OF: R-43316-37308 A value of 2 (0x02) means the page is an
-    ** interior index b-tree page. */
-    assert( (PTF_ZERODATA)==2 );
-    /* EVIDENCE-OF: R-59615-42828 A value of 10 (0x0a) means the page is a
-    ** leaf index b-tree page. */
-    assert( (PTF_ZERODATA|PTF_LEAF)==10 );
-    pPage->intKey = 0;
-    pPage->intKeyLeaf = 0;
-    pPage->xCellSize = cellSizePtr;
-    pPage->xParseCell = btreeParseCellPtrIndex;
-    pPage->maxLocal = pBt->maxLocal;
-    pPage->minLocal = pBt->minLocal;
-  }else{
-    /* EVIDENCE-OF: R-47608-56469 Any other value for the b-tree page type is
-    ** an error. */
-    pPage->intKey = 0;
-    pPage->intKeyLeaf = 0;
-    pPage->xCellSize = cellSizePtr;
-    pPage->xParseCell = btreeParseCellPtrIndex;
-    return SQLITE_CORRUPT_PAGE(pPage);
   }
-  pPage->max1bytePayload = pBt->max1bytePayload;
   return SQLITE_OK;
 }
 
@@ -7234,14 +7239,16 @@ struct CellArray {
 ** computed.
 */
 static void populateCellCache(CellArray *p, int idx, int N){
+  MemPage *pRef = p->pRef;
+  u16 *szCell = p->szCell;
   assert( idx>=0 && idx+N<=p->nCell );
   while( N>0 ){
     assert( p->apCell[idx]!=0 );
-    if( p->szCell[idx]==0 ){
-      p->szCell[idx] = p->pRef->xCellSize(p->pRef, p->apCell[idx]);
+    if( szCell[idx]==0 ){
+      szCell[idx] = pRef->xCellSize(pRef, p->apCell[idx]);
     }else{
       assert( CORRUPT_DB ||
-              p->szCell[idx]==p->pRef->xCellSize(p->pRef, p->apCell[idx]) );
+              szCell[idx]==pRef->xCellSize(pRef, p->apCell[idx]) );
     }
     idx++;
     N--;
@@ -7443,8 +7450,8 @@ static int pageFreeArray(
   int nRet = 0;
   int i;
   int iEnd = iFirst + nCell;
-  u8 *pFree = 0;
-  int szFree = 0;
+  u8 *pFree = 0;                  /* \__ Parameters for pending call to */
+  int szFree = 0;                 /* /   freeSpace()                    */
 
   for(i=iFirst; i<iEnd; i++){
     u8 *pCell = pCArray->apCell[i];
@@ -7465,6 +7472,9 @@ static int pageFreeArray(
           return 0;
         }
       }else{
+        /* The current cell is adjacent to and before the pFree cell.
+        ** Combine the two regions into one to reduce the number of calls
+        ** to freeSpace(). */
         pFree = pCell;
         szFree += sz;
       }
@@ -8234,15 +8244,17 @@ static int balance_nonroot(
     d = r + 1 - leafData;
     (void)cachedCellSize(&b, d);
     do{
+      int szR, szD;
       assert( d<nMaxCells );
       assert( r<nMaxCells );
-      (void)cachedCellSize(&b, r);
+      szR = cachedCellSize(&b, r);
+      szD = b.szCell[d];
       if( szRight!=0
-       && (bBulk || szRight+b.szCell[d]+2 > szLeft-(b.szCell[r]+(i==k-1?0:2)))){
+       && (bBulk || szRight+szD+2 > szLeft-(szR+(i==k-1?0:2)))){
         break;
       }
-      szRight += b.szCell[d] + 2;
-      szLeft -= b.szCell[r] + 2;
+      szRight += szD + 2;
+      szLeft -= szR + 2;
       cntNew[i-1] = r;
       r--;
       d--;
@@ -9160,6 +9172,7 @@ int sqlite3BtreeInsert(
   assert( pPage->isInit || CORRUPT_DB );
   newCell = pBt->pTmpSpace;
   assert( newCell!=0 );
+  assert( BTREE_PREFORMAT==OPFLAG_PREFORMAT );
   if( flags & BTREE_PREFORMAT ){
     rc = SQLITE_OK;
     szNew = pBt->nPreformatSize;
@@ -9170,12 +9183,13 @@ int sqlite3BtreeInsert(
       if( info.nPayload!=info.nLocal ){
         Pgno ovfl = get4byte(&newCell[szNew-4]);
         ptrmapPut(pBt, ovfl, PTRMAP_OVERFLOW1, pPage->pgno, &rc);
+        if( NEVER(rc) ) goto end_insert;
       }
     }
   }else{
     rc = fillInCell(pPage, newCell, pX, &szNew);
+    if( rc ) goto end_insert;
   }
-  if( rc ) goto end_insert;
   assert( szNew==pPage->xCellSize(pPage, newCell) );
   assert( szNew <= MX_CELL_SIZE(pBt) );
   idx = pCur->ix;
