@@ -58,12 +58,12 @@ fiddle.SOAP.js := $(dir.fiddle)/$(notdir $(SOAP.js))
 $(fiddle.SOAP.js): $(SOAP.js)
 	cp $< $@
 
-$(eval $(call call-make-pre-js,fiddle-module,vanilla))
+$(eval $(call call-make-pre-js,fiddle-module))
 $(fiddle-module.js): $(MAKEFILE) $(MAKEFILE.fiddle) \
     $(EXPORTED_FUNCTIONS.fiddle) \
-    $(fiddle.cses) $(pre-post-fiddle-module.deps.vanilla) $(fiddle.SOAP.js)
+    $(fiddle.cses) $(pre-post-fiddle-module.deps) $(fiddle.SOAP.js)
 	$(emcc.bin) -o $@ $(fiddle.emcc-flags) \
-    $(pre-post-fiddle-module.flags.vanilla) \
+    $(pre-post-common.flags) $(pre-post-fiddle-module.flags) \
     $(fiddle.cses)
 	$(maybe-wasm-strip) $(fiddle-module.wasm)
 	gzip < $@ > $@.gz
