@@ -1038,29 +1038,6 @@ extern u32 sqlite3TreeTrace;
 # define TREETRACE_ENABLED 0
 #endif
 
-/* TREETRACE flag meanings:
-**
-**   0x00000001     Beginning and end of SELECT processing
-**   0x00000002     WHERE clause processing
-**   0x00000004     Query flattener
-**   0x00000008     Result-set wildcard expansion
-**   0x00000010     Query name resolution
-**   0x00000020     Aggregate analysis
-**   0x00000040     Window functions
-**   0x00000080     Generated column names
-**   0x00000100     Move HAVING terms into WHERE
-**   0x00000200     Count-of-view optimization
-**   0x00000400     Compound SELECT processing
-**   0x00000800     Drop superfluous ORDER BY
-**   0x00001000     LEFT JOIN simplifies to JOIN
-**   0x00002000     Constant propagation
-**   0x00004000     Push-down optimization
-**   0x00008000     After all FROM-clause analysis
-**   0x00010000     Beginning of DELETE/INSERT/UPDATE processing
-**   0x00020000     Transform DISTINCT into GROUP BY
-**   0x00040000     SELECT tree dump after all code has been generated
-*/
-
 /*
 ** Macros for "wheretrace"
 */
@@ -2739,16 +2716,15 @@ struct AggInfo {
                           ** from source tables rather than from accumulators */
   u8 useSortingIdx;       /* In direct mode, reference the sorting index rather
                           ** than the source table */
+  u16 nSortingColumn;     /* Number of columns in the sorting index */
   int sortingIdx;         /* Cursor number of the sorting index */
   int sortingIdxPTab;     /* Cursor number of pseudo-table */
-  int nSortingColumn;     /* Number of columns in the sorting index */
-  int mnReg, mxReg;       /* Range of registers allocated for aCol and aFunc */
+  int iFirstReg;          /* First register in range for aCol[] and aFunc[] */
   ExprList *pGroupBy;     /* The group by clause */
   struct AggInfo_col {    /* For each column used in source tables */
     Table *pTab;             /* Source table */
     Expr *pCExpr;            /* The original expression */
     int iTable;              /* Cursor number of the source table */
-    int iMem;                /* Memory location that acts as accumulator */
     i16 iColumn;             /* Column number within the source table */
     i16 iSorterColumn;       /* Column number in the sorting index */
   } *aCol;
@@ -2759,13 +2735,18 @@ struct AggInfo {
   struct AggInfo_func {   /* For each aggregate function */
     Expr *pFExpr;            /* Expression encoding the function */
     FuncDef *pFunc;          /* The aggregate function implementation */
-    int iMem;                /* Memory location that acts as accumulator */
     int iDistinct;           /* Ephemeral table used to enforce DISTINCT */
     int iDistAddr;           /* Address of OP_OpenEphemeral */
   } *aFunc;
   int nFunc;              /* Number of entries in aFunc[] */
   u32 selId;              /* Select to which this AggInfo belongs */
 };
+
+/*
+** Macros to compute aCol[] and aFunc[] register numbers:
+*/
+#define AggInfoColumnReg(A,I)  ((A)->iFirstReg+(I))
+#define AggInfoFuncReg(A,I)    ((A)->iFirstReg+(A)->nColumn+(I))
 
 /*
 ** The datatype ynVar is a signed integer, either 16-bit or 32-bit.
