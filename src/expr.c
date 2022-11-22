@@ -4037,7 +4037,7 @@ static int exprCodeInlineFunction(
 }
 
 /*
-** Check to see if pExpr is one of the indexed expressions on pParse->pIdxEpr.
+** Check to see if pExpr is one of the indexed expressions on pParse->pIdxExpr.
 ** If it is, then resolve the expression by reading from the index and
 ** return the register into which the value has been read.  If pExpr is
 ** not an indexed expression, then return negative.
@@ -4049,7 +4049,7 @@ static SQLITE_NOINLINE int sqlite3IndexedExprLookup(
 ){
   IndexedExpr *p;
   Vdbe *v;
-  for(p=pParse->pIdxEpr; p; p=p->pIENext){
+  for(p=pParse->pIdxExpr; p; p=p->pIENext){
     int iDataCur = p->iDataCur;
     if( iDataCur<0 ) continue;
     if( pParse->iSelfTab ){
@@ -4069,10 +4069,10 @@ static SQLITE_NOINLINE int sqlite3IndexedExprLookup(
       sqlite3VdbeAddOp3(v, OP_Column, p->iIdxCur, p->iIdxCol, target);
       VdbeComment((v, "%s expr-column %d", p->zIdxName, p->iIdxCol));
       sqlite3VdbeGoto(v, 0);
-      p = pParse->pIdxEpr;
-      pParse->pIdxEpr = 0;
+      p = pParse->pIdxExpr;
+      pParse->pIdxExpr = 0;
       sqlite3ExprCode(pParse, pExpr, target);
-      pParse->pIdxEpr = p;
+      pParse->pIdxExpr = p;
       sqlite3VdbeJumpHere(v, addr+2);
     }else{
       sqlite3VdbeAddOp3(v, OP_Column, p->iIdxCur, p->iIdxCol, target);
@@ -4111,7 +4111,7 @@ int sqlite3ExprCodeTarget(Parse *pParse, Expr *pExpr, int target){
 expr_code_doover:
   if( pExpr==0 ){
     op = TK_NULL;
-  }else if( pParse->pIdxEpr!=0 
+  }else if( pParse->pIdxExpr!=0 
    && !ExprHasProperty(pExpr, EP_Leaf)
    && (r1 = sqlite3IndexedExprLookup(pParse, pExpr, target))>=0
   ){
@@ -4128,7 +4128,8 @@ expr_code_doover:
       assert( pExpr->iAgg>=0 && pExpr->iAgg<pAggInfo->nColumn );
       pCol = &pAggInfo->aCol[pExpr->iAgg];
       if( !pAggInfo->directMode ){
-        return AggInfoColumnReg(pAggInfo, pExpr->iAgg);
+        assert( pCol->iMem>0 );
+        return pCol->iMem;
       }else if( pAggInfo->useSortingIdx ){
         Table *pTab = pCol->pTab;
         sqlite3VdbeAddOp3(v, OP_Column, pAggInfo->sortingIdxPTab,
@@ -4440,7 +4441,7 @@ expr_code_doover:
         assert( !ExprHasProperty(pExpr, EP_IntValue) );
         sqlite3ErrorMsg(pParse, "misuse of aggregate: %#T()", pExpr);
       }else{
-        return AggInfoFuncReg(pInfo, pExpr->iAgg);
+        return pInfo->aFunc[pExpr->iAgg].iMem;
       }
       break;
     }
@@ -4729,7 +4730,7 @@ expr_code_doover:
       if( pAggInfo ){
         assert( pExpr->iAgg>=0 && pExpr->iAgg<pAggInfo->nColumn );
         if( !pAggInfo->directMode ){
-          inReg = AggInfoColumnReg(pAggInfo, pExpr->iAgg);
+          inReg = pAggInfo->aCol[pExpr->iAgg].iMem;
           break;
         }
         if( pExpr->pAggInfo->useSortingIdx ){
@@ -6293,6 +6294,7 @@ static int analyzeAggregate(Walker *pWalker, Expr *pExpr){
               pCol->pTab = pExpr->y.pTab;
               pCol->iTable = pExpr->iTable;
               pCol->iColumn = pExpr->iColumn;
+              pCol->iMem = ++pParse->nMem;
               pCol->iSorterColumn = -1;
               pCol->pCExpr = pExpr;
               if( pAggInfo->pGroupBy && pExpr->op!=TK_IF_NULL_ROW ){
@@ -6355,6 +6357,7 @@ static int analyzeAggregate(Walker *pWalker, Expr *pExpr){
             assert( !ExprHasProperty(pExpr, EP_xIsSelect) );
             pItem = &pAggInfo->aFunc[i];
             pItem->pFExpr = pExpr;
+            pItem->iMem = ++pParse->nMem;
             assert( ExprUseUToken(pExpr) );
             pItem->pFunc = sqlite3FindFunction(pParse->db,
                    pExpr->u.zToken, 
