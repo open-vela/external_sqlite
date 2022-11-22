@@ -674,9 +674,9 @@ struct BtCursor {
 ** So, this macro is defined instead.
 */
 #ifndef SQLITE_OMIT_AUTOVACUUM
-#define ISAUTOVACUUM(pBt) (pBt->autoVacuum)
+#define ISAUTOVACUUM (pBt->autoVacuum)
 #else
-#define ISAUTOVACUUM(pBt) 0
+#define ISAUTOVACUUM 0
 #endif
 
 
