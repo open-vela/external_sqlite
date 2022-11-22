@@ -6205,19 +6205,6 @@ void sqlite3SelectPrep(
 }
 
 /*
-** Assign register numbers to all pAggInfo->aCol[] and pAggInfo->aFunc[]
-** entries.
-*/
-static void assignAggregateRegisters(Parse *pParse, AggInfo *pAggInfo){
-  int i, m;
-  assert( pAggInfo!=0 );
-  m = pParse->nMem;
-  for(i=0; i<pAggInfo->nColumn; i++) pAggInfo->aCol[i].iMem = ++m;
-  for(i=0; i<pAggInfo->nFunc; i++) pAggInfo->aFunc[i].iMem = ++m;
-  pParse->nMem = m;
-}
-
-/*
 ** Reset the aggregate accumulator.
 **
 ** The aggregate accumulator is a set of memory cells that hold
@@ -6228,34 +6215,26 @@ static void assignAggregateRegisters(Parse *pParse, AggInfo *pAggInfo){
 static void resetAccumulator(Parse *pParse, AggInfo *pAggInfo){
   Vdbe *v = pParse->pVdbe;
   int i;
-  int iFirstReg;
   struct AggInfo_func *pFunc;
   int nReg = pAggInfo->nFunc + pAggInfo->nColumn;
   assert( pParse->db->pParse==pParse );
   assert( pParse->db->mallocFailed==0 || pParse->nErr!=0 );
   if( nReg==0 ) return;
   if( pParse->nErr ) return;
-  if( pAggInfo->nColumn==0 ){
-    iFirstReg = pAggInfo->aFunc[0].iMem;
-  }else{
-    iFirstReg = pAggInfo->aCol[0].iMem;
-  }
 #ifdef SQLITE_DEBUG
-  /* Verify that all AggInfo register numbers have been assigned and that
-  ** they are all sequential. */
-  assert( iFirstReg>0 );
+  /* Verify that all AggInfo registers are within the range specified by
+  ** AggInfo.mnReg..AggInfo.mxReg */
+  assert( nReg==pAggInfo->mxReg-pAggInfo->mnReg+1 );
   for(i=0; i<pAggInfo->nColumn; i++){
-    assert( pAggInfo->aCol[i].iMem>=iFirstReg );
-    assert( i==0 || pAggInfo->aCol[i].iMem==pAggInfo->aCol[i-1].iMem+1 );
+    assert( pAggInfo->aCol[i].iMem>=pAggInfo->mnReg
+         && pAggInfo->aCol[i].iMem<=pAggInfo->mxReg );
   }
   for(i=0; i<pAggInfo->nFunc; i++){
-    assert( pAggInfo->aFunc[i].iMem>=iFirstReg );
-    assert( i>0 || pAggInfo->nColumn==0
-      || pAggInfo->aFunc[i].iMem==pAggInfo->aCol[pAggInfo->nColumn-1].iMem+1 );
-    assert( i==0 || pAggInfo->aFunc[i].iMem==pAggInfo->aFunc[i-1].iMem+1 );
+    assert( pAggInfo->aFunc[i].iMem>=pAggInfo->mnReg
+         && pAggInfo->aFunc[i].iMem<=pAggInfo->mxReg );
   }
 #endif
-  sqlite3VdbeAddOp3(v, OP_Null, 0, iFirstReg, iFirstReg+nReg-1);
+  sqlite3VdbeAddOp3(v, OP_Null, 0, pAggInfo->mnReg, pAggInfo->mxReg);
   for(pFunc=pAggInfo->aFunc, i=0; i<pAggInfo->nFunc; i++, pFunc++){
     if( pFunc->iDistinct>=0 ){
       Expr *pE = pFunc->pFExpr;
@@ -7435,6 +7414,7 @@ int sqlite3Select(
     sNC.pSrcList = pTabList;
     sNC.uNC.pAggInfo = pAggInfo;
     VVA_ONLY( sNC.ncFlags = NC_UAggInfo; )
+    pAggInfo->mnReg = pParse->nMem+1;
     pAggInfo->nSortingColumn = pGroupBy ? pGroupBy->nExpr : 0;
     pAggInfo->pGroupBy = pGroupBy;
     sqlite3ExprAnalyzeAggList(&sNC, pEList);
@@ -7468,6 +7448,7 @@ int sqlite3Select(
 #endif
       sNC.ncFlags &= ~NC_InAggFunc;
     }
+    pAggInfo->mxReg = pParse->nMem;
     if( db->mallocFailed ) goto select_end;
 #if TREETRACE_ENABLED
     if( sqlite3TreeTrace & 0x400 ){
@@ -7555,7 +7536,6 @@ int sqlite3Select(
         sqlite3ExprListDelete(db, pDistinct);
         goto select_end;
       }
-      assignAggregateRegisters(pParse, pAggInfo);
       eDist = sqlite3WhereIsDistinct(pWInfo);
       SELECTTRACE(1,pParse,p,("WhereBegin returns\n"));
       if( sqlite3WhereIsOrdered(pWInfo)==pGroupBy->nExpr ){
@@ -7794,8 +7774,6 @@ int sqlite3Select(
         if( pKeyInfo ){
           sqlite3VdbeChangeP4(v, -1, (char *)pKeyInfo, P4_KEYINFO);
         }
-        assignAggregateRegisters(pParse, pAggInfo);
-        assert( pAggInfo->aFunc[0].iMem>=0 );
         sqlite3VdbeAddOp2(v, OP_Count, iCsr, pAggInfo->aFunc[0].iMem);
         sqlite3VdbeAddOp1(v, OP_Close, iCsr);
         explainSimpleCount(pParse, pTab, pBest);
@@ -7832,7 +7810,6 @@ int sqlite3Select(
           pDistinct = pAggInfo->aFunc[0].pFExpr->x.pList;
           distFlag = pDistinct ? (WHERE_WANT_DISTINCT|WHERE_AGG_DISTINCT) : 0;
         }
-        assignAggregateRegisters(pParse, pAggInfo);
 
         /* This case runs if the aggregate has no GROUP BY clause.  The
         ** processing is much simpler since there is only a single row
