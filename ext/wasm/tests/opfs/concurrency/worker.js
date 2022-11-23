@@ -43,7 +43,11 @@ self.sqlite3InitModule().then(async function(sqlite3){
     }
   };
   const run = async function(){
-    db = new sqlite3.opfs.OpfsDb(dbName,'c');
+    db = new sqlite3.oo1.DB({
+      filename: 'file:'+dbName,//+'?opfs-unlock-asap=1'/*EXPERIMENTAL*/,
+      flags: 'c',
+      vfs: 'opfs'
+    });
     sqlite3.capi.sqlite3_busy_timeout(db.pointer, 5000);
     db.transaction((db)=>{
       db.exec([
@@ -70,11 +74,12 @@ self.sqlite3InitModule().then(async function(sqlite3){
       }
     };
     if(1){/*use setInterval()*/
-      interval.handle = setInterval(async ()=>{
+      setTimeout(async function timer(){
         await doWork();
         if(interval.error || maxIterations === interval.count){
-          clearInterval(interval.handle);
           finish();
+        }else{
+          setTimeout(timer, interval.delay);
         }
       }, interval.delay);
     }else{
