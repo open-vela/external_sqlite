@@ -4128,8 +4128,7 @@ expr_code_doover:
       assert( pExpr->iAgg>=0 && pExpr->iAgg<pAggInfo->nColumn );
       pCol = &pAggInfo->aCol[pExpr->iAgg];
       if( !pAggInfo->directMode ){
-        assert( pCol->iMem>0 );
-        return pCol->iMem;
+        return AggInfoColumnReg(pAggInfo, pExpr->iAgg);
       }else if( pAggInfo->useSortingIdx ){
         Table *pTab = pCol->pTab;
         sqlite3VdbeAddOp3(v, OP_Column, pAggInfo->sortingIdxPTab,
@@ -4441,7 +4440,7 @@ expr_code_doover:
         assert( !ExprHasProperty(pExpr, EP_IntValue) );
         sqlite3ErrorMsg(pParse, "misuse of aggregate: %#T()", pExpr);
       }else{
-        return pInfo->aFunc[pExpr->iAgg].iMem;
+        return AggInfoFuncReg(pInfo, pExpr->iAgg);
       }
       break;
     }
@@ -4730,7 +4729,7 @@ expr_code_doover:
       if( pAggInfo ){
         assert( pExpr->iAgg>=0 && pExpr->iAgg<pAggInfo->nColumn );
         if( !pAggInfo->directMode ){
-          inReg = pAggInfo->aCol[pExpr->iAgg].iMem;
+          inReg = AggInfoColumnReg(pAggInfo, pExpr->iAgg);
           break;
         }
         if( pExpr->pAggInfo->useSortingIdx ){
@@ -6294,7 +6293,6 @@ static int analyzeAggregate(Walker *pWalker, Expr *pExpr){
               pCol->pTab = pExpr->y.pTab;
               pCol->iTable = pExpr->iTable;
               pCol->iColumn = pExpr->iColumn;
-              pCol->iMem = ++pParse->nMem;
               pCol->iSorterColumn = -1;
               pCol->pCExpr = pExpr;
               if( pAggInfo->pGroupBy && pExpr->op!=TK_IF_NULL_ROW ){
@@ -6357,7 +6355,6 @@ static int analyzeAggregate(Walker *pWalker, Expr *pExpr){
             assert( !ExprHasProperty(pExpr, EP_xIsSelect) );
             pItem = &pAggInfo->aFunc[i];
             pItem->pFExpr = pExpr;
-            pItem->iMem = ++pParse->nMem;
             assert( ExprUseUToken(pExpr) );
             pItem->pFunc = sqlite3FindFunction(pParse->db,
                    pExpr->u.zToken, 
