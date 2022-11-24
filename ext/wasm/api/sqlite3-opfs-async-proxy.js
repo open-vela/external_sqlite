@@ -105,7 +105,7 @@ metrics.dump = ()=>{
 */
 const __openFiles = Object.create(null);
 /**
-   __implicitLocks is a Set of sqlite3_file pointers (integers) which were
+   __autoLocks is a Set of sqlite3_file pointers (integers) which were
    "auto-locked".  i.e. those for which we obtained a sync access
    handle without an explicit xLock() call. Such locks will be
    released during db connection idle time, whereas a sync access
@@ -117,7 +117,7 @@ const __openFiles = Object.create(null);
    penalty: speedtest1 benchmarks take up to 4x as long. By delaying
    the lock release until idle time, the hit is negligible.
 */
-const __implicitLocks = new Set();
+const __autoLocks = new Set();
 
 /**
    Expects an OPFS file path. It gets resolved, such that ".."
@@ -166,7 +166,7 @@ const closeSyncHandle = async (fh)=>{
     const h = fh.syncHandle;
     delete fh.syncHandle;
     delete fh.xLock;
-    __implicitLocks.delete(fh.fid);
+    __autoLocks.delete(fh.fid);
     return h.close();
   }
 };
@@ -190,28 +190,14 @@ const closeSyncHandleNoThrow = async (fh)=>{
 };
 
 /* Release all auto-locks. */
-const releaseImplicitLocks = async ()=>{
-  if(__implicitLocks.size){
+const closeAutoLocks = async ()=>{
+  if(__autoLocks.size){
     /* Release all auto-locks. */
-    for(const fid of __implicitLocks){
+    for(const fid of __autoLocks){
       const fh = __openFiles[fid];
       await closeSyncHandleNoThrow(fh);
       log("Auto-unlocked",fid,fh.filenameAbs);
     }
-  }
-};
-
-/**
-   An experiment in improving concurrency by freeing up implicit locks
-   sooner. This is known to impact performance dramatically but it has
-   also shown to improve concurrency considerably.
-
-   If fh.releaseImplicitLocks is truthy and fh is in __implicitLocks,
-   this routine returns closeSyncHandleNoThrow(), else it is a no-op.
-*/
-const releaseImplicitLock = async (fh)=>{
-  if(fh.releaseImplicitLocks && __implicitLocks.has(fh.fid)){
-    return closeSyncHandleNoThrow(fh);
   }
 };
 
@@ -260,7 +246,7 @@ GetSyncHandleError.convertRc = (e,rc)=>{
    still fails at that point it will give up and propagate the
    exception.
 */
-const getSyncHandle = async (fh,opName)=>{
+const getSyncHandle = async (fh)=>{
   if(!fh.syncHandle){
     const t = performance.now();
     log("Acquiring sync handle for",fh.filenameAbs);
@@ -276,21 +262,20 @@ const getSyncHandle = async (fh,opName)=>{
       }catch(e){
         if(i === maxTries){
           throw new GetSyncHandleError(
-            e, "Error getting sync handle for",opName+"().",maxTries,
+            e, "Error getting sync handle.",maxTries,
             "attempts failed.",fh.filenameAbs
           );
         }
-        warn("Error getting sync handle for",opName+"(). Waiting",ms,
+        warn("Error getting sync handle. Waiting",ms,
              "ms and trying again.",fh.filenameAbs,e);
-        //await releaseImplicitLocks();
+        await closeAutoLocks();
         Atomics.wait(state.sabOPView, state.opIds.retry, 0, ms);
       }
     }
-    log("Got",opName+"() sync handle for",fh.filenameAbs,
-        'in',performance.now() - t,'ms');
+    log("Got sync handle for",fh.filenameAbs,'in',performance.now() - t,'ms');
     if(!fh.xLock){
-      __implicitLocks.add(fh.fid);
-      log("Auto-locked for",opName+"()",fh.fid,fh.filenameAbs);
+      __autoLocks.add(fh.fid);
+      log("Auto-locked",fh.fid,fh.filenameAbs);
     }
   }
   return fh.syncHandle;
@@ -424,7 +409,7 @@ const vfsAsyncImpls = {
   xClose: async function(fid/*sqlite3_file pointer*/){
     const opName = 'xClose';
     mTimeStart(opName);
-    __implicitLocks.delete(fid);
+    __autoLocks.delete(fid);
     const fh = __openFiles[fid];
     let rc = 0;
     wTimeStart(opName);
@@ -489,14 +474,13 @@ const vfsAsyncImpls = {
     wTimeStart('xFileSize');
     try{
       affirmLocked('xFileSize',fh);
-      const sz = await (await getSyncHandle(fh,'xFileSize')).getSize();
+      const sz = await (await getSyncHandle(fh)).getSize();
       state.s11n.serialize(Number(sz));
       rc = 0;
     }catch(e){
       state.s11n.storeException(2,e);
       rc = GetSyncHandleError.convertRc(e,state.sq3Codes.SQLITE_IOERR);
     }
-    await releaseImplicitLock(fh);
     wTimeEnd();
     storeAndNotify('xFileSize', rc);
     mTimeEnd();
@@ -511,8 +495,8 @@ const vfsAsyncImpls = {
     if( !fh.syncHandle ){
       wTimeStart('xLock');
       try {
-        await getSyncHandle(fh,'xLock');
-        __implicitLocks.delete(fid);
+        await getSyncHandle(fh);
+        __autoLocks.delete(fid);
       }catch(e){
         state.s11n.storeException(1,e);
         rc = GetSyncHandleError.convertRc(e,state.sq3Codes.SQLITE_IOERR_LOCK);
@@ -524,10 +508,10 @@ const vfsAsyncImpls = {
     mTimeEnd();
   },
   xOpen: async function(fid/*sqlite3_file pointer*/, filename,
-                        flags/*SQLITE_OPEN_...*/,
-                        opfsFlags/*OPFS_...*/){
+                        flags/*SQLITE_OPEN_...*/){
     const opName = 'xOpen';
     mTimeStart(opName);
+    const deleteOnClose = (state.sq3Codes.SQLITE_OPEN_DELETEONCLOSE & flags);
     const create = (state.sq3Codes.SQLITE_OPEN_CREATE & flags);
     wTimeStart('xOpen');
     try{
@@ -542,8 +526,14 @@ const vfsAsyncImpls = {
         return;
       }
       const hFile = await hDir.getFileHandle(filenamePart, {create});
+      /**
+         wa-sqlite, at this point, grabs a SyncAccessHandle and
+         assigns it to the syncHandle prop of the file state
+         object, but only for certain cases and it's unclear why it
+         places that limitation on it.
+      */
       wTimeEnd();
-      const fh = Object.assign(Object.create(null),{
+      __openFiles[fid] = Object.assign(Object.create(null),{
         fid: fid,
         filenameAbs: filename,
         filenamePart: filenamePart,
@@ -552,26 +542,8 @@ const vfsAsyncImpls = {
         sabView: state.sabFileBufView,
         readOnly: create
           ? false : (state.sq3Codes.SQLITE_OPEN_READONLY & flags),
-        deleteOnClose: !!(state.sq3Codes.SQLITE_OPEN_DELETEONCLOSE & flags)
+        deleteOnClose: deleteOnClose
       });
-      fh.releaseImplicitLocks =
-        (opfsFlags & state.opfsFlags.OPFS_UNLOCK_ASAP)
-        || state.opfsFlags.defaultUnlockAsap;
-      if(0 /* this block is modelled after something wa-sqlite
-              does but it leads to immediate contention on journal files. */
-         && (0===(flags & state.sq3Codes.SQLITE_OPEN_MAIN_DB))){
-        /* sqlite does not lock these files, so go ahead and grab an OPFS
-           lock.
-
-           https://www.sqlite.org/uri.html
-        */
-        fh.xLock = "xOpen"/* Truthy value to keep entry from getting
-                             flagged as auto-locked. String value so
-                             that we can easily distinguish is later
-                             if needed. */;
-        await getSyncHandle(fh,'xOpen');
-      }
-      __openFiles[fid] = fh;
       storeAndNotify(opName, 0);
     }catch(e){
       wTimeEnd();
@@ -588,7 +560,7 @@ const vfsAsyncImpls = {
     try{
       affirmLocked('xRead',fh);
       wTimeStart('xRead');
-      nRead = (await getSyncHandle(fh,'xRead')).read(
+      nRead = (await getSyncHandle(fh)).read(
         fh.sabView.subarray(0, n),
         {at: Number(offset64)}
       );
@@ -603,7 +575,6 @@ const vfsAsyncImpls = {
       state.s11n.storeException(1,e);
       rc = GetSyncHandleError.convertRc(e,state.sq3Codes.SQLITE_IOERR_READ);
     }
-    await releaseImplicitLock(fh);
     storeAndNotify('xRead',rc);
     mTimeEnd();
   },
@@ -632,13 +603,12 @@ const vfsAsyncImpls = {
     try{
       affirmLocked('xTruncate',fh);
       affirmNotRO('xTruncate', fh);
-      await (await getSyncHandle(fh,'xTruncate')).truncate(size);
+      await (await getSyncHandle(fh)).truncate(size);
     }catch(e){
       error("xTruncate():",e,fh);
       state.s11n.storeException(2,e);
       rc = GetSyncHandleError.convertRc(e,state.sq3Codes.SQLITE_IOERR_TRUNCATE);
     }
-    await releaseImplicitLock(fh);
     wTimeEnd();
     storeAndNotify('xTruncate',rc);
     mTimeEnd();
@@ -670,7 +640,7 @@ const vfsAsyncImpls = {
       affirmLocked('xWrite',fh);
       affirmNotRO('xWrite', fh);
       rc = (
-        n === (await getSyncHandle(fh,'xWrite'))
+        n === (await getSyncHandle(fh))
           .write(fh.sabView.subarray(0, n),
                  {at: Number(offset64)})
       ) ? 0 : state.sq3Codes.SQLITE_IOERR_WRITE;
@@ -679,7 +649,6 @@ const vfsAsyncImpls = {
       state.s11n.storeException(1,e);
       rc = GetSyncHandleError.convertRc(e,state.sq3Codes.SQLITE_IOERR_WRITE);
     }
-    await releaseImplicitLock(fh);
     wTimeEnd();
     storeAndNotify('xWrite',rc);
     mTimeEnd();
@@ -808,13 +777,13 @@ const waitLoop = async function f(){
      to do other things. If this is too high (e.g. 500ms) then
      even two workers/tabs can easily run into locking errors.
   */
-  const waitTime = 100;
+  const waitTime = 150;
   while(!flagAsyncShutdown){
     try {
       if('timed-out'===Atomics.wait(
         state.sabOPView, state.opIds.whichOp, 0, waitTime
       )){
-        await releaseImplicitLocks();
+        await closeAutoLocks();
         continue;
       }
       const opId = Atomics.load(state.sabOPView, state.opIds.whichOp);
@@ -855,7 +824,6 @@ navigator.storage.getDirectory().then(function(d){
           state.sabS11nView = new Uint8Array(state.sabIO, state.sabS11nOffset, state.sabS11nSize);
           state.opIds = opt.opIds;
           state.sq3Codes = opt.sq3Codes;
-          state.opfsFlags = opt.opfsFlags;
           Object.keys(vfsAsyncImpls).forEach((k)=>{
             if(!Number.isFinite(state.opIds[k])){
               toss("Maintenance required: missing state.opIds[",k,"]");
