@@ -1,5 +1,5 @@
-C Sync\sw/trunk,\szap\ssurplus\sspace.
-D 2022-11-28T14:11:48.108
+C Add\s(optional)\sbase64\sand\sbase85\sUDF\sextensions.
+D 2022-11-28T14:51:50.439
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2064,8 +2064,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 17b823500a2ed135c1f40aa7f4d87ba5b2eab35c0abd9e0856041cf0f510cbee a2449bcc2c71d0f4c3289621fbf1cb97f0f407c9f7b5bf18245b7854a07c6cfa
+P a2449bcc2c71d0f4c3289621fbf1cb97f0f407c9f7b5bf18245b7854a07c6cfa b8345630a2a322234bda49ee4b996f6ba20e2b080621e229a2ec5e820892a663
 R b25d12f698cc565856f0ef09be44e05e
 U larrybr
-Z cf8d223b7c2dae4330a88af45b5f7bd0
+Z dca654d0507bf9deef15f6de6a6be007
 # Remove this line to create a well-formed Fossil manifest.
