@@ -172,7 +172,6 @@ struct VdbeFrame {
   VdbeFrame *pParent;     /* Parent of this frame, or NULL if parent is main */
   Op *aOp;                /* Program instructions for parent frame */
   i64 *anExec;            /* Event counters from parent frame */
-  u64 *anCycle;           /* Cycle counters from parent frame */
   Mem *aMem;              /* Array of memory cells for parent frame */
   VdbeCursor **apCsr;     /* Array of Vdbe cursors for parent frame */
   u8 *aOnce;              /* Bitmask used by OP_Once */
@@ -392,7 +391,6 @@ typedef unsigned bft;  /* Bit Field Type */
 typedef struct ScanStatus ScanStatus;
 struct ScanStatus {
   int addrExplain;                /* OP_Explain for loop */
-  int addrEndRange;               /* End of range (inclusive) of times to sum */
   int addrLoop;                   /* Address of "loops" counter */
   int addrVisit;                  /* Address of "rows visited" counter */
   int iSelectID;                  /* The "Select-ID" for this loop */
@@ -484,11 +482,8 @@ struct Vdbe {
   u32 expmask;            /* Binding to these vars invalidates VM */
   SubProgram *pProgram;   /* Linked list of all sub-programs used by VM */
   AuxData *pAuxData;      /* Linked list of auxdata allocations */
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
-  i64 *anExec;            /* Number of times each op has been executed */
-  u64 *anCycle;           /* Sum of sqlite3HwTime() spent in each opcode */
-#endif
 #ifdef SQLITE_ENABLE_STMT_SCANSTATUS
+  i64 *anExec;            /* Number of times each op has been executed */
   int nScan;              /* Entries in aScan[] */
   ScanStatus *aScan;      /* Scan definitions for sqlite3_stmt_scanstatus() */
 #endif
