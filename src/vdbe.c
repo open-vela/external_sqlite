@@ -617,6 +617,7 @@ void sqlite3VdbeRegisterDump(Vdbe *v){
 #  define REGISTER_TRACE(R,M)
 #endif
 
+
 #ifndef NDEBUG
 /*
 ** This function is only called from within an assert() expression. It
@@ -706,8 +707,10 @@ int sqlite3VdbeExec(
 ){
   Op *aOp = p->aOp;          /* Copy of p->aOp */
   Op *pOp = aOp;             /* Current operation */
-#ifdef SQLITE_DEBUG
+#if defined(SQLITE_DEBUG) || defined(VDBE_PROFILE)
   Op *pOrigOp;               /* Value of pOp at the top of the loop */
+#endif
+#ifdef SQLITE_DEBUG
   int nExtraDelete = 0;      /* Verifies FORDELETE and AUXDELETE flags */
 #endif
   int rc = SQLITE_OK;        /* Value to return */
@@ -724,8 +727,8 @@ int sqlite3VdbeExec(
   Mem *pIn2 = 0;             /* 2nd input operand */
   Mem *pIn3 = 0;             /* 3rd input operand */
   Mem *pOut = 0;             /* Output operand */
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
-  u64 *pnCycle = 0;
+#ifdef VDBE_PROFILE
+  u64 start;                 /* CPU clock count at start of opcode */
 #endif
   /*** INSERT STACK UNION HERE ***/
 
@@ -788,17 +791,12 @@ int sqlite3VdbeExec(
     assert( rc==SQLITE_OK );
 
     assert( pOp>=aOp && pOp<&aOp[p->nOp]);
+#ifdef VDBE_PROFILE
+    start = sqlite3NProfileCnt ? sqlite3NProfileCnt : sqlite3Hwtime();
+#endif
     nVmStep++;
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
-    if( p->anExec ){
-      assert( p->anExec && p->anCycle );
-      p->anExec[(int)(pOp-aOp)]++;
-      pnCycle = &p->anCycle[pOp-aOp];
-# ifdef VDBE_PROFILE
-      if( sqlite3NProfileCnt==0 )
-# endif
-        *pnCycle -= sqlite3Hwtime();
-    }
+#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
+    if( p->anExec ) p->anExec[(int)(pOp-aOp)]++;
 #endif
 
     /* Only allow tracing if SQLITE_DEBUG is defined.
@@ -860,7 +858,7 @@ int sqlite3VdbeExec(
       }
     }
 #endif
-#ifdef SQLITE_DEBUG
+#if defined(SQLITE_DEBUG) || defined(VDBE_PROFILE)
     pOrigOp = pOp;
 #endif
   
@@ -7152,9 +7150,8 @@ case OP_Program: {        /* jump */
     pFrame->aOp = p->aOp;
     pFrame->nOp = p->nOp;
     pFrame->token = pProgram->token;
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
+#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
     pFrame->anExec = p->anExec;
-    pFrame->anCycle = p->anCycle;
 #endif
 #ifdef SQLITE_DEBUG
     pFrame->iFrameMagic = SQLITE_FRAME_MAGIC;
@@ -7192,9 +7189,8 @@ case OP_Program: {        /* jump */
   memset(pFrame->aOnce, 0, (pProgram->nOp + 7)/8);
   p->aOp = aOp = pProgram->aOp;
   p->nOp = pProgram->nOp;
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
+#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
   p->anExec = 0;
-  p->anCycle = 0;
 #endif
 #ifdef SQLITE_DEBUG
   /* Verify that second and subsequent executions of the same trigger do not
@@ -8731,16 +8727,11 @@ default: {          /* This is really OP_Noop, OP_Explain */
 *****************************************************************************/
     }
 
-#if defined(VDBE_PROFILE)
-    assert( pnCycle );
-    if( pnCycle ){
-      *pnCycle += sqlite3NProfileCnt ? sqlite3NProfileCnt : sqlite3Hwtime();
-      pnCycle = 0;
-    }
-#elif defined(SQLITE_ENABLE_STMT_SCANSTATUS)
-    if( pnCycle ){
-      *pnCycle += sqlite3Hwtime();
-      pnCycle = 0;
+#ifdef VDBE_PROFILE
+    {
+      u64 endTime = sqlite3NProfileCnt ? sqlite3NProfileCnt : sqlite3Hwtime();
+      if( endTime>start ) pOrigOp->cycles += endTime - start;
+      pOrigOp->cnt++;
     }
 #endif
 
@@ -8817,14 +8808,6 @@ abort_due_to_error:
   ** release the mutexes on btrees that were acquired at the
   ** top. */
 vdbe_return:
-#if defined(VDBE_PROFILE)
-    if( pnCycle ){
-      *pnCycle += sqlite3NProfileCnt ? sqlite3NProfileCnt : sqlite3Hwtime();
-    }
-#elif defined(SQLITE_ENABLE_STMT_SCANSTATUS)
-  if( pnCycle ) *pnCycle += sqlite3Hwtime();
-#endif
-
 #ifndef SQLITE_OMIT_PROGRESS_CALLBACK
   while( nVmStep>=nProgressLimit && db->xProgress!=0 ){
     nProgressLimit += db->nProgressOps;
