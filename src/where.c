@@ -3472,7 +3472,7 @@ static int whereLoopAddBtree(
     sPk.aiRowLogEst = aiRowEstPk;
     sPk.onError = OE_Replace;
     sPk.pTable = pTab;
-    sPk.szIdxRow = 3;  /* TUNING: Interior rows of IPK table are very small */
+    sPk.szIdxRow = pTab->szTabRow;
     sPk.idxType = SQLITE_IDXTYPE_IPK;
     aiRowEstPk[0] = pTab->nRowLogEst;
     aiRowEstPk[1] = 0;
@@ -4803,56 +4803,37 @@ static const char *wherePathName(WherePath *pPath, int nLoop, WhereLoop *pLast){
 ** order.
 */
 static LogEst whereSortingCost(
-  WhereInfo *pWInfo, /* Query planning context */
-  LogEst nRow,       /* Estimated number of rows to sort */
-  int nOrderBy,      /* Number of ORDER BY clause terms */
-  int nSorted        /* Number of initial ORDER BY terms naturally in order */
+  WhereInfo *pWInfo,
+  LogEst nRow,
+  int nOrderBy,
+  int nSorted
 ){
-  /* Estimated cost of a full external sort, where N is 
+  /* TUNING: Estimated cost of a full external sort, where N is 
   ** the number of rows to sort is:
   **
-  **   cost = (K * N * log(N)).
+  **   cost = (3.0 * N * log(N)).
   ** 
   ** Or, if the order-by clause has X terms but only the last Y 
   ** terms are out of order, then block-sorting will reduce the 
   ** sorting cost to:
   **
-  **   cost = (K * N * log(N)) * (Y/X)
+  **   cost = (3.0 * N * log(N)) * (Y/X)
   **
-  ** The constant K is at least 2.0 but will be larger if there are a
-  ** large number of columns to be sorted, as the sorting time is
-  ** proportional to the amount of content to be sorted.  The algorithm
-  ** does not currently distinguish between fat columns (BLOBs and TEXTs) 
-  ** and skinny columns (INTs).  It just uses the number of columns as 
-  ** an approximation for the row width.
-  **
-  ** And extra factor of 2.0 or 3.0 is added to the sorting cost if the sort
-  ** is built using OP_IdxInsert and OP_Sort rather than with OP_SorterInsert.
+  ** The (Y/X) term is implemented using stack variable rScale
+  ** below.
   */
-  LogEst rSortCost, nCol;
-  assert( pWInfo->pSelect!=0 );
-  assert( pWInfo->pSelect->pEList!=0 );
-  /* TUNING: sorting cost proportional to the number of output columns: */
-  nCol = sqlite3LogEst((pWInfo->pSelect->pEList->nExpr+59)/30);
-  rSortCost = nRow + nCol;
-  if( nSorted>0 ){
-    /* Scale the result by (Y/X) */
-    rSortCost += sqlite3LogEst((nOrderBy-nSorted)*100/nOrderBy) - 66;
-  }
+  LogEst rScale, rSortCost;
+  assert( nOrderBy>0 && 66==sqlite3LogEst(100) );
+  rScale = sqlite3LogEst((nOrderBy-nSorted)*100/nOrderBy) - 66;
+  rSortCost = nRow + rScale + 16;
 
   /* Multiple by log(M) where M is the number of output rows.
   ** Use the LIMIT for M if it is smaller.  Or if this sort is for
   ** a DISTINCT operator, M will be the number of distinct output
   ** rows, so fudge it downwards a bit.
   */
-  if( (pWInfo->wctrlFlags & WHERE_USE_LIMIT)!=0 ){
-    rSortCost += 10;       /* TUNING: Extra 2.0x if using LIMIT */
-    if( nSorted!=0 ){
-      rSortCost += 6;      /* TUNING: Extra 1.5x if also using partial sort */
-    }
-    if( pWInfo->iLimit<nRow ){
-      nRow = pWInfo->iLimit;
-    }
+  if( (pWInfo->wctrlFlags & WHERE_USE_LIMIT)!=0 && pWInfo->iLimit<nRow ){
+    nRow = pWInfo->iLimit;
   }else if( (pWInfo->wctrlFlags & WHERE_WANT_DISTINCT) ){
     /* TUNING: In the sort for a DISTINCT operator, assume that the DISTINCT
     ** reduces the number of output rows by a factor of 2 */
@@ -5004,11 +4985,11 @@ static int wherePathSolver(WhereInfo *pWInfo, LogEst nRowEst){
                 pWInfo, nRowEst, nOrderBy, isOrdered
             );
           }
-          /* TUNING:  Add a small extra penalty (3) to sorting as an
+          /* TUNING:  Add a small extra penalty (5) to sorting as an
           ** extra encouragment to the query planner to select a plan
           ** where the rows emerge in the correct order without any sorting
           ** required. */
-          rCost = sqlite3LogEstAdd(rUnsorted, aSortCost[isOrdered]) + 3;
+          rCost = sqlite3LogEstAdd(rUnsorted, aSortCost[isOrdered]) + 5;
 
           WHERETRACE(0x002,
               ("---- sort cost=%-3d (%d/%d) increases cost %3d to %-3d\n",
