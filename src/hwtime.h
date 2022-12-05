@@ -48,9 +48,9 @@
 #elif !defined(__STRICT_ANSI__) && (defined(__GNUC__) && defined(__x86_64__))
 
   __inline__ sqlite_uint64 sqlite3Hwtime(void){
-     unsigned int lo, hi;
-     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-     return (sqlite_uint64)hi << 32 | lo;
+      unsigned long val;
+      __asm__ __volatile__ ("rdtsc" : "=A" (val));
+      return val;
   }
  
 #elif !defined(__STRICT_ANSI__) && (defined(__GNUC__) && defined(__ppc__))
