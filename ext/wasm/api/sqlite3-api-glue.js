@@ -37,6 +37,20 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   });
   delete self.Jaccwabyt;
 
+  if(0){
+    /*  "The problem" is that the following isn't even remotely
+        type-safe. OTOH, nothing about WASM pointers is. */
+    const argPointer = wasm.xWrap.argAdapter('*');
+    wasm.xWrap.argAdapter('StructType', (v)=>{
+      if(v && v.constructor && v instanceof StructBinder.StructType){
+        v = v.pointer;
+      }
+      return wasm.isPtr(v)
+        ? argPointer(v)
+        : toss("Invalid (object) type for StructType-type argument.");
+    });
+  }
+
   {/* Convert Arrays and certain TypedArrays to strings for
       'flexible-string'-type arguments */
     const xString = wasm.xWrap.argAdapter('string');
@@ -54,21 +68,15 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
        `sqlite3_vfs*` via capi.sqlite3_vfs.pointer.
     */
     const aPtr = wasm.xWrap.argAdapter('*');
-    const nilType = function(){};
     wasm.xWrap.argAdapter('sqlite3_filename', aPtr)
     ('sqlite3_stmt*', aPtr)
     ('sqlite3_context*', aPtr)
     ('sqlite3_value*', aPtr)
     ('void*', aPtr)
-    ('sqlite3*', (v)=>
-      aPtr((v instanceof (sqlite3?.oo1?.DB || nilType))
-           ? v.pointer : v))
-    ('sqlite3_index_info*', (v)=>
-      aPtr((v instanceof (capi.sqlite3_index_info || nilType))
-           ? v.pointer : v))
-    ('sqlite3_module*', (v)=>
-      aPtr((v instanceof (capi.sqlite3_module || nilType))
-           ? v.pointer : v))
+    ('sqlite3*', (v)=>{
+      if(sqlite3.oo1 && v instanceof sqlite3.oo1.DB) v = v.pointer;
+      return aPtr(v);
+    })
     /**
        `sqlite3_vfs*`:
 
@@ -79,13 +87,14 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     */
     ('sqlite3_vfs*', (v)=>{
       if('string'===typeof v){
+        const x = capi.sqlite3_vfs_find(v);
         /* A NULL sqlite3_vfs pointer will be treated as the default
            VFS in many contexts. We specifically do not want that
            behavior here. */
-        return capi.sqlite3_vfs_find(v)
-          || sqlite3.SQLite3Error.toss("Unknown sqlite3_vfs name:",v);
-      }
-      return aPtr((v instanceof capi.sqlite3_vfs) ? v.pointer : v);
+        if(!x) sqlite3.SQLite3Error.toss("Unknown sqlite3_vfs name:",v);
+        return x;
+      }else if(v instanceof sqlite3.capi.sqlite3_vfs) v = v.pointer;
+      return aPtr(v);
     });
 
     wasm.xWrap.resultAdapter('sqlite3*', aPtr)
@@ -118,7 +127,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
         : fI64Disabled(e[0]);
     }
 
-    /* There's no need to expose bindingSignatures to clients,
+    /* There's no(?) need to expose bindingSignatures to clients,
        implicitly making it part of the public interface. */
     delete wasm.bindingSignatures;
 
@@ -132,7 +141,20 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
         return errCode;
       };
     }
+
   }/*xWrap() bindings*/;
+
+  /**
+     When registering a VFS and its related components it may be
+     necessary to ensure that JS keeps a reference to them to keep
+     them from getting garbage collected. Simply pass each such value
+     to this function and a reference will be held to it for the life
+     of the app.
+  */
+  capi.sqlite3_vfs_register.addReference = function f(...args){
+    if(!f._) f._ = [];
+    f._.push(...args);
+  };
 
   /**
      Internal helper to assist in validating call argument counts in
@@ -581,17 +603,13 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     }
     wasm.ctype = JSON.parse(wasm.cstringToJs(cJson));
     //console.debug('wasm.ctype length =',wasm.cstrlen(cJson));
-    const defineGroups = ['access', 'authorizer',
-                          'blobFinalizers', 'dataTypes',
-                          'encodings', 'fcntl', 'flock', 'ioCap',
-                          'limits', 'openFlags',
-                          'prepareFlags', 'resultCodes',
-                          'serialize', 'syncFlags', 'trace', 'udfFlags',
-                          'version' ];
-    if(wasm.bigIntEnabled){
-      defineGroups.push('vtab');
-    }
-    for(const t of defineGroups){
+    for(const t of ['access', 'blobFinalizers', 'dataTypes',
+                    'encodings', 'fcntl', 'flock', 'ioCap',
+                    'limits',
+                    'openFlags', 'prepareFlags', 'resultCodes',
+                    'serialize', 'syncFlags', 'trace', 'udfFlags',
+                    'version'
+                   ]){
       for(const e of Object.entries(wasm.ctype[t])){
         // ^^^ [k,v] there triggers a buggy code transformation via
         // one of the Emscripten-driven optimizers.
@@ -611,37 +629,19 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     capi.sqlite3_js_rc_str = (rc)=>__rcMap[rc];
     /* Bind all registered C-side structs... */
     const notThese = Object.assign(Object.create(null),{
-      // For each struct to NOT register, map its name to true:
-      WasmTestStruct: true,
-      /* We unregister the kvvfs VFS from Worker threads below. */
-      sqlite3_kvvfs_methods: !util.isUIThread(),
-      /* sqlite3_index_info and friends require int64: */
-      sqlite3_index_info: !wasm.bigIntEnabled,
-      sqlite3_index_constraint: !wasm.bigIntEnabled,
-      sqlite3_index_orderby: !wasm.bigIntEnabled,
-      sqlite3_index_constraint_usage: !wasm.bigIntEnabled
+      // Structs NOT to register
+      WasmTestStruct: true
     });
+    if(!util.isUIThread()){
+      /* We remove the kvvfs VFS from Worker threads below. */
+      notThese.sqlite3_kvvfs_methods = true;
+    }
     for(const s of wasm.ctype.structs){
       if(!notThese[s.name]){
         capi[s.name] = sqlite3.StructBinder(s);
       }
     }
-    if(capi.sqlite3_index_info){
-      /* Move these inner structs into sqlite3_index_info.  Binding
-      ** them to WASM requires that we create global-scope structs to
-      ** model them with, but those are no longer needed after we've
-      ** passed them to StructBinder. */
-      for(const k of ['sqlite3_index_constraint',
-                      'sqlite3_index_orderby',
-                      'sqlite3_index_constraint_usage']){
-        capi.sqlite3_index_info[k] = capi[k];
-        delete capi[k];
-      }
-      capi.sqlite3_vtab_config =
-        (pDb, op, arg=0)=>wasm.exports.sqlite3_wasm_vtab_config(
-          wasm.xWrap.argAdapter('sqlite3*')(pDb), op, arg);
-    }/* end vtab-related setup */
-  }/*end C constant and struct imports*/
+  }/*end C constant imports*/
 
   const pKvvfs = capi.sqlite3_vfs_find("kvvfs");
   if( pKvvfs ){/* kvvfs-specific glue */
@@ -652,7 +652,8 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       delete capi.sqlite3_kvvfs_methods;
 
       const kvvfsMakeKey = wasm.exports.sqlite3_wasm_kvvfsMakeKeyOnPstack,
-            pstack = wasm.pstack;
+            pstack = wasm.pstack,
+            pAllocRaw = wasm.exports.sqlite3_wasm_pstack_alloc;
 
       const kvvfsStorage = (zClass)=>
             ((115/*=='s'*/===wasm.getMemValue(zClass))
