@@ -602,7 +602,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
        If the callback is not a JS function then this binding performs
        no translation of the callback, but the sql argument is still
        converted to a WASM string for the call using the
-       "flexible-string" argument converter.
+       "string:flexible" argument converter.
     */
     sqlite3_exec: (pDb, sql, callback, pVoid, pErrMsg)=>{}/*installed later*/,
 
@@ -884,12 +884,18 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     ["sqlite3_bind_null",undefined, "sqlite3_stmt*", "int"],
     ["sqlite3_bind_parameter_count", "int", "sqlite3_stmt*"],
     ["sqlite3_bind_parameter_index","int", "sqlite3_stmt*", "string"],
+    ["sqlite3_bind_pointer", "int",
+     "sqlite3_stmt*", "int", "*", "string:static", "*"],
     ["sqlite3_bind_text","int", "sqlite3_stmt*", "int", "string", "int", "int"
      /* We should arguably create a hand-written binding of
         bind_text() which does more flexible text conversion, along
         the lines of sqlite3_prepare_v3(). The slightly problematic
         part is the final argument (text destructor). */
     ],
+    //["sqlite3_busy_handler","int", "sqlite3*", "*", "*"],
+    // ^^^^ TODO: custom binding which auto-converts JS function arg
+    // to a WASM function, noting that calling it multiple times
+    // would introduce a leak.
     ["sqlite3_busy_timeout","int", "sqlite3*", "int"],
     ["sqlite3_close_v2", "int", "sqlite3*"],
     ["sqlite3_changes", "int", "sqlite3*"],
@@ -904,6 +910,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     ["sqlite3_column_type","int", "sqlite3_stmt*", "int"],
     ["sqlite3_compileoption_get", "string", "int"],
     ["sqlite3_compileoption_used", "int", "string"],
+    ["sqlite3_complete", "int", "string:flexible"],
     /* sqlite3_create_function(), sqlite3_create_function_v2(), and
        sqlite3_create_window_function() use hand-written bindings to
        simplify handling of their function-type arguments. */
@@ -953,6 +960,8 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     ["sqlite3_result_error_toobig", undefined, "sqlite3_context*"],
     ["sqlite3_result_int",undefined, "sqlite3_context*", "int"],
     ["sqlite3_result_null",undefined, "sqlite3_context*"],
+    ["sqlite3_result_pointer",undefined,
+     "sqlite3_context*", "*", "string:static", "*"],
     ["sqlite3_result_text",undefined, "sqlite3_context*", "string", "int", "*"],
     ["sqlite3_result_zeroblob", undefined, "sqlite3_context*", "int"],
     ["sqlite3_serialize","*", "sqlite3*", "string", "*", "int"],
@@ -975,6 +984,7 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     ["sqlite3_value_bytes","int", "sqlite3_value*"],
     ["sqlite3_value_double","f64", "sqlite3_value*"],
     ["sqlite3_value_int","int", "sqlite3_value*"],
+    ["sqlite3_value_pointer", "*", "sqlite3_value*", "string:static"],
     ["sqlite3_value_text", "string", "sqlite3_value*"],
     ["sqlite3_value_type", "int", "sqlite3_value*"],
     ["sqlite3_vfs_find", "*", "string"],
@@ -998,14 +1008,31 @@ self.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     ["sqlite3_bind_int64","int", ["sqlite3_stmt*", "int", "i64"]],
     ["sqlite3_changes64","i64", ["sqlite3*"]],
     ["sqlite3_column_int64","i64", ["sqlite3_stmt*", "int"]],
+    ["sqlite3_create_module", "int",
+     ["sqlite3*","string","sqlite3_module*","*"]],
+    ["sqlite3_create_module_v2", "int",
+     ["sqlite3*","string","sqlite3_module*","*","*"]],
+    ["sqlite3_declare_vtab", "int", ["sqlite3*", "string:flexible"]],
+    ["sqlite3_drop_modules", "int", ["sqlite3*", "**"]],
     ["sqlite3_malloc64", "*","i64"],
     ["sqlite3_msize", "i64", "*"],
+    ["sqlite3_overload_function", "int", ["sqlite3*","string","int"]],
     ["sqlite3_realloc64", "*","*", "i64"],
     ["sqlite3_result_int64",undefined, "*", "i64"],
     ["sqlite3_result_zeroblob64", "int", "*", "i64"],
     ["sqlite3_total_changes64", "i64", ["sqlite3*"]],
     ["sqlite3_uri_int64", "i64", ["sqlite3_filename", "string", "i64"]],
     ["sqlite3_value_int64","i64", "sqlite3_value*"],
+    ["sqlite3_vtab_collation","string","sqlite3_index_info*","int"],
+    ["sqlite3_vtab_distinct","int", "sqlite3_index_info*"],
+    ["sqlite3_vtab_in","int", "sqlite3_index_info*", "int", "int"],
+    ["sqlite3_vtab_in_first", "int", "sqlite3_value*", "**"],
+    ["sqlite3_vtab_in_next", "int", "sqlite3_value*", "**"],
+    /*["sqlite3_vtab_config" is variadic and requires a hand-written
+      proxy.] */
+    ["sqlite3_vtab_nochange","int", "sqlite3_context*"],
+    ["sqlite3_vtab_on_conflict","int", "sqlite3*"],
+    ["sqlite3_vtab_rhs_value","int", "sqlite3_index_info*", "int", "**"]
   ];
 
   /**
