@@ -65,10 +65,6 @@ struct SortCtx {
   } aDefer[4];
 #endif
   struct RowLoadInfo *pDeferredRowLoad;  /* Deferred row loading info or NULL */
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-  int addrPush;         /* First instruction to push data into sorter */
-  int addrPushEnd;      /* Last instruction that pushes data into sorter */
-#endif
 };
 #define SORTFLAG_UseSorter  0x01   /* Use SorterOpen instead of OpenEphemeral */
 
@@ -725,10 +721,6 @@ static void pushOntoSorter(
   */
   assert( nData==1 || regData==regOrigData || regOrigData==0 );
 
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-  pSort->addrPush = sqlite3VdbeCurrentAddr(v);
-#endif
-
   if( nPrefixReg ){
     assert( nPrefixReg==nExpr+bSeq );
     regBase = regData - nPrefixReg;
@@ -829,9 +821,6 @@ static void pushOntoSorter(
     sqlite3VdbeChangeP2(v, iSkip,
          pSort->labelOBLopt ? pSort->labelOBLopt : sqlite3VdbeCurrentAddr(v));
   }
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-  pSort->addrPushEnd = sqlite3VdbeCurrentAddr(v)-1;
-#endif
 }
 
 /*
@@ -1658,16 +1647,6 @@ static void generateSortTail(
   int bSeq;                       /* True if sorter record includes seq. no. */
   int nRefKey = 0;
   struct ExprList_item *aOutEx = p->pEList->a;
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-  int addrExplain;                /* Address of OP_Explain instruction */
-#endif
-
-  ExplainQueryPlan2(addrExplain, (pParse, 0, 
-        "USE TEMP B-TREE FOR %sORDER BY", pSort->nOBSat>0?"RIGHT PART OF ":"")
-  );
-  sqlite3VdbeScanStatusRange(v, addrExplain,pSort->addrPush,pSort->addrPushEnd);
-  sqlite3VdbeScanStatusCounters(v, addrExplain, addrExplain, pSort->addrPush);
-
 
   assert( addrBreak<0 );
   if( pSort->labelBkOut ){
@@ -1780,7 +1759,6 @@ static void generateSortTail(
       VdbeComment((v, "%s", aOutEx[i].zEName));
     }
   }
-  sqlite3VdbeScanStatusRange(v, addrExplain, addrExplain, -1);
   switch( eDest ){
     case SRT_Table:
     case SRT_EphemTab: {
@@ -1842,7 +1820,6 @@ static void generateSortTail(
   }else{
     sqlite3VdbeAddOp2(v, OP_Next, iTab, addr); VdbeCoverage(v);
   }
-  sqlite3VdbeScanStatusRange(v, addrExplain, sqlite3VdbeCurrentAddr(v)-1, -1);
   if( pSort->regReturn ) sqlite3VdbeAddOp1(v, OP_Return, pSort->regReturn);
   sqlite3VdbeResolveLabel(v, addrBreak);
 }
@@ -7300,9 +7277,6 @@ int sqlite3Select(
       ** the same view can reuse the materialization. */
       int topAddr;
       int onceAddr = 0;
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-      int addrExplain;
-#endif
 
       pItem->regReturn = ++pParse->nMem;
       topAddr = sqlite3VdbeAddOp0(v, OP_Goto);
@@ -7318,8 +7292,7 @@ int sqlite3Select(
         VdbeNoopComment((v, "materialize %!S", pItem));
       }
       sqlite3SelectDestInit(&dest, SRT_EphemTab, pItem->iCursor);
-
-      ExplainQueryPlan2(addrExplain, (pParse, 1, "MATERIALIZE %!S", pItem));
+      ExplainQueryPlan((pParse, 1, "MATERIALIZE %!S", pItem));
       dest.zAffSdst = sqlite3TableAffinityStr(db, pItem->pTab);
       sqlite3Select(pParse, pSub, &dest);
       sqlite3DbFree(db, dest.zAffSdst);
@@ -7328,7 +7301,6 @@ int sqlite3Select(
       if( onceAddr ) sqlite3VdbeJumpHere(v, onceAddr);
       sqlite3VdbeAddOp2(v, OP_Return, pItem->regReturn, topAddr+1);
       VdbeComment((v, "end %!S", pItem));
-      sqlite3VdbeScanStatusRange(v, addrExplain, addrExplain, -1);
       sqlite3VdbeJumpHere(v, topAddr);
       sqlite3ClearTempRegCache(pParse);
       if( pItem->fg.isCte && pItem->fg.isCorrelated==0 ){
@@ -8083,6 +8055,8 @@ int sqlite3Select(
   ** and send them to the callback one by one.
   */
   if( sSort.pOrderBy ){
+    explainTempTable(pParse,
+                     sSort.nOBSat>0 ? "RIGHT PART OF ORDER BY":"ORDER BY");
     assert( p->pEList==pEList );
     generateSortTail(pParse, p, &sSort, pEList->nExpr, pDest);
   }
