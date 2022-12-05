@@ -281,21 +281,29 @@ supported letters are:
   signature entry.
 - **`f`** = `float` (4 bytes)
 - **`d`** = `double` (8 bytes)
-- **`p`** = `int32` (but see below!)
+- **`c`** = `int8` (1 byte) char - see notes below!
+- **`C`** = `uint8` (1 byte) unsigned char - see notes below!
+- **`p`** = `int32` (see notes below!)
 - **`P`** = Like `p` but with extra handling. Described below.
-- **`s`** = like `int32` but is a _hint_ that it's a pointer to a string
-  so that _some_ (very limited) contexts may treat it as such, noting
-  such algorithms must, for lack of information to the contrary,
-  assume both that the encoding is UTF-8 and that the pointer's member
-  is NUL-terminated. If that is _not_ the case for a given string
-  member, do not use `s`: use `i` or `p` instead and do any string
-  handling yourself.
+- **`s`** = like `int32` but is a _hint_ that it's a pointer to a
+  string so that _some_ (very limited) contexts may treat it as such,
+  noting that such algorithms must, for lack of information to the
+  contrary, assume both that the encoding is UTF-8 and that the
+  pointer's member is NUL-terminated. If that is _not_ the case for a
+  given string member, do not use `s`: use `i` or `p` instead and do
+  any string handling yourself.
 
 Noting that:
 
-- All of these types are numeric. Attempting to set any struct-bound
-  property to a non-numeric value will trigger an exception except in
-  cases explicitly noted otherwise.
+- **All of these types are numeric**. Attempting to set any
+  struct-bound property to a non-numeric value will trigger an
+  exception except in cases explicitly noted otherwise.
+- **"Char" types**: WASM does not define an `int8` type, nor does it
+  distinguish between signed and unsigned. This API treats `c` as
+  `int8` and `C` as `uint8` for purposes of getting and setting values
+  when using the `DataView` class. It is _not_ recommended that client
+  code use these types in new WASM-capable code, but they were added
+  for the sake of binding some immutable legacy code to WASM.
 
 > Sidebar: Emscripten's public docs do not mention `p`, but their
 generated code includes `p` as an alias for `i`, presumably to mean
@@ -317,12 +325,12 @@ Signatures in the form `x(...)` denote function-pointer members and
 form `x()`. For function-type signatures, the strings are formulated
 such that they can be passed to Emscripten's `addFunction()` after
 stripping out the `(` and `)` characters. For good measure, to match
-the public Emscripten docs, `p` should also be replaced with `i`. In
-JavaScript that might look like:
+the public Emscripten docs, `p`, `c`, and `C`, should also be replaced
+with `i`. In JavaScript that might look like:
 
 >  
 ```
-signature.replace(/[^vipPsjfd]/g,'').replace(/[pPs]/g,'i');
+signature.replace(/[^vipPsjfdcC]/g,'').replace(/[pPscC]/g,'i');
 ```
 
 <a name='step-2-pvsp'></a>
@@ -337,12 +345,15 @@ special use of unsigned numbers). A capital `P` changes the semantics
 of plain member pointers (but not, as of this writing, function
 pointer members) as follows:
 
-- When a `P`-type member is **fetched** via `myStruct.x` and its value is
-  a non-0 integer, [`StructBinder.instanceForPointer()`][StructBinder]
-  is used to try to map that pointer to a struct instance. If a match
-  is found, the "get" operation returns that instance instead of the
-  integer. If no match is found, it behaves exactly as for `p`, returning
-  the integer value.
+- <s>When a `P`-type member is **fetched** via `myStruct.x` and its
+  value is a non-0 integer,
+  [`StructBinder.instanceForPointer()`][StructBinder] is used to try
+  to map that pointer to a struct instance. If a match is found, the
+  "get" operation returns that instance instead of the integer. If no
+  match is found, it behaves exactly as for `p`, returning the integer
+  value.</s> Removed because it's legal and possible to for multiple
+  instances to proxy the same pointer and this infrastructure cannot
+  account for that.
 - When a `P`-type member is **set** via `myStruct.x=y`, if
   [`(y instanceof StructType)`][StructType] then the value of `y.pointer` is
   stored in `myStruct.x`. If `y` is neither a number nor
@@ -395,7 +406,6 @@ instances which have not been manually disposed.
 The following usage pattern offers one way to easily ensure proper
 cleanup of struct instances:
 
-
 >  
 ```javascript
 const my = new MyStruct();
@@ -409,11 +419,6 @@ try {
      from the byte array. */
   // Pass the struct to C code which takes a MyStruct pointer:
   aCFunction( my.pointer );
-  // Type-safely check if a pointer returned from C is a MyStruct:
-  const x = MyStruct.instanceForPointer( anotherCFunction() );
-  // If it is a MyStruct, x now refers to that object. Note, however,
-  // that this only works for instances created in JS, as the
-  // pointer mapping only exists in JS space.
 } finally {
   my.dispose();
 }
@@ -425,6 +430,15 @@ flow-control keywords like `return` or `break`. It is perfectly legal
 to use `try`/`finally` without a `catch`, and doing so is an ideal
 match for the memory management requirements of Jaccwaby-bound struct
 instances.
+
+It is often useful to wrap an existing instance of a C-side struct
+without taking over ownership of its memory. That can be achieved by
+simply passing a pointer to the constructor. For example:
+
+```js
+const m = new MyStruct( functionReturningASharedPtr() );
+// calling m.dispose() will _not_ free the wrapped C-side instance.
+```
 
 Now that we have struct instances, there are a number of things we
 can do with them, as covered in the rest of this document.
@@ -549,7 +563,10 @@ The Struct Binder has the following members:
   any of its "significant" configuration values may have undefined
   results.
 
-- `instanceForPointer(pointer)`  
+- <s>`instanceForPointer(pointer)`</s> (DEPRECATED)  
+  *Do not use this - it will be removed* because it is legal for
+  multiple StructType instances to proxy the same pointer, and
+  instanceForPointer() cannot account for that.\  
   Given a pointer value relative to `config.memory`, if that pointer
   resolves to a struct of _any type_ generated via the same Struct
   Binder, this returns the struct instance associated with it, or
@@ -591,7 +608,7 @@ individual instances via `theInstance.constructor`.):
   [struct's constructor][StructCtors]. If true, the memory is owned by
   someone other than the object and must outlive the object.
 
-- `instanceForPointer(pointer)`  
+- <s>`instanceForPointer(pointer)`</s> (DEPRECATED)  
   Works identically to the [StructBinder][] method of the same name.
 
 - `isA(value)`  
@@ -744,7 +761,7 @@ These constructors have the following "static" members:
   with _all_ instances and clears the `instanceForPointer()`
   mappings. Returns `this`.
 
-- `instanceForPointer(pointer)`  
+- <s>`instanceForPointer(pointer)`</s> (DEPRECATED)  
   Given a pointer value (accessible via the `pointer` property of all
   struct instances) which ostensibly refers to an instance of this
   class, this returns the instance associated with it, or `undefined`
