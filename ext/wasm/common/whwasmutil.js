@@ -725,12 +725,11 @@ self.WhWasmUtilInstaller = function(target){
      Expects ptr to be a pointer into the WASM heap memory which
      refers to a NUL-terminated C-style string encoded as UTF-8.
      Returns the length, in bytes, of the string, as for `strlen(3)`.
-     As a special case, if !ptr or if it's not a pointer then it
-     returns `null`. Throws if ptr is out of range for
-     target.heap8u().
+     As a special case, if !ptr then it it returns `null`. Throws if
+     ptr is out of range for target.heap8u().
   */
   target.cstrlen = function(ptr){
-    if(!ptr || !target.isPtr(ptr)) return null;
+    if(!ptr) return null;
     const h = heapWrappers().HEAP8U;
     let pos = ptr;
     for( ; h[pos] !== 0; ++pos ){}
@@ -754,7 +753,7 @@ self.WhWasmUtilInstaller = function(target){
      refers to a NUL-terminated C-style string encoded as UTF-8. This
      function counts its byte length using cstrlen() then returns a
      JS-format string representing its contents. As a special case, if
-     ptr is falsy or not a pointer, `null` is returned.
+     ptr is falsy, `null` is returned.
   */
   target.cstringToJs = function(ptr){
     const n = target.cstrlen(ptr);
@@ -1082,9 +1081,10 @@ self.WhWasmUtilInstaller = function(target){
 
   // impl for allocMainArgv() and scopedAllocMainArgv().
   const __allocMainArgv = function(isScoped, list){
+    if(!list.length) toss("Cannot allocate empty array.");
     const pList = target[
       isScoped ? 'scopedAlloc' : 'alloc'
-    ]((list.length + 1) * target.ptrSizeof);
+    ](list.length * target.ptrSizeof);
     let i = 0;
     list.forEach((e)=>{
       target.setPtrValue(pList + (target.ptrSizeof * i++),
@@ -1092,33 +1092,26 @@ self.WhWasmUtilInstaller = function(target){
                            isScoped ? 'scopedAllocCString' : 'allocCString'
                          ](""+e));
     });
-    target.setPtrValue(pList + (target.ptrSizeof * i), 0);
     return pList;
   };
 
   /**
      Creates an array, using scopedAlloc(), suitable for passing to a
      C-level main() routine. The input is a collection with a length
-     property and a forEach() method. A block of memory
-     (list.length+1) entries long is allocated and each pointer-sized
-     block of that memory is populated with a scopedAllocCString()
-     conversion of the (""+value) of each element, with the exception
-     that the final entry is a NULL pointer. Returns a pointer to the
-     start of the list, suitable for passing as the 2nd argument to a
-     C-style main() function.
+     property and a forEach() method. A block of memory list.length
+     entries long is allocated and each pointer-sized block of that
+     memory is populated with a scopedAllocCString() conversion of the
+     (""+value) of each element. Returns a pointer to the start of the
+     list, suitable for passing as the 2nd argument to a C-style
+     main() function.
 
-     Throws if scopedAllocPush() is not active.
-
-     Design note: the returned array is allocated with an extra NULL
-     pointer entry to accommodate certain APIs, but client code which
-     does not need that functionality should treat the returned array
-     as list.length entries long.
+     Throws if list.length is falsy or scopedAllocPush() is not active.
   */
   target.scopedAllocMainArgv = (list)=>__allocMainArgv(true, list);
 
   /**
      Identical to scopedAllocMainArgv() but uses alloc() instead of
-     scopedAlloc().
+     scopedAllocMainArgv
   */
   target.allocMainArgv = (list)=>__allocMainArgv(false, list);
 
@@ -1274,7 +1267,7 @@ self.WhWasmUtilInstaller = function(target){
      - If v is a string, scopeAlloc() a new C-string from it and return
        that temp string's pointer.
 
-     - Else return the value from the arg adapter defined for ptrIR.
+     - Else return the value from the arg adaptor defined for ptrIR.
 
      TODO? Permit an Int8Array/Uint8Array and convert it to a string?
      Would that be too much magic concentrated in one place, ready to
@@ -1286,12 +1279,12 @@ self.WhWasmUtilInstaller = function(target){
       return v ? xcv.arg[ptrIR](v) : null;
     };
   xcv.result.string = xcv.result.utf8 = (i)=>target.cstringToJs(i);
-  xcv.result['string:dealloc'] = xcv.result['utf8:dealloc'] = (i)=>{
+  xcv.result['string:free'] = xcv.result['utf8:free'] = (i)=>{
     try { return i ? target.cstringToJs(i) : null }
     finally{ target.dealloc(i) }
   };
   xcv.result.json = (i)=>JSON.parse(target.cstringToJs(i));
-  xcv.result['json:dealloc'] = (i)=>{
+  xcv.result['json:free'] = (i)=>{
     try{ return i ? JSON.parse(target.cstringToJs(i)) : null }
     finally{ target.dealloc(i) }
   }
@@ -1390,7 +1383,7 @@ self.WhWasmUtilInstaller = function(target){
        true.
 
      - `f32` (`float`), `f64` (`double`) (args and results): pass
-       their argument to Number(). i.e. the adapter does not currently
+       their argument to Number(). i.e. the adaptor does not currently
        distinguish between the two types of floating-point numbers.
 
      - `number` (results): converts the result to a JS Number using
@@ -1418,7 +1411,7 @@ self.WhWasmUtilInstaller = function(target){
          const C-string, encoded as UTF-8, copies it to a JS string,
          and returns that JS string.
 
-     - `string:dealloc` or `utf8:dealloc) (results): treats the result value
+     - `string:free` or `utf8:free) (results): treats the result value
        as a non-const UTF-8 C-string, ownership of which has just been
        transfered to the caller. It copies the C-string to a JS
        string, frees the C-string, and returns the JS string. If such
@@ -1429,7 +1422,7 @@ self.WhWasmUtilInstaller = function(target){
        required. For example:
 
 ```js
-   target.xWrap.resultAdapter('string:my_free',(i)=>{
+   target.xWrap.resultAdaptor('string:my_free',(i)=>{
       try { return i ? target.cstringToJs(i) : null }
       finally{ target.exports.my_free(i) }
    };
@@ -1439,9 +1432,9 @@ self.WhWasmUtilInstaller = function(target){
        returns the result of passing the converted-to-JS string to
        JSON.parse(). Returns `null` if the C-string is a NULL pointer.
 
-     - `json:dealloc` (results): works exactly like `string:dealloc` but
+     - `json:free` (results): works exactly like `string:free` but
        returns the same thing as the `json` adapter. Note the
-       warning in `string:dealloc` regarding maching allocators and
+       warning in `string:free` regarding maching allocators and
        deallocators.
 
      The type names for results and arguments are validated when
@@ -1552,7 +1545,7 @@ self.WhWasmUtilInstaller = function(target){
   */
   target.xWrap.resultAdapter = function f(typeName, adapter){
     return __xAdapter(f, arguments.length, typeName, adapter,
-                      'resultAdapter()', xcv.result);
+                      'resultAdaptor()', xcv.result);
   };
 
   /**
