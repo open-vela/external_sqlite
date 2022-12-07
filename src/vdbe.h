@@ -71,10 +71,6 @@ struct VdbeOp {
   u32 iSrcLine;            /* Source-code line that generated this opcode
                            ** with flags in the upper 8 bits */
 #endif
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || defined(VDBE_PROFILE)
-  u64 nExec;
-  u64 nCycle;
-#endif
 };
 typedef struct VdbeOp VdbeOp;
 
@@ -169,7 +165,6 @@ typedef struct VdbeOpList VdbeOpList;
 ** Additional non-public SQLITE_PREPARE_* flags
 */
 #define SQLITE_PREPARE_SAVESQL  0x80  /* Preserve SQL text */
-#define SQLITE_PREPARE_SAFEOPT  0x40  /* Use only safe optimizations */
 #define SQLITE_PREPARE_MASK     0x0f  /* Mask of public flags */
 
 /*

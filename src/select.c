@@ -6855,52 +6855,6 @@ static int sameSrcAlias(SrcItem *p0, SrcList *pSrc){
 }
 
 /*
-** Return TRUE (non-zero) if the i-th entry in the pTabList SrcList can
-** be implemented as a co-routine.  The i-th entry is guaranteed to be
-** a subquery.
-**
-** The subquery is implemented as a co-routine if all of the following are
-** true:
-**
-**    (1)  Either of the following are true:
-**         (1a)  The subquery must be the outer loop because it is either
-**               (i) the only term in the FROM clause, or because (ii) it
-**               is the left-most term and a CROSS JOIN or similar requires
-**               it to be the outer loop. subquery and there is nothing
-**         (1b)  There is nothing that would prevent the subquery from
-**               being an outer loop and the SQLITE_PREPARE_SAFESQL flag
-**               is not set.
-**    (2)  The subquery is not a CTE that should be materialized
-**    (3)  The subquery is not part of a left operand for a RIGHT JOIN
-**    (4)  The SQLITE_Coroutine optimization disable flag is not set
-*/
-static int fromClauseTermCanBeCoroutine(
-  Parse *pParse,            /* Parsing context */
-  SrcList *pTabList,        /* FROM clause */
-  int i                     /* Which term of the FROM clause */
-){
-  SrcItem *pItem = &pTabList->a[i];
-  if( pItem->fg.isCte && pItem->u2.pCteUse->eM10d==M10d_Yes ) return 0;/* (2) */
-  if( pTabList->a[0].fg.jointype & JT_LTORJ ) return 0;                /* (3) */
-  if( OptimizationDisabled(pParse->db, SQLITE_Coroutines) ) return 0;  /* (4) */
-  if( i==0 ){
-    if( pTabList->nSrc==1 ) return 1;                              /* (1a-i) */
-    if( pTabList->a[1].fg.jointype & JT_CROSS ) return 1;          /* (1a-ii) */
-    if( pParse->prepFlags & SQLITE_PREPARE_SAFEOPT ) return 0;     
-    return 1;
-  }
-  if( pParse->prepFlags & SQLITE_PREPARE_SAFEOPT ) return 0;
-  while( 1 /*exit-by-break*/ ){
-    if( pItem->fg.jointype & (JT_OUTER|JT_CROSS)  ) return 0;
-    if( i==0 ) break;
-    i--;
-    pItem--;
-    if( pItem->pSelect!=0 ) return 0;
-  }
-  return 1;
-}
-
-/*
 ** Generate code for the SELECT statement given in the p argument.  
 **
 ** The results are returned according to the SelectDest structure.
@@ -7287,8 +7241,21 @@ int sqlite3Select(
     pParse->zAuthContext = pItem->zName;
 
     /* Generate code to implement the subquery
+    **
+    ** The subquery is implemented as a co-routine if all of the following are
+    ** true:
+    **
+    **    (1)  the subquery is guaranteed to be the outer loop (so that
+    **         it does not need to be computed more than once), and
+    **    (2)  the subquery is not a CTE that should be materialized
+    **    (3)  the subquery is not part of a left operand for a RIGHT JOIN
     */
-    if( fromClauseTermCanBeCoroutine(pParse, pTabList, i) ){
+    if( i==0
+     && (pTabList->nSrc==1
+            || (pTabList->a[1].fg.jointype&(JT_OUTER|JT_CROSS))!=0)  /* (1) */
+     && (pItem->fg.isCte==0 || pItem->u2.pCteUse->eM10d!=M10d_Yes)   /* (2) */
+     && (pTabList->a[0].fg.jointype & JT_LTORJ)==0                   /* (3) */
+    ){
       /* Implement a co-routine that will return a single row of the result
       ** set on each invocation.
       */
