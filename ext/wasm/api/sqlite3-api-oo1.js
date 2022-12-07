@@ -73,7 +73,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
           if(capi.SQLITE_TRACE_STMT===t){
             // x == SQL, p == sqlite3_stmt*
             console.log("SQL TRACE #"+(++this.counter),
-                        wasm.cstrToJs(x));
+                        wasm.cstringToJs(x));
           }
         }.bind({counter: 0}));
 
@@ -139,7 +139,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       console.error("Invalid DB ctor args",opt,arguments);
       toss3("Invalid arguments for DB constructor.");
     }
-    let fnJs = ('number'===typeof fn) ? wasm.cstrToJs(fn) : fn;
+    let fnJs = ('number'===typeof fn) ? wasm.cstringToJs(fn) : fn;
     const vfsCheck = ctor._name2vfs[fnJs];
     if(vfsCheck){
       vfsName = vfsCheck.vfs;
@@ -192,13 +192,13 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   /**
      Sets SQL which should be exec()'d on a DB instance after it is
      opened with the given VFS pointer. The SQL may be any type
-     supported by the "string:flexible" function argument conversion.
-     Alternately, the 2nd argument may be a function, in which case it
-     is called with (theOo1DbObject,sqlite3Namespace) at the end of
-     the DB() constructor. The function must throw on error, in which
-     case the db is closed and the exception is propagated.  This
-     function is intended only for use by DB subclasses or sqlite3_vfs
-     implementations.
+     supported by the "flexible-string" function argument
+     conversion. Alternately, the 2nd argument may be a function, in
+     which case it is called with (theOo1DbObject,sqlite3Namespace) at
+     the end of the DB() constructor. The function must throw on
+     error, in which case the db is closed and the exception is
+     propagated.  This function is intended only for use by DB
+     subclasses or sqlite3_vfs implementations.
   */
   dbCtorHelper.setVfsPostOpenSql = function(pVfs, sql){
     __vfsPostOpenSql[pVfs] = sql;
@@ -474,15 +474,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
   };
 
   /**
-     Internal impl of the DB.selectArrays() and
-     selectObjects() methods.
-  */
-  const __selectAll =
-        (db, sql, bind, rowMode)=>db.exec({
-          sql, bind, rowMode, returnValue: 'resultRows'
-        });
-
-  /**
      Expects to be given a DB instance or an `sqlite3*` pointer (may
      be null) and an sqlite3 API result code. If the result code is
      not falsy, this function throws an SQLite3Error with an error
@@ -600,7 +591,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       );
       if(pVfs){
         const v = new capi.sqlite3_vfs(pVfs);
-        try{ rc = wasm.cstrToJs(v.$zName) }
+        try{ rc = wasm.cstringToJs(v.$zName) }
         finally { v.dispose() }
       }
       return rc;        
@@ -1105,26 +1096,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     */
     selectObject: function(sql,bind){
       return __selectFirstRow(this, sql, bind, {});
-    },
-
-    /**
-       Runs the given SQL and returns an array of all results, with
-       each row represented as an array, as per the 'array' `rowMode`
-       option to `exec()`. An empty result set resolves
-       to an empty array. The second argument, if any, is treated as
-       the 'bind' option to a call to exec().
-    */
-    selectArrays: function(sql,bind){
-      return __selectAll(this, sql, bind, 'array');
-    },
-
-    /**
-       Works identically to selectArrays() except that each value
-       in the returned array is an object, as per the 'object' `rowMode`
-       option to `exec()`.
-    */
-    selectObjects: function(sql,bind){
-      return __selectAll(this, sql, bind, 'object');
     },
 
     /**
