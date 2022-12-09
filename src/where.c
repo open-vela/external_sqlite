@@ -836,8 +836,7 @@ static void explainAutomaticIndex(
     const char *zSep = "";
     char *zText = 0;
     int ii = 0;
-    sqlite3_str *pStr = sqlite3_str_new(pParse->db);
-    sqlite3_str_appendf(pStr,"CREATE AUTOMATIC INDEX ON %s(", pTab->zName);
+    zText = sqlite3_mprintf("CREATE AUTOMATIC INDEX ON %s(", pTab->zName);
     assert( pIdx->nColumn>1 );
     assert( pIdx->aiColumn[pIdx->nColumn-1]==XN_ROWID );
     for(ii=0; ii<(pIdx->nColumn-1); ii++){
@@ -845,18 +844,13 @@ static void explainAutomaticIndex(
       int iCol = pIdx->aiColumn[ii];
 
       zName = pTab->aCol[iCol].zCnName;
-      sqlite3_str_appendf(pStr, "%s%s", zSep, zName);
+      zText = sqlite3_mprintf("%z%s%s", zText, zSep, zName);
       zSep = ", ";
     }
-    zText = sqlite3_str_finish(pStr);
-    if( zText==0 ){
-      sqlite3OomFault(pParse->db);
-    }else{
-      *pAddrExplain = sqlite3VdbeExplain(
-          pParse, 0, "%s)%s", zText, (bPartial ? " WHERE <expr>" : "")
-      );
-      sqlite3_free(zText);
-    }
+    *pAddrExplain = sqlite3VdbeExplain(
+        pParse, 0, "%s)%s", zText, (bPartial ? " WHERE <expr>" : "")
+    );
+    sqlite3_free(zText);
   }
 }
 #else
