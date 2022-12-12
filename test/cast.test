@@ -500,19 +500,19 @@ do_execsql_test cast-9.4 {
   SELECT x, typeof(x) FROM (SELECT CAST(4 AS NUMERIC) AS x) JOIN dual;
 } {4 integer}
 do_execsql_test cast-9.5 {
-  SELECT x, typeof(x) FROM (SELECT CAST(4 AS NUMERIC) AS x) CROSS JOIN dual;
+  SELECT x, typeof(x) FROM dual CROSS JOIN (SELECT CAST(4 AS NUMERIC) AS x);
 } {4 integer}
 do_execsql_test cast-9.10 {
   SELECT x, typeof(x) FROM (SELECT CAST(4.0 AS NUMERIC) AS x) JOIN dual;
 } {4.0 real}
 do_execsql_test cast-9.11 {
-  SELECT x, typeof(x) FROM (SELECT CAST(4.0 AS NUMERIC) AS x) CROSS JOIN dual;
+  SELECT x, typeof(x) FROM dual CROSS JOIN (SELECT CAST(4.0 AS NUMERIC) AS x);
 } {4.0 real}
 do_execsql_test cast-9.12 {
   SELECT x, typeof(x) FROM (SELECT CAST(4.5 AS NUMERIC) AS x) JOIN dual;
 } {4.5 real}
 do_execsql_test cast-9.13 {
-  SELECT x, typeof(x) FROM (SELECT CAST(4.5 AS NUMERIC) AS x) CROSS JOIN dual;
+  SELECT x, typeof(x) FROM dual CROSS JOIN (SELECT CAST(4.5 AS NUMERIC) AS x);
 } {4.5 real}
 
 finish_test
