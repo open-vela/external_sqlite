@@ -141,8 +141,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
         "sqlite3*", "int", new wasm.xWrap.FuncPtrAdapter({
           name: 'xProgressHandler',
           signature: 'i(p)',
-          bindScope: 'context',
-          contextKey: (argIndex,argv)=>'sqlite3@'+argv[0]
+          bindMode: 'singleton'
         }), "*"
       ]
     ],
@@ -179,12 +178,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
      "sqlite3*", "string", "string", "string",
      "**", "**", "*", "*", "*"],
     ["sqlite3_total_changes", "int", "sqlite3*"],
-    ["sqlite3_trace_v2", "int", "sqlite3*", "int",
-     new wasm.xWrap.FuncPtrAdapter({
-       name: 'sqlite3_trace_v2::callback',
-       signature: 'i(ippp)',
-       contextKey: (argIndex, argv)=>'sqlite3@'+argv[0]
-     }), "*"],
+    ["sqlite3_trace_v2", "int", "sqlite3*", "int", "*", "*"],
     ["sqlite3_txn_state", "int", ["sqlite3*","string"]],
     /* Note that sqlite3_uri_...() have very specific requirements for
        their first C-string arguments, so we cannot perform any value
@@ -460,44 +454,27 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 
   if(1){/* Bindings for sqlite3_create_collation() */
 
-    const __collationContextKey = (argIndex,argv)=>{
-      return 'argv['+argIndex+']:sqlite3@'+argv[0]+
-        ':'+((/*THIS IS WRONG. We can't sensibly use a converted-to-C-string
-                address here and don't have access to the JS string (IF ANY)
-                which the user passed in.*/
-          ''+argv[1]
-        ).toLowerCase());
-    };
     const __ccv2 = wasm.xWrap(
       'sqlite3_create_collation_v2', 'int',
-      'sqlite3*','string','int','*','*','*'
-      /* int(*xCompare)(void*,int,const void*,int,const void*) */
-      /* void(*xDestroy(void*) */
-    );
-    if(0){
-      // Problem: we cannot, due to xWrap() arg-passing limitations,
-      // currently easily/efficiently get a per-collation distinct
-      // key for purposes of creating distinct FuncPtrAdapter contexts.
+      'sqlite3*','string','int','*',
       new wasm.xWrap.FuncPtrAdapter({
         /* int(*xCompare)(void*,int,const void*,int,const void*) */
         name: 'xCompare',
         signature: 'i(pipip)',
-        bindScope: 'context',
-        contextKey: __collationContextKey
+        bindMode: 'static'
       }),
       new wasm.xWrap.FuncPtrAdapter({
         /* void(*xDestroy(void*) */
         name: 'xDestroy',
         signature: 'v(p)',
-        bindScope: 'context',
-        contextKey: __collationContextKey
+        bindMode: 'static'
       })
-    }
+    );
 
     /**
        Works exactly like C's sqlite3_create_collation_v2() except that:
 
-       1) It accepts JS functions for its function-pointer arguments,
+       1) It permits its two function arguments to be JS functions,
           for which it will install WASM-bound proxies. The bindings
           are "permanent," in that they will stay in the WASM environment
           until it shuts down unless the client somehow finds and removes
@@ -517,19 +494,10 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
           pDb, capi.SQLITE_FORMAT, "SQLITE_UTF8 is the only supported encoding."
         );
       }
-      let rc, pfCompare, pfDestroy;
+      let rc;
       try{
-        if(xCompare instanceof Function){
-          pfCompare = wasm.installFunction(xCompare, 'i(pipip)');
-        }
-        if(xDestroy instanceof Function){
-          pfDestroy = wasm.installFunction(xDestroy, 'v(p)');
-        }
-        rc = __ccv2(pDb, zName, eTextRep, pArg,
-                    pfCompare || xCompare, pfDestroy || xDestroy);
+        rc = __ccv2(pDb, zName, eTextRep, pArg, xCompare, xDestroy);
       }catch(e){
-        if(pfCompare) wasm.uninstallFunction(pfCompare);
-        if(pfDestroy) wasm.uninstallFunction(pfDestroy);
         rc = util.sqlite3_wasm_db_error(pDb, e);
       }
       return rc;
@@ -548,7 +516,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
                               ["sqlite3*", "string:flexible",
                                new wasm.xWrap.FuncPtrAdapter({
                                  signature: 'i(pipp)',
-                                 bindScope: 'transient'
+                                 bindMode: 'transient'
                                }), "*", "**"]);
     /* Documented in the api object's initializer. */
     capi.sqlite3_exec = function f(pDb, sql, callback, pVoid, pErrMsg){
