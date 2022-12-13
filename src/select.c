@@ -2291,38 +2291,39 @@ int sqlite3ColumnsFromExprList(
 
 /*
 ** This bit, when added to the "aff" parameter of 
-** sqlite3ColumnTypeOfSubquery() means that result set
+** sqlite3SelectAddColumnTypeAndCollation() means that result set
 ** expressions of the form "CAST(expr AS NUMERIC)" should result in
 ** NONE affinity rather than NUMERIC affinity.
 */
 #define SQLITE_AFF_FLAG1  0x10
 
 /*
-** pTab is a transient Table object that represents a subquery of some
-** kind (maybe a parenthesized subquery in the FROM clause of a larger
-** query, or a VIEW, or a CTE).  This routine computes type information
-** for that Table object based on the Select object that implements the
-** subquery.  For the purposes of this routine, "type infomation" means:
+** Add type and collation information to a column list based on
+** a SELECT statement.
+** 
+** The column list presumably came from selectColumnNamesFromExprList().
+** The column list has only names, not types or collations.  This
+** routine goes through and adds the types and collations.
 **
-**    *   The datatype name, as it might appear in a CREATE TABLE statement
-**    *   Which collating sequence to use for the column
-**    *   The affinity of the column
+** This routine requires that all identifiers in the SELECT
+** statement be resolved.
 **
 ** The SQLITE_AFF_FLAG1 bit added to parameter aff means that a
 ** result set column of the form "CAST(expr AS NUMERIC)" should use
 ** NONE affinity rather than NUMERIC affinity.  See the
 ** 2022-12-10 "reopen" of ticket https://sqlite.org/src/tktview/57c47526c3.
 */
-void sqlite3SubqueryColumnTypes(
-  Parse *pParse,      /* Parsing contexts */
-  Table *pTab,        /* Add column type information to this table */
-  Select *pSelect,    /* SELECT used to determine types and collations */
-  char aff            /* Default affinity.  Maybe with SQLITE_AFF_FLAG1 too */
+void sqlite3SelectAddColumnTypeAndCollation(
+  Parse *pParse,        /* Parsing contexts */
+  Table *pTab,          /* Add column type information to this table */
+  Select *pSelect,      /* SELECT used to determine types and collations */
+  char aff              /* Default affinity.  Maybe with SQLITE_AFF_FLAG1 too */
 ){
   sqlite3 *db = pParse->db;
+  NameContext sNC;
   Column *pCol;
   CollSeq *pColl;
-  int i,j;
+  int i;
   Expr *p;
   struct ExprList_item *a;
 
@@ -2331,12 +2332,15 @@ void sqlite3SubqueryColumnTypes(
   assert( pTab->nCol==pSelect->pEList->nExpr || db->mallocFailed );
   if( db->mallocFailed ) return;
   while( pSelect->pPrior ) pSelect = pSelect->pPrior;
+  memset(&sNC, 0, sizeof(sNC));
+  sNC.pSrcList = pSelect->pSrc;
   a = pSelect->pEList->a;
   for(i=0, pCol=pTab->aCol; i<pTab->nCol; i++, pCol++){
     const char *zType;
     i64 n, m;
     pTab->tabFlags |= (pCol->colFlags & COLFLAG_NOINSERT);
     p = a[i].pExpr;
+    zType = columnType(&sNC, p, 0, 0, 0);
     /* pCol->szEst = ... // Column size est for SELECT tables never used */
     pCol->affinity = sqlite3ExprAffinity(p);
     if( pCol->affinity==SQLITE_AFF_NUMERIC
@@ -2344,17 +2348,6 @@ void sqlite3SubqueryColumnTypes(
      && (aff & SQLITE_AFF_FLAG1)!=0
     ){
       pCol->affinity = SQLITE_AFF_NONE;
-    }
-    if( pCol->affinity<=SQLITE_AFF_NONE ){
-      assert( (SQLITE_AFF_FLAG1 & SQLITE_AFF_MASK)==0 );
-      pCol->affinity = aff & SQLITE_AFF_MASK;
-    }
-    zType = 0;
-    for(j=0; j<SQLITE_N_STDTYPE; j++){
-      if( sqlite3StdTypeAffinity[j]==pCol->affinity ){
-        zType = sqlite3StdType[j];
-        break;
-      }
     }
     if( zType ){
       m = sqlite3Strlen30(zType);
@@ -2367,6 +2360,10 @@ void sqlite3SubqueryColumnTypes(
         testcase( pCol->colFlags & COLFLAG_HASTYPE );
         pCol->colFlags &= ~(COLFLAG_HASTYPE|COLFLAG_HASCOLL);
       }
+    }
+    if( pCol->affinity<=SQLITE_AFF_NONE ){
+      assert( (SQLITE_AFF_FLAG1 & SQLITE_AFF_MASK)==0 );
+      pCol->affinity = aff & SQLITE_AFF_MASK;
     }
     pColl = sqlite3ExprCollSeq(pParse, p);
     if( pColl ){
@@ -2401,7 +2398,7 @@ Table *sqlite3ResultSetOfSelect(Parse *pParse, Select *pSelect, char aff){
   pTab->zName = 0;
   pTab->nRowLogEst = 200; assert( 200==sqlite3LogEst(1048576) );
   sqlite3ColumnsFromExprList(pParse, pSelect->pEList, &pTab->nCol, &pTab->aCol);
-  sqlite3SubqueryColumnTypes(pParse, pTab, pSelect, aff);
+  sqlite3SelectAddColumnTypeAndCollation(pParse, pTab, pSelect, aff);
   pTab->iPKey = -1;
   if( db->mallocFailed ){
     sqlite3DeleteTable(db, pTab);
@@ -6212,14 +6209,14 @@ static void sqlite3SelectExpand(Parse *pParse, Select *pSelect){
 ** This is a Walker.xSelectCallback callback for the sqlite3SelectTypeInfo()
 ** interface.
 **
-** For each FROM-clause subquery, add Column.zType, Column.zColl, and
-** Column.affinity information to the Table structure that represents
-** the result set of that subquery.
+** For each FROM-clause subquery, add Column.zType and Column.zColl
+** information to the Table structure that represents the result set
+** of that subquery.
 **
 ** The Table structure that represents the result set was constructed
-** by selectExpander() but the type and collation and affinity information
-** was omitted at that point because identifiers had not yet been resolved.
-** This routine is called after identifier resolution.
+** by selectExpander() but the type and collation information was omitted
+** at that point because identifiers had not yet been resolved.  This
+** routine is called after identifier resolution.
 */
 static void selectAddSubqueryTypeInfo(Walker *pWalker, Select *p){
   Parse *pParse;
@@ -6239,8 +6236,9 @@ static void selectAddSubqueryTypeInfo(Walker *pWalker, Select *p){
       /* A sub-query in the FROM clause of a SELECT */
       Select *pSel = pFrom->pSelect;
       if( pSel ){
-        sqlite3SubqueryColumnTypes(pParse, pTab, pSel,
-                                   SQLITE_AFF_NONE|SQLITE_AFF_FLAG1);
+        while( pSel->pPrior ) pSel = pSel->pPrior;
+        sqlite3SelectAddColumnTypeAndCollation(pParse, pTab, pSel,
+                                     SQLITE_AFF_NONE|SQLITE_AFF_FLAG1);
       }
     }
   }
