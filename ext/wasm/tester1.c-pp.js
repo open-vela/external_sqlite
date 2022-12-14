@@ -480,6 +480,7 @@ self.sqlite3InitModule = sqlite3InitModule;
           T.assert(u[i] === byteList[i])
             .assert(u[i] === w.peek(m + i, 'i8'));
         }
+
         w.dealloc(m);
         T.mustThrowMatching(
           ()=>w.allocFromTypedArray(1),
@@ -487,6 +488,25 @@ self.sqlite3InitModule = sqlite3InitModule;
         );
       }
 
+      { // Test peekXYZ()/pokeXYZ()...
+        const m = w.alloc(8);
+        T.assert( 17 === w.poke8(m,17).peek8(m) )
+          .assert( 31987 === w.poke16(m,31987).peek16(m) )
+          .assert( 345678 === w.poke32(m,345678).peek32(m) )
+          .assert(
+            T.eqApprox( 345678.9, w.pokeF32(m,345678.9).peekF32(m) )
+          ).assert(
+            T.eqApprox( 4567890123.4, w.pokeF64(m, 4567890123.4).peekF64(m) )
+          );
+        if(w.bigIntEnabled){
+          T.assert(
+            BigInt(Number.MAX_SAFE_INTEGER) ===
+              w.poke64(m, Number.MAX_SAFE_INTEGER).peek64(m)
+          );
+        }
+        w.dealloc(m);
+      }
+      
       // isPtr32()
       {
         const ip = w.isPtr32;
@@ -1246,9 +1266,19 @@ self.sqlite3InitModule = sqlite3InitModule;
         rowMode: 'object',
         resultRows: list,
         columnNames: colNames,
+        _myState: 3 /* Accessible from the callback */,
         callback: function(row,stmt){
           ++counter;
-          T.assert((row.a%2 && row.a<6) || 'blob'===row.a);
+          T.assert(
+            3 === this._myState
+            /* Recall that "this" is the options object. */
+          ).assert(
+            this.columnNames[0]==='a' && this.columnNames[1]==='b'
+            /* options.columnNames is filled out before the first
+               Stmt.step(). */
+          ).assert(
+            (row.a%2 && row.a<6) || 'blob'===row.a
+          );
         }
       });
       T.assert(2 === colNames.length)
