@@ -53,22 +53,16 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     ["sqlite3_bind_parameter_index","int", "sqlite3_stmt*", "string"],
     ["sqlite3_bind_pointer", "int",
      "sqlite3_stmt*", "int", "*", "string:static", "*"],
-    ["sqlite3_bind_text","int", "sqlite3_stmt*", "int", "string", "int", "int"
+    ["sqlite3_bind_text","int", "sqlite3_stmt*", "int", "string", "int", "*"
      /* We should arguably create a hand-written binding of
         bind_text() which does more flexible text conversion, along
         the lines of sqlite3_prepare_v3(). The slightly problematic
         part is the final argument (text destructor). */
     ],
-    ["sqlite3_busy_handler","int", [
-      "sqlite3*",
-      new wasm.xWrap.FuncPtrAdapter({
-        name: 'sqlite3_busy_handler',
-        signature: 'i(pi)',
-        bindScope: 'context',
-        contextKey: (argIndex,argv)=>'sqlite3@'+argv[0]
-      }),
-      "*"
-    ]],
+    //["sqlite3_busy_handler","int", "sqlite3*", "*", "*"],
+    // ^^^^ TODO: custom binding which auto-converts JS function arg
+    // to a WASM function, noting that calling it multiple times
+    // would introduce a leak.
     ["sqlite3_busy_timeout","int", "sqlite3*", "int"],
     ["sqlite3_close_v2", "int", "sqlite3*"],
     ["sqlite3_changes", "int", "sqlite3*"],
@@ -137,16 +131,14 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
        for those, depending on how their SQL argument is provided. */
     /* sqlite3_randomness() uses a hand-written wrapper to extend
        the range of supported argument types. */
-    [
+    [ 
       "sqlite3_progress_handler", undefined, [
-        "sqlite3*", "int",
-        new wasm.xWrap.FuncPtrAdapter({
+        "sqlite3*", "int", new wasm.xWrap.FuncPtrAdapter({
           name: 'xProgressHandler',
           signature: 'i(p)',
           bindScope: 'context',
           contextKey: (argIndex,argv)=>'sqlite3@'+argv[0]
-        }),
-        "*"
+        }), "*"
       ]
     ],
     ["sqlite3_realloc", "*","*","int"],
@@ -219,7 +211,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
        optional features into account. */
     wasm.bindingSignatures.push(["sqlite3_normalized_sql", "string", "sqlite3_stmt*"]);
   }
-
+  
   /**
      Functions which require BigInt (int64) support are separated from
      the others because we need to conditionally bind them or apply
@@ -271,187 +263,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     ["sqlite3_vtab_rhs_value","int", "sqlite3_index_info*", "int", "**"]
   ];
 
-  // Add session/changeset APIs...
-  if(wasm.bigIntEnabled && !!wasm.exports.sqlite3changegroup_add){
-    /* ACHTUNG: 2022-12-23: the session/changeset API bindings are
-       COMPLETELY UNTESTED. Additionally, the callback-taking APIs
-       have a shortcoming which will make using those which take
-       string-type arguments more painful than it should be. How best
-       to resolve that, such that we can perform the same type conversions
-       as we do when binding in "the other direction," is as yet
-       undetermined.
-    */
-    /* TODO: we need hand-written wrappers to adapt callbacks which
-       take string arguments. Or we need to find a way to do this sort
-       of reverse-binding which includes type conversions. */
-    wasm.bindingSignatures.int64.push(...[
-      ['sqlite3changegroup_add', 'int', ['sqlite3_changegroup*', 'int', 'void*']],
-      ['sqlite3changegroup_add_strm', 'int', [
-        'sqlite3_changegroup*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changegroup_delete', undefined, ['sqlite3_changegroup*']],
-      ['sqlite3changegroup_new', 'int', ['**']],
-      ['sqlite3changegroup_output', 'int', ['sqlite3_changegroup*', 'int*', '**']],
-      ['sqlite3changegroup_output_strm', 'int', [
-        'sqlite3_changegroup*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xOutput', signature: 'i(ppi)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_apply', 'int', [
-        'sqlite3*', 'int', 'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)', bindScope: 'transient'
-        }),
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xConflict', signature: 'i(pip)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_apply_strm', 'int', [
-        'sqlite3*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)', bindScope: 'transient'
-        }),
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xConflict', signature: 'i(pip)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_apply_v2', 'int', [
-        'sqlite3*', 'int', 'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)', bindScope: 'transient'
-        }),
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xConflict', signature: 'i(pip)', bindScope: 'transient'
-        }),
-        'void*', '**', 'int*', 'int'
-
-      ]],
-      ['sqlite3changeset_apply_v2', 'int', [
-        'sqlite3*', 'int', 'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)', bindScope: 'transient'
-        }),
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xConflict', signature: 'i(pip)', bindScope: 'transient'
-        }),
-        'void*', '**', 'int*', 'int'
-      ]],
-      ['sqlite3changeset_apply_v2_strm', 'int', [
-        'sqlite3*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)', bindScope: 'transient'
-        }),
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xConflict', signature: 'i(pip)', bindScope: 'transient'
-        }),
-        'void*', '**', 'int*', 'int'
-      ]],
-      ['sqlite3changeset_concat', 'int', ['int','void*', 'int', 'void*', 'int*', '**']],
-      ['sqlite3changeset_concat_strm', 'int', [
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInputA', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInputB', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xOutput', signature: 'i(ppi)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_conflict', 'int', ['sqlite3_changeset_iter*', 'int', '**']],
-      ['sqlite3changeset_finalize', 'int', ['sqlite3_changeset_iter*']],
-      ['sqlite3changeset_fk_conflicts', 'int', ['sqlite3_changeset_iter*', 'int*']],
-      ['sqlite3changeset_invert', 'int', ['int', 'void*', 'int*', '**']],
-      ['sqlite3changeset_invert_strm', 'int', [
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xOutput', signature: 'i(ppi)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_new', 'int', ['sqlite3_changeset_iter*', 'int', '**']],
-      ['sqlite3changeset_next', 'int', ['sqlite3_changeset_iter*']],
-      ['sqlite3changeset_old', 'int', ['sqlite3_changeset_iter*', 'int', '**']],
-      ['sqlite3changeset_op', 'int', [
-        'sqlite3_changeset_iter*', '**', 'int*', 'int*','int*'
-      ]],
-      ['sqlite3changeset_pk', 'int', ['sqlite3_changeset_iter*', '**', 'int*']],
-      ['sqlite3changeset_start', 'int', ['**', 'int', '*']],
-      ['sqlite3changeset_start_strm', 'int', [
-        '**',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3changeset_start_v2', 'int', ['**', 'int', '*', 'int']],
-      ['sqlite3changeset_start_v2_strm', 'int', [
-        '**',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xInput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*', 'int'
-      ]],
-      ['sqlite3session_attach', 'int', ['sqlite3_session*', 'string']],
-      ['sqlite3session_changeset', 'int', ['sqlite3_session*', 'int*', '**']],
-      ['sqlite3session_changeset_size', 'i64', ['sqlite3_session*']],
-      ['sqlite3session_changeset_strm', 'int', [
-        'sqlite3_session*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xOutput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3session_config', 'int', ['int', 'void*']],
-      ['sqlite3session_create', 'int', ['sqlite3*', 'string', '**']],
-      ['sqlite3session_delete', undefined, ['sqlite3_session*']],
-      ['sqlite3session_diff', 'int', ['sqlite3_session*', 'string', 'string', '**']],
-      ['sqlite3session_enable', 'int', ['sqlite3_session*', 'int']],
-      ['sqlite3session_indirect', 'int', ['sqlite3_session*', 'int']],
-      ['sqlite3session_isempty', 'int', ['sqlite3_session*']],
-      ['sqlite3session_memory_used', 'i64', ['sqlite3_session*']],
-      ['sqlite3session_object_config', 'int', ['sqlite3_session*', 'int', 'void*']],
-      ['sqlite3session_patchset', 'int', ['sqlite3_session*', '*', '**']],
-      ['sqlite3session_patchset_strm', 'int', [
-        'sqlite3_session*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xOutput', signature: 'i(ppp)', bindScope: 'transient'
-        }),
-        'void*'
-      ]],
-      ['sqlite3session_table_filter', undefined, [
-        'sqlite3_session*',
-        new wasm.xWrap.FuncPtrAdapter({
-          name: 'xFilter', signature: 'i(ps)',
-          contextKey: (argIndex,argv)=>argv[0/* (sqlite3_session*) */]
-        }),
-        '*'
-      ]]
-    ]);
-  }/*session/changeset APIs*/
-
   /**
      Functions which are intended solely for API-internal use by the
      WASM components, not client code. These get installed into
@@ -481,9 +292,9 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 
   {/* Convert Arrays and certain TypedArrays to strings for
       'string:flexible'-type arguments */
-    const xString = wasm.xWrap.argAdapter('string');
+    const __xString = wasm.xWrap.argAdapter('string');
     wasm.xWrap.argAdapter(
-      'string:flexible', (v)=>xString(util.flexibleString(v))
+      'string:flexible', (v)=>__xString(util.flexibleString(v))
     );
 
     /**
@@ -513,18 +324,18 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
         if(wasm.isPtr(v)) return v;
         v = ''+v;
         let rc = this[v];
-        return rc || (rc = this[v] = wasm.allocCString(v));
+        return rc || (this[v] = wasm.allocCString(v));
       }.bind(Object.create(null))
     );
   }/* special-case string-type argument conversions */
-  
-  if(1){// WhWasmUtil.xWrap() bindings...
+
+  if(1){// wasm.xWrap() bindings...
     /**
        Add some descriptive xWrap() aliases for '*' intended to (A)
-       initially improve readability/correctness of
-       wasm.bindingSignatures and (B) provide automatic conversion
-       from higher-level representations, e.g. capi.sqlite3_vfs to
-       `sqlite3_vfs*` via capi.sqlite3_vfs.pointer.
+       initially improve readability/correctness of capi.signatures
+       and (B) provide automatic conversion from higher-level
+       representations, e.g. capi.sqlite3_vfs to `sqlite3_vfs*` via
+       capi.sqlite3_vfs.pointer.
     */
     const aPtr = wasm.xWrap.argAdapter('*');
     const nilType = function(){};
@@ -532,10 +343,6 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     ('sqlite3_context*', aPtr)
     ('sqlite3_value*', aPtr)
     ('void*', aPtr)
-    ('sqlite3_changegroup*', aPtr)
-    ('sqlite3_changeset_iter*', aPtr)
-    //('sqlite3_rebaser*', aPtr)
-    ('sqlite3_session*', aPtr)
     ('sqlite3_stmt*', (v)=>
       aPtr((v instanceof (sqlite3?.oo1?.Stmt || nilType))
            ? v.pointer : v))
@@ -562,19 +369,22 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
            VFS in many contexts. We specifically do not want that
            behavior here. */
         return capi.sqlite3_vfs_find(v)
-          || sqlite3.SQLite3Error.toss("Unknown sqlite3_vfs name:",v);
+          || sqlite3.SQLite3Error.toss(
+            capi.SQLITE_NOTFOUND,
+            "Unknown sqlite3_vfs name:", v
+          );
       }
       return aPtr((v instanceof (capi.sqlite3_vfs || nilType))
                   ? v.pointer : v);
     });
 
-    const rPtr = wasm.xWrap.resultAdapter('*');
-    wasm.xWrap.resultAdapter('sqlite3*', rPtr)
-    ('sqlite3_context*', rPtr)
-    ('sqlite3_stmt*', rPtr)
-    ('sqlite3_value*', rPtr)
-    ('sqlite3_vfs*', rPtr)
-    ('void*', rPtr);
+    const __xRcPtr = wasm.xWrap.resultAdapter('*');
+    wasm.xWrap.resultAdapter('sqlite3*', __xRcPtr)
+    ('sqlite3_context*', __xRcPtr)
+    ('sqlite3_stmt*', __xRcPtr)
+    ('sqlite3_value*', __xRcPtr)
+    ('sqlite3_vfs*', __xRcPtr)
+    ('void*', __xRcPtr);
 
     /**
        Populate api object with sqlite3_...() by binding the "raw" wasm
@@ -588,10 +398,12 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     }
 
     /* For C API functions which cannot work properly unless
-       wasm.bigIntEnabled is true, install a bogus impl which
-       throws if called when bigIntEnabled is false. */
+       wasm.bigIntEnabled is true, install a bogus impl which throws
+       if called when bigIntEnabled is false. The alternative would be
+       to elide these functions altogether, which seems likely to
+       cause more confusion. */
     const fI64Disabled = function(fname){
-      return ()=>toss(fname+"() disabled due to lack",
+      return ()=>toss(fname+"() is unavailable due to lack",
                       "of BigInt support in this build.");
     };
     for(const e of wasm.bindingSignatures.int64){
@@ -614,7 +426,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
          - (sqlite3*, int code, string msg)
          - (sqlite3*, Error e [,string msg = ''+e])
 
-         If passed a WasmAllocError, the message is ingored and the
+         If passed a WasmAllocError, the message is ignored and the
          result code is SQLITE_NOMEM. If passed any other Error type,
          the result code defaults to SQLITE_ERROR unless the Error
          object has a resultCode property, in which case that is used
@@ -662,8 +474,7 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     );
   };
 
-  if(1){/* Bindings for sqlite3_create_collation() */
-
+  if(1){/* Bindings for sqlite3_create_collation[_v2]() */
     const __collationContextKey = (argIndex,argv)=>{
       return 'argv['+argIndex+']:sqlite3@'+argv[0]+
         ':'+wasm.cstrToJs(argv[1]).toLowerCase()
@@ -690,15 +501,22 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     /**
        Works exactly like C's sqlite3_create_collation_v2() except that:
 
-       1) It accepts JS functions for its function-pointer arguments,
+       1) It returns capi.SQLITE_FORMAT if the 3rd argument contains
+          any encoding-related value other than capi.SQLITE_UTF8.  No
+          other encodings are supported. As a special case, if the
+          bottom 4 bits of that argument are 0, SQLITE_UTF8 is
+          assumed.
+
+       2) It accepts JS functions for its function-pointer arguments,
           for which it will install WASM-bound proxies. The bindings
           are "permanent," in that they will stay in the WASM environment
-          until it shuts down unless the client somehow finds and removes
-          them.
+          until it shuts down unless the client calls this again with the
+          same collation name and a value of 0 or null for the
+          the function pointer(s).
 
-       2) It returns capi.SQLITE_FORMAT if the 3rd argument is not
-          capi.SQLITE_UTF8. No other encodings are supported. To simplify
-          usage, any falsy value of eTextRep is treated as SQLITE_UTF8.
+       For consistency with the C API, it requires the same number of
+       arguments. It returns capi.SQLITE_MISUSE if passed any other
+       argument count.
 
        Returns 0 on success, non-0 on error, in which case the error
        state of pDb (of type `sqlite3*` or argument-convertible to it)
@@ -706,13 +524,13 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     */
     capi.sqlite3_create_collation_v2 = function(pDb,zName,eTextRep,pArg,xCompare,xDestroy){
       if(6!==arguments.length) return __dbArgcMismatch(pDb, 'sqlite3_create_collation_v2', 6);
-      else if(!eTextRep){
-        eTextRep = capi.SQLITE_UTF8;
-      }else if(capi.SQLITE_UTF8!==eTextRep){
+      else if( 0 === (eTextRep & 0xf) ){
+        eTextRep |= capi.SQLITE_UTF8;
+      }else if( capi.SQLITE_UTF8 !== (eTextRep & 0xf) ){
         return __errEncoding(pDb);
       }
       let rc, pfCompare, pfDestroy;
-      try{
+     try{
         rc = __ccv2(pDb, zName, eTextRep, pArg, xCompare, xDestroy);
       }catch(e){
         rc = util.sqlite3_wasm_db_error(pDb, e);
@@ -777,13 +595,15 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 
   if(1){/* Special-case handling of sqlite3_create_function_v2()
            and sqlite3_create_window_function() */
+    /* Maintenance reminder: FuncPtrAdapter is not expressive enough
+       to be able to perform these mappings. */
     const sqlite3CreateFunction = wasm.xWrap(
       "sqlite3_create_function_v2", "int",
       ["sqlite3*", "string"/*funcName*/, "int"/*nArg*/,
        "int"/*eTextRep*/, "*"/*pApp*/,
        "*"/*xStep*/,"*"/*xFinal*/, "*"/*xValue*/, "*"/*xDestroy*/]
     );
-    // TODO: reimplement these using FuncPtrAdapter.
+
     const sqlite3CreateWindowFunction = wasm.xWrap(
       "sqlite3_create_window_function", "int",
       ["sqlite3*", "string"/*funcName*/, "int"/*nArg*/,
@@ -836,13 +656,13 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       xDestroy: {sig:'v(p)',   f:__xDestroy}
     });
 
-    const __xWrapFuncs = function(theFuncs, tgtUninst){
+    /* Internal helper for sqlite3_create_function() and friends. */
+    const __xWrapFuncs = function(theKeys, theFuncs, tgtUninst){
       const rc = []
-      let k;
-      for(k in theFuncs){
+      for(const k of theKeys){
         let fArg = theFuncs[k];
         if('function'===typeof fArg){
-          const w = __xMap[k];
+          const w = __xMap[k] || toss3("Internal error in __xWrapFuncs: invalid key:",k);
           fArg = wasm.installFunction(w.sig, w.f(fArg));
           tgtUninst.push(fArg);
         }
@@ -859,18 +679,19 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       xFinal,  //void (*xFinal)(sqlite3_context*)
       xDestroy //void (*xDestroy)(void*)
     ){
-      if(f.length!==arguments.length){
+      if( f.length!==arguments.length ){
         return __dbArgcMismatch(pDb,"sqlite3_create_function_v2",f.length);
-      }else if(!eTextRep){
-        eTextRep = capi.SQLITE_UTF8;
-      }else if(capi.SQLITE_UTF8!==eTextRep){
+      }else if( 0 === (eTextRep & 0xf) ){
+        eTextRep |= capi.SQLITE_UTF8;
+      }else if( capi.SQLITE_UTF8 !== (eTextRep & 0xf) ){
         return __errEncoding(pDb);
       }
       /* Wrap the callbacks in a WASM-bound functions... */
       const uninstall = [/*funcs to uninstall on error*/];
       let rc;
       try{
-        const funcArgs =  __xWrapFuncs({xFunc, xStep, xFinal, xDestroy},
+        const funcArgs =  __xWrapFuncs(['xFunc','xStep','xFinal','xDestroy'],
+                                       {xFunc, xStep, xFinal, xDestroy},
                                        uninstall);
         rc = sqlite3CreateFunction(pDb, funcName, nArg, eTextRep,
                                    pApp, ...funcArgs);
@@ -904,18 +725,19 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
       xInverse,//void (*xStep)(sqlite3_context*,int,sqlite3_value**)
       xDestroy //void (*xDestroy)(void*)
     ){
-      if(f.length!==arguments.length){
+      if( f.length!==arguments.length ){
         return __dbArgcMismatch(pDb,"sqlite3_create_window_function",f.length);
-      }else if(!eTextRep){
-        eTextRep = capi.SQLITE_UTF8;
-      }else if(capi.SQLITE_UTF8!==eTextRep){
+      }else if( 0 === (eTextRep & 0xf) ){
+        eTextRep |= capi.SQLITE_UTF8;
+      }else if( capi.SQLITE_UTF8 !== (eTextRep & 0xf) ){
         return __errEncoding(pDb);
       }
       /* Wrap the callbacks in a WASM-bound functions... */
       const uninstall = [/*funcs to uninstall on error*/];
       let rc;
       try{
-        const funcArgs = __xWrapFuncs({xStep, xFinal, xValue, xInverse, xDestroy},
+        const funcArgs = __xWrapFuncs(['xStep','xFinal','xValue','xInverse','xDestroy'],
+                                      {xStep, xFinal, xValue, xInverse, xDestroy},
                                       uninstall);
         rc = sqlite3CreateWindowFunction(pDb, funcName, nArg, eTextRep,
                                          pApp, ...funcArgs);
@@ -1118,14 +940,12 @@ self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
     wasm.ctype = JSON.parse(wasm.cstrToJs(cJson));
     //console.debug('wasm.ctype length =',wasm.cstrlen(cJson));
     const defineGroups = ['access', 'authorizer',
-                          'blobFinalizers', 'changeset',
-                          'config', 'dataTypes',
+                          'blobFinalizers', 'config', 'dataTypes',
                           'dbConfig', 'dbStatus',
                           'encodings', 'fcntl', 'flock', 'ioCap',
                           'limits', 'openFlags',
                           'prepareFlags', 'resultCodes',
-                          'serialize', 'session',
-                          'sqlite3Status',
+                          'serialize', 'sqlite3Status',
                           'stmtStatus', 'syncFlags',
                           'trace', 'txnState', 'udfFlags',
                           'version' ];
