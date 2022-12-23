@@ -447,7 +447,7 @@ self.WhWasmUtilInstaller = function(target){
             type(s) of the given function signature, or throws if the
             signature is invalid. */
         /******** // only valid for use with the WebAssembly.Function ctor, which
-                  // is not yet documented on MDN.
+                  // is not yet documented on MDN. 
         sigToWasm: function(sig){
           const rc = {parameters:[], results: []};
           if('v'!==sig[0]) rc.results.push(f.sigTypes(sig[0]));
@@ -1406,7 +1406,8 @@ self.WhWasmUtilInstaller = function(target){
     .set('int', xArg.get('i32'))
     .set('null', (i)=>i)
     .set(null, xArg.get('null'))
-    .set('**', __xArgPtr);
+    .set('**', __xArgPtr)
+    .set('*', __xArgPtr);
   xResult.set('*', __xArgPtr)
     .set('pointer', __xArgPtr)
     .set('number', (v)=>Number(v))
@@ -1448,23 +1449,23 @@ self.WhWasmUtilInstaller = function(target){
     if('string'===typeof v) return target.scopedAllocCString(v);
     return v ? __xArgPtr(v) : null;
   };
-  xArg.set('string', __xArgString);
-  xArg.set('utf8', __xArgString);
-  xArg.set('pointer', __xArgString);
-  xArg.set('*', __xArgString);
+  xArg.set('string', __xArgString)
+    .set('utf8', __xArgString)
+    .set('pointer', __xArgString);
+  //xArg.set('*', __xArgString);
 
-  xResult.set('string', (i)=>target.cstrToJs(i));
-  xResult.set('utf8', xResult.get('string'));
-  xResult.set('string:dealloc', (i)=>{
-    try { return i ? target.cstrToJs(i) : null }
-    finally{ target.dealloc(i) }
-  });
-  xResult.set('utf8:dealloc', xResult.get('string:dealloc'));
-  xResult.set('json', (i)=>JSON.parse(target.cstrToJs(i)));
-  xResult.set('json:dealloc', (i)=>{
-    try{ return i ? JSON.parse(target.cstrToJs(i)) : null }
-    finally{ target.dealloc(i) }
-  });
+  xResult.set('string', (i)=>target.cstrToJs(i))
+    .set('utf8', xResult.get('string'))
+    .set('string:dealloc', (i)=>{
+      try { return i ? target.cstrToJs(i) : null }
+      finally{ target.dealloc(i) }
+    })
+    .set('utf8:dealloc', xResult.get('string:dealloc'))
+    .set('json', (i)=>JSON.parse(target.cstrToJs(i)))
+    .set('json:dealloc', (i)=>{
+      try{ return i ? JSON.parse(target.cstrToJs(i)) : null }
+      finally{ target.dealloc(i) }
+    });
 
   /**
      Internal-use-only base class for FuncPtrAdapter and potentially
@@ -1575,20 +1576,10 @@ self.WhWasmUtilInstaller = function(target){
      not actually bind any functions. Its convertArg() method is
      called via xWrap() to perform any bindings.
 
-     Shortcomings:
-
-     - These "reverse" bindings, i.e. calling into a JS-defined
-       function from a WASM-defined function (the generated proxy
-       wrapper), lack all type conversion support. That means, for
-       example, that...
-
-     - Function pointers which include C-string arguments may still
-       need a level of hand-written wrappers around them, depending on
-       how they're used, in order to provide the client with JS
-       strings. Alternately, clients will need to perform such conversions
-       on their own, e.g. using cstrtojs(). Or maybe we can find a way
-       to perform such conversions here, via addition of an xWrap()-style
-       function signature to the options argument.
+     Shortcomings: function pointers which include C-string arguments
+     may still need a level of hand-written wrappers around them,
+     depending on how they're used, in order to provide the client
+     with JS strings.
   */
   xArg.FuncPtrAdapter = class FuncPtrAdapter extends AbstractArgAdapter {
     constructor(opt) {
@@ -1758,10 +1749,13 @@ self.WhWasmUtilInstaller = function(target){
      - `N*` (args): a type name in the form `N*`, where N is a numeric
        type name, is treated the same as WASM pointer.
 
-     - `*` and `pointer` (args): have multple semantics. They
-       behave exactly as described below for `string` args.
+     - `*` and `pointer` (args): are assumed to be WASM pointer values
+       and are returned coerced to an appropriately-sized pointer
+       value (i32 or i64). Non-numeric values will coerce to 0 and
+       out-of-range values will have undefined results (just as with
+       any pointer misuse).
 
-     - `*` and `pointer` (results): are aliases for the current
+     - `*` and `pointer` (results): aliases for the current
        WASM pointer numeric type.
 
      - `**` (args): is simply a descriptive alias for the WASM pointer
