@@ -1440,9 +1440,6 @@ static void unknownFunc(
   sqlite3_value **argv
 ){
   /* no-op */
-  (void)context;
-  (void)argc;
-  (void)argv;
 }
 #endif /*SQLITE_ENABLE_UNKNOWN_SQL_FUNCTION*/
 
@@ -2186,7 +2183,6 @@ static void piFunc(
   sqlite3_value **argv
 ){
   assert( argc==0 );
-  (void)argv;
   sqlite3_result_double(context, M_PI);
 }
 
