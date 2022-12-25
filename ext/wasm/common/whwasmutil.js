@@ -447,7 +447,7 @@ self.WhWasmUtilInstaller = function(target){
             type(s) of the given function signature, or throws if the
             signature is invalid. */
         /******** // only valid for use with the WebAssembly.Function ctor, which
-                  // is not yet documented on MDN.
+                  // is not yet documented on MDN. 
         sigToWasm: function(sig){
           const rc = {parameters:[], results: []};
           if('v'!==sig[0]) rc.results.push(f.sigTypes(sig[0]));
@@ -1590,20 +1590,10 @@ self.WhWasmUtilInstaller = function(target){
      not actually bind any functions. Its convertArg() method is
      called via xWrap() to perform any bindings.
 
-     Shortcomings:
-
-     - These "reverse" bindings, i.e. calling into a JS-defined
-       function from a WASM-defined function (the generated proxy
-       wrapper), lack all type conversion support. That means, for
-       example, that...
-
-     - Function pointers which include C-string arguments may still
-       need a level of hand-written wrappers around them, depending on
-       how they're used, in order to provide the client with JS
-       strings. Alternately, clients will need to perform such conversions
-       on their own, e.g. using cstrtojs(). Or maybe we can find a way
-       to perform such conversions here, via addition of an xWrap()-style
-       function signature to the options argument.
+     Shortcomings: function pointers which include C-string arguments
+     may still need a level of hand-written wrappers around them,
+     depending on how they're used, in order to provide the client
+     with JS strings.
   */
   xArg.FuncPtrAdapter = class FuncPtrAdapter extends AbstractArgAdapter {
     constructor(opt) {
@@ -1614,18 +1604,19 @@ self.WhWasmUtilInstaller = function(target){
                      'client-level code. Invoked with:',opt);
       }
       this.signature = opt.signature;
-      if(!opt.bindScope && (opt.contextKey instanceof Function)){
-        opt.bindScope = 'context';
-      }else if(FuncPtrAdapter.bindScopes.indexOf(opt.bindScope)<0){
+      if(opt.contextKey instanceof Function){
+        this.contextKey = opt.contextKey;
+        if(!opt.bindScope) opt.bindScope = 'context';
+      }
+      this.bindScope = opt.bindScope
+        || toss("FuncPtrAdapter options requires a bindScope (explicit or implied).");
+      if(FuncPtrAdapter.bindScopes.indexOf(opt.bindScope)<0){
         toss("Invalid options.bindScope ("+opt.bindMod+") for FuncPtrAdapter. "+
              "Expecting one of: ("+FuncPtrAdapter.bindScopes.join(', ')+')');
       }
-      this.bindScope = opt.bindScope;
-      if(opt.contextKey) this.contextKey = opt.contextKey /*else inherit one*/;
       this.isTransient = 'transient'===this.bindScope;
       this.isContext = 'context'===this.bindScope;
-      if( ('singleton'===this.bindScope) ) this.singleton = [];
-      else this.singleton = undefined;
+      this.singleton = ('singleton'===this.bindScope) ? [] : undefined;
       //console.warn("FuncPtrAdapter()",opt,this);
       this.callProxy = (opt.callProxy instanceof Function)
         ? opt.callProxy : undefined;
@@ -1928,7 +1919,7 @@ self.WhWasmUtilInstaller = function(target){
       const scope = target.scopedAllocPush();
       try{
         /*
-          Maintenance reminder re. arguments passed to convertArgs():
+          Maintenance reminder re. arguments passed to convertArg():
           The public interface of argument adapters is that they take
           ONE argument and return a (possibly) converted result for
           it. The passing-on of arguments after the first is an
