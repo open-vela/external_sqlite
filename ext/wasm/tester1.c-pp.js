@@ -1927,7 +1927,10 @@ self.sqlite3InitModule = sqlite3InitModule;
       });
       try {
         T.assert(wasm.isPtr(pCb));
-        rc = capi.sqlite3_exec(db, "select a, a*2 from foo.bar", pCb, 0, 0);
+        rc = capi.sqlite3_exec(
+          db, new TextEncoder('utf-8').encode("select a, a*2 from foo.bar"),
+          pCb, 0, 0
+        );
         T.assert(0===rc)
           .assert(3===rowCount)
           .assert(2===colCount);
@@ -1937,7 +1940,7 @@ self.sqlite3InitModule = sqlite3InitModule;
 
       // Demonstrate that an OOM result does not propagate through sqlite3_exec()...
       rc = capi.sqlite3_exec(
-        db, "select a, a*2 from foo.bar", function(aVals, aNames){
+        db, ["select a,"," a*2 from foo.bar"], (aVals, aNames)=>{
           sqlite3.WasmAllocError.toss("just testing");
         }, 0, 0
       );
@@ -2641,6 +2644,7 @@ self.sqlite3InitModule = sqlite3InitModule;
       name: 'Session API sanity checks',
       predicate: ()=>!!capi.sqlite3changegroup_add,
       test: function(sqlite3){
+        warn("The session API tests could use some expansion.");
         const db1 = new sqlite3.oo1.DB(), db2 = new sqlite3.oo1.DB();
         const sqlInit = [
           "create table t(rowid INTEGER PRIMARY KEY,a,b); ",
