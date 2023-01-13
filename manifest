@@ -1,5 +1,5 @@
-C Update\sdocumentation\sfor\ssqlite3_progress_handler().
-D 2023-01-13T15:31:24.311
+C Enhance\squery\splanning\sso\sthat\sit\scheck\sfor\ssqlite3_interrupt()\scalls\sand\nperiodically\sinvokes\sthe\sprogress\shandler\scallback\s(if\sany)\sduring\slong\nquery\sanalyses.
+D 2023-01-13T15:54:25.723
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -376,6 +376,7 @@ F ext/rbu/rbufts.test 0ae8d1da191c75bd776b86e24456db0fb6e97b7c944259fae5407ea55d
 F ext/rbu/rbumisc.test 329986cf5dd51890c4eb906c2f960ebb773a79a64bed90f506b7c417825b37eb
 F ext/rbu/rbumulti.test 5fb139058f37ddc5a113c5b93238de915b769b7792de41b44c983bc7c18cf5b9
 F ext/rbu/rbupartial.test f25df014b8dbe3c5345851fba6e66f79ab237f57dc201b2d5f0dbae658ae5a4c
+F ext/rbu/rbupass.test 1a8f635a9f6026f905a952e70a081811d8042de28165099d874832c1bf49d4b9
 F ext/rbu/rbuprogress.test 857cf1f8166c83ef977edb9ef4fc42d80f71fbd798652b46ae2f3a7031870f8d
 F ext/rbu/rburename.test a9b4aea612352b74c45de1757edd2ecb2079348b1d4cc734572dc29e55b1b376
 F ext/rbu/rburesume.test dbdc4ca504e9c76375a69e5f0d91205db967dcc509a5166ca80231f8fda49eb1
@@ -386,7 +387,7 @@ F ext/rbu/rbuvacuum.test 55e101e90168c2b31df6c9638fe73dc7f7cc666b6142266d1563697
 F ext/rbu/rbuvacuum2.test 2643b58f4d8d3573db0f93faae18805a35ab162b4c55ff6b656062ff432ed55b
 F ext/rbu/rbuvacuum3.test 8addd82e4b83b4c93fa47428eae4fd0dbf410f8512c186f38e348feb49ba03dc
 F ext/rbu/rbuvacuum4.test a78898e438a44803eb2bc897ba3323373c9f277418e2d6d76e90f2f1dbccfd10
-F ext/rbu/sqlite3rbu.c 64d105c7c6c95272e7c12142cd021059214387a0d51e262bb0663285a2b91660
+F ext/rbu/sqlite3rbu.c 2f82788e5dc0a40ce92237b85ea89093d471187ed09981c3c228c6315c2f4513
 F ext/rbu/sqlite3rbu.h 02d981e2d39c151391759e1a400e29c7388730812957ac3db8dad7f6c9f9cfc8
 F ext/rbu/test_rbu.c ee6ede75147bc081fe9bc3931e6b206277418d14d3fbceea6fdc6216d9b47055
 F ext/recover/dbdata.c dc25628e405c86936c597e28f3e6f56a257029c3034c5ef7f6b10f7c02f41018
@@ -2068,8 +2069,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 3006b3b32fb1efedde3ade418c19c35b6e9a4af1e6a7cb5d5c72a080ec1f6f3c
-R 33ea1cbe269f174f61a6120d13d981a4
+P c5d958eb942a8d6ea1e6e1d2d57637f9359d518965a28f298c7fbacdb9080f59 41b4c407b7f6968f4493fb9a0b220c55a6f6a353a8e6cb054efd3eb01bdd11dc
+R c48cc3fce2e639d8b7f17511d0860c6a
+T +closed 41b4c407b7f6968f4493fb9a0b220c55a6f6a353a8e6cb054efd3eb01bdd11dc
 U drh
-Z 24a4936197f59974fd50260986b7ffd3
+Z ce33d829c4c5aabbb58fbd24075e297a
 # Remove this line to create a well-formed Fossil manifest.
