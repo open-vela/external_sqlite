@@ -6,14 +6,10 @@
 */
 
 // See notes in extern-post-js.js
-const sqlite3InitModuleState = self.sqlite3InitModuleState
-      || Object.assign(Object.create(null),{
-        debugModule: ()=>{}
-      });
+const sqlite3InitModuleState = self.sqlite3InitModuleState || Object.create(null);
 delete self.sqlite3InitModuleState;
 sqlite3InitModuleState.debugModule('self.location =',self.location);
 
-//#ifnot target=es6-bundler-friendly
 /**
    This custom locateFile() tries to figure out where to load `path`
    from. The intent is to provide a way for foo/bar/X.js loaded from a
@@ -55,9 +51,8 @@ Module['locateFile'] = function(path, prefix) {
     "result =", theFile
   );
   return theFile;
-//#endif //target=es6-module
+//#endif /* SQLITE_JS_EMS */
 }.bind(sqlite3InitModuleState);
-//#endif //ifnot target=es6-bundler-friendly
 
 /**
    Bug warning: a custom Module.instantiateWasm() does not work
@@ -67,7 +62,7 @@ Module['locateFile'] = function(path, prefix) {
 
    In such builds we must disable this.
 */
-const xNameOfInstantiateWasm = false
+const xNameOfInstantiateWasm = true
       ? 'instantiateWasm'
       : 'emscripten-bug-17951';
 Module[xNameOfInstantiateWasm] = function callee(imports,onSuccess){
