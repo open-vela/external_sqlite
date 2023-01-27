@@ -100,20 +100,13 @@ const installOpfsVfs = function callee(options){
   if(!options || 'object'!==typeof options){
     options = Object.create(null);
   }
-  const urlParams =
-//#if target=es6-bundler-friendly
-        undefined;
-//#else
-        new URL(self.location.href).searchParams;
-//#endif
-  if(urlParams){
-    if(undefined===options.verbose){
-      options.verbose = urlParams.has('opfs-verbose')
-        ? (+urlParams.get('opfs-verbose') || 2) : 1;
-    }
-    if(undefined===options.sanityChecks){
-      options.sanityChecks = urlParams.has('opfs-sanity-check');
-    }
+  const urlParams = new URL(self.location.href).searchParams;
+  if(undefined===options.verbose){
+    options.verbose = urlParams.has('opfs-verbose')
+      ? (+urlParams.get('opfs-verbose') || 2) : 1;
+  }
+  if(undefined===options.sanityChecks){
+    options.sanityChecks = urlParams.has('opfs-sanity-check');
   }
   if(undefined===options.proxyUri){
     options.proxyUri = callee.defaultProxyUri;
@@ -205,9 +198,7 @@ const installOpfsVfs = function callee(options){
       return promiseReject_(err);
     };
     const W =
-//#if target=es6-bundler-friendly
-    new Worker(new URL("sqlite3-opfs-async-proxy.js", import.meta.url));
-//#elif target=es6-module
+//#if target=es6-module
     new Worker(new URL(options.proxyUri, import.meta.url));
 //#else
     new Worker(options.proxyUri);
