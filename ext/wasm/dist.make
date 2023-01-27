@@ -84,8 +84,6 @@ dist: \
 		> $(dist-dir.jswasm)/$(notdir $(sqlite3.js))
 	@$(bin.stripccomments) -k -k < $(sqlite3.mjs) \
 		> $(dist-dir.jswasm)/$(notdir $(sqlite3.mjs))
-	@$(bin.stripccomments) -k -k < $(sqlite3-bundler-friendly.mjs) \
-		> $(dist-dir.jswasm)/$(notdir $(sqlite3-bundler-friendly.mjs))
 	@cp -p $(dist.common.extras) $(dist-dir.common)
 	@set -e; \
 		vnum=$$($(bin.version-info) --download-version); \
