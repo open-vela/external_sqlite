@@ -12,9 +12,10 @@
 # Tests for the [sqldiff --rbu] command.
 #
 #
-
-source [file join [file dirname [info script]] rbu_common.tcl]
-ifcapable !rbu { finish_test ; return }
+if {![info exists testdir]} {
+  set testdir [file join [file dirname [info script]] .. .. test]
+}
+source $testdir/tester.tcl
 set testprefix rbudiff
 
 set PROG [test_find_sqldiff]
