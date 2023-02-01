@@ -177,8 +177,6 @@
   #include <assert.h>
 #endif
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-
 /* Forward declarations */
 typedef struct vt02_vtab vt02_vtab;
 typedef struct vt02_cur vt02_cur;
@@ -1000,10 +998,6 @@ static void vt02CoreInit(sqlite3 *db){
   sqlite3_create_module(db, "vt02pkx", &vt02Module, (void*)zPkXSchema);
   sqlite3_create_module(db, "vt02pkabcd", &vt02Module, (void*)zPkABCDSchema);
 }
-
-#else
-# define vt02CoreInit(db)
-#endif /* ifndef SQLITE_OMIT_VIRTUALTABLE */
 
 #ifdef TH3_VERSION
 static void vt02_init(th3state *p, int iDb, char *zArg){
