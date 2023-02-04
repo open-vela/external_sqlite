@@ -1597,8 +1597,6 @@ static int analysisLoader(void *pData, int argc, char **argv, char **NotUsed){
 ** and its contents.
 */
 void sqlite3DeleteIndexSamples(sqlite3 *db, Index *pIdx){
-  assert( db!=0 );
-  assert( pIdx!=0 );
 #ifdef SQLITE_ENABLE_STAT4
   if( pIdx->aSample ){
     int j;
@@ -1608,7 +1606,7 @@ void sqlite3DeleteIndexSamples(sqlite3 *db, Index *pIdx){
     }
     sqlite3DbFree(db, pIdx->aSample);
   }
-  if( db->pnBytesFreed==0 ){
+  if( db && db->pnBytesFreed==0 ){
     pIdx->nSample = 0;
     pIdx->aSample = 0;
   }
