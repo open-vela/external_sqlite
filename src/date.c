@@ -331,12 +331,16 @@ static int parseYyyyMmDd(const char *zDate, DateTime *p){
 }
 
 /*
-** Set the time to the current time reported by the VFS.
+** Set the time to the current time reported for the prepared statement
+** that is currently executing.  The same time is reported for all
+** invocations of this routine from within the same call to sqlite3_step().
+**
+** Or if bTxn is true, use the transaction time.
 **
 ** Return the number of errors.
 */
-static int setDateTimeToCurrent(sqlite3_context *context, DateTime *p){
-  p->iJD = sqlite3StmtCurrentTime(context);
+static int setCurrentStmtTime(sqlite3_context *context, DateTime *p, int bTxn){
+  p->iJD = sqlite3StmtCurrentTime(context, bTxn);
   if( p->iJD>0 ){
     p->validJD = 1;
     return 0;
@@ -387,7 +391,9 @@ static int parseDateOrTime(
   }else if( parseHhMmSs(zDate, p)==0 ){
     return 0;
   }else if( sqlite3StrICmp(zDate,"now")==0 && sqlite3NotPureFunc(context) ){
-    return setDateTimeToCurrent(context, p);
+    return setCurrentStmtTime(context, p, 0);
+  }else if( sqlite3StrICmp(zDate,"txn")==0 && sqlite3NotPureFunc(context) ){
+    return setCurrentStmtTime(context, p, 1);
   }else if( sqlite3AtoF(zDate, &r, sqlite3Strlen30(zDate), SQLITE_UTF8)>0 ){
     setRawDateNumber(p, r);
     return 0;
@@ -946,7 +952,7 @@ static int isDate(
   memset(p, 0, sizeof(*p));
   if( argc==0 ){
     if( !sqlite3NotPureFunc(context) ) return 1;
-    return setDateTimeToCurrent(context, p);
+    return setCurrentStmtTime(context, p, 1);
   }
   if( (eType = sqlite3_value_type(argv[0]))==SQLITE_FLOAT
                    || eType==SQLITE_INTEGER ){
@@ -1312,7 +1318,7 @@ static void currentTimeFunc(
   UNUSED_PARAMETER(argc);
   UNUSED_PARAMETER(argv);
 
-  iT = sqlite3StmtCurrentTime(context);
+  iT = sqlite3StmtCurrentTime(context, 1);
   if( iT<=0 ) return;
   t = iT/1000 - 10000*(sqlite3_int64)21086676;
 #if HAVE_GMTIME_R
