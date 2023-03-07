@@ -313,11 +313,11 @@
   options.columnNames may be populated by the call to db.exec().
 
 */
-globalThis.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
+self.sqlite3ApiBootstrap.initializers.push(function(sqlite3){
 sqlite3.initWorker1API = function(){
   'use strict';
   const toss = (...args)=>{throw new Error(args.join(' '))};
-  if(!(globalThis.WorkerGlobalScope instanceof Function)){
+  if('function' !== typeof importScripts){
     toss("initWorker1API() must be run from a Worker thread.");
   }
   const self = this.self;
@@ -382,10 +382,10 @@ sqlite3.initWorker1API = function(){
     */
     post: function(msg,xferList){
       if(xferList && xferList.length){
-        globalThis.postMessage( msg, Array.from(xferList) );
+        self.postMessage( msg, Array.from(xferList) );
         xferList.length = 0;
       }else{
-        globalThis.postMessage(msg);
+        self.postMessage(msg);
       }
     },
     /** Map of DB IDs to DBs. */
@@ -589,7 +589,7 @@ sqlite3.initWorker1API = function(){
     }
   }/*wMsgHandler*/;
 
-  globalThis.onmessage = async function(ev){
+  self.onmessage = async function(ev){
     ev = ev.data;
     let result, dbId = ev.dbId, evType = ev.type;
     const arrivalTime = performance.now();
@@ -637,6 +637,6 @@ sqlite3.initWorker1API = function(){
       result: result
     }, wState.xfer);
   };
-  globalThis.postMessage({type:'sqlite3-api',result:'worker1-ready'});
+  self.postMessage({type:'sqlite3-api',result:'worker1-ready'});
 }.bind({self, sqlite3});
 });
