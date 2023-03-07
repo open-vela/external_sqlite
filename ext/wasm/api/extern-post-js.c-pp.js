@@ -28,7 +28,7 @@ const toExportForESM =
            for non-ES6 Module cases but wrong for ES6 modules because those
            resolve this symbol differently. */ sqlite3InitModule;
   if(!originalInit){
-    throw new Error("Expecting globalThis.sqlite3InitModule to be defined by the Emscripten build.");
+    throw new Error("Expecting self.sqlite3InitModule to be defined by the Emscripten build.");
   }
   /**
      We need to add some state which our custom Module.locateFile()
@@ -41,13 +41,11 @@ const toExportForESM =
      into the global scope and delete it when sqlite3InitModule()
      is called.
   */
-  const initModuleState = globalThis.sqlite3InitModuleState = Object.assign(Object.create(null),{
+  const initModuleState = self.sqlite3InitModuleState = Object.assign(Object.create(null),{
     moduleScript: self?.document?.currentScript,
     isWorker: ('undefined' !== typeof WorkerGlobalScope),
-    location: globalThis.location,
-    urlParams:  globalThis?.location?.href
-      ? new URL(globalThis.location.href).searchParams
-      : new URLSearchParams()
+    location: self.location,
+    urlParams:  new URL(self.location.href).searchParams
   });
   initModuleState.debugModule =
     initModuleState.urlParams.has('sqlite3.debugModule')
@@ -62,14 +60,14 @@ const toExportForESM =
     initModuleState.sqlite3Dir = li.join('/') + '/';
   }
 
-  globalThis.sqlite3InitModule = function ff(...args){
+  self.sqlite3InitModule = function ff(...args){
     //console.warn("Using replaced sqlite3InitModule()",self.location);
     return originalInit(...args).then((EmscriptenModule)=>{
-      if('undefined'!==typeof WorkerGlobalScope &&
+      if(self.window!==self &&
          (EmscriptenModule['ENVIRONMENT_IS_PTHREAD']
           || EmscriptenModule['_pthread_self']
           || 'function'===typeof threadAlert
-          || globalThis?.location?.pathname?.endsWith?.('.worker.js')
+          || self.location.pathname.endsWith('.worker.js')
          )){
         /** Workaround for wasmfs-generated worker, which calls this
             routine from each individual thread and requires that its
@@ -90,10 +88,10 @@ const toExportForESM =
       throw e;
     });
   };
-  globalThis.sqlite3InitModule.ready = originalInit.ready;
+  self.sqlite3InitModule.ready = originalInit.ready;
 
-  if(globalThis.sqlite3InitModuleState.moduleScript){
-    const sim = globalThis.sqlite3InitModuleState;
+  if(self.sqlite3InitModuleState.moduleScript){
+    const sim = self.sqlite3InitModuleState;
     let src = sim.moduleScript.src.split('/');
     src.pop();
     sim.scriptDir = src.join('/') + '/';
@@ -101,7 +99,7 @@ const toExportForESM =
   initModuleState.debugModule('sqlite3InitModuleState =',initModuleState);
   if(0){
     console.warn("Replaced sqlite3InitModule()");
-    console.warn("globalThis.location.href =",globalThis.location.href);
+    console.warn("self.location.href =",self.location.href);
     if('undefined' !== typeof document){
       console.warn("document.currentScript.src =",
                    document?.currentScript?.src);
@@ -121,7 +119,7 @@ const toExportForESM =
   /* AMD modules get injected in a way we cannot override,
      so we can't handle those here. */
 //#endif // !target=es6-module
-  return globalThis.sqlite3InitModule /* required for ESM */;
+  return self.sqlite3InitModule /* required for ESM */;
 })();
 //#if target=es6-module
 export default toExportForESM;

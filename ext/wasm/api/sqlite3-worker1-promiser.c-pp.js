@@ -132,7 +132,7 @@
 
      https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker
 */
-globalThis.sqlite3Worker1Promiser = function callee(config = callee.defaultConfig){
+self.sqlite3Worker1Promiser = function callee(config = callee.defaultConfig){
   // Inspired by: https://stackoverflow.com/a/52439530
   if(1===arguments.length && 'function'===typeof arguments[0]){
     const f = config;
@@ -245,7 +245,7 @@ globalThis.sqlite3Worker1Promiser = function callee(config = callee.defaultConfi
     return p;
   };
 }/*sqlite3Worker1Promiser()*/;
-globalThis.sqlite3Worker1Promiser.defaultConfig = {
+self.sqlite3Worker1Promiser.defaultConfig = {
   worker: function(){
 //#if target=es6-bundler-friendly
     return new Worker("sqlite3-worker1-bundler-friendly.mjs",{
@@ -259,17 +259,17 @@ globalThis.sqlite3Worker1Promiser.defaultConfig = {
       src.pop();
       theJs = src.join('/')+'/' + theJs;
       //sqlite3.config.warn("promiser currentScript, theJs =",this.currentScript,theJs);
-    }else if(globalThis.location){
-      //sqlite3.config.warn("promiser globalThis.location =",globalThis.location);
-      const urlParams = new URL(globalThis.location.href).searchParams;
+    }else{
+      //sqlite3.config.warn("promiser self.location =",self.location);
+      const urlParams = new URL(self.location.href).searchParams;
       if(urlParams.has('sqlite3.dir')){
         theJs = urlParams.get('sqlite3.dir') + '/' + theJs;
       }
     }
-    return new Worker(theJs + globalThis.location.search);
+    return new Worker(theJs + self.location.search);
 //#endif
   }.bind({
-    currentScript: globalThis?.document?.currentScript
+    currentScript: self?.document?.currentScript
   }),
   onerror: (...args)=>console.error('worker1 promiser error',...args)
 };
