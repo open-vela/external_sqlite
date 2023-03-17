@@ -11465,9 +11465,9 @@ static int process_input(ShellState *p){
     }
     /* No single-line dispositions remain; accumulate line(s). */
     nLine = strlen(zLine);
-    if( nSql+nLine+8>=nAlloc ){
+    if( nSql+nLine+2>=nAlloc ){
       /* Grow buffer by half-again increments when big. */
-      nAlloc = nSql+(nSql>>1)+nLine+104;
+      nAlloc = nSql+(nSql>>1)+nLine+100;
       zSql = realloc(zSql, nAlloc);
       shell_check_oom(zSql);
     }
@@ -11667,7 +11667,6 @@ static void process_sqliterc(
 ** Show available command line options
 */
 static const char zOptions[] =
-  "   --                   treat no subsequent arguments as options\n"
 #if defined(SQLITE_HAVE_ZLIB) && !defined(SQLITE_OMIT_VIRTUALTABLE)
   "   -A ARGS...           run \".archive ARGS\" and exit\n"
 #endif
@@ -11730,9 +11729,9 @@ static const char zOptions[] =
 ;
 static void usage(int showDetail){
   utf8_printf(stderr,
-      "Usage: %s [OPTIONS] [FILENAME [SQL]]\n"
+      "Usage: %s [OPTIONS] FILENAME [SQL]\n"
       "FILENAME is the name of an SQLite database. A new database is created\n"
-      "if the file does not previously exist. Defaults to :memory:.\n", Argv0);
+      "if the file does not previously exist.\n", Argv0);
   if( showDetail ){
     utf8_printf(stderr, "OPTIONS include:\n%s", zOptions);
   }else{

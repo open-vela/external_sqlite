@@ -3862,9 +3862,7 @@ static Expr *substExpr(
         sqlite3VectorErrorMsg(pSubst->pParse, pCopy);
       }else{
         sqlite3 *db = pSubst->pParse->db;
-        if( pSubst->isOuterJoin
-         && (pCopy->op!=TK_COLUMN || pCopy->iTable!=pSubst->iNewTable)
-        ){
+        if( pSubst->isOuterJoin ){
           memset(&ifNullRow, 0, sizeof(ifNullRow));
           ifNullRow.op = TK_IF_NULL_ROW;
           ifNullRow.pLeft = pCopy;
