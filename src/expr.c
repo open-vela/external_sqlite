@@ -4222,13 +4222,7 @@ expr_code_doover:
       AggInfo *pAggInfo = pExpr->pAggInfo;
       struct AggInfo_col *pCol;
       assert( pAggInfo!=0 );
-      assert( pExpr->iAgg>=0 );
-      if( pExpr->iAgg>=pAggInfo->nColumn ){
-        sqlite3VdbeAddOp2(v, OP_Null, 0, target);
-        /* FIXME:  Need to verify that tests run this opcode
-        ** Some kind of coverage macro.. VdbeCoverage(v);  tag-20230325-2 */
-        break;
-      }
+      assert( pExpr->iAgg>=0 && pExpr->iAgg<pAggInfo->nColumn );
       pCol = &pAggInfo->aCol[pExpr->iAgg];
       if( !pAggInfo->directMode ){
         return AggInfoColumnReg(pAggInfo, pExpr->iAgg);
