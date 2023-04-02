@@ -1,12 +1,12 @@
-C Allow\sspecial\sfloating-point\svalue\snames\sin\sJSON:\s\s"inf",\s"-inf",\s"infinity",\n"-infinity",\s"nan",\s"qnan",\sand\s"snan".\s\sAll\sare\sconverted\sinto\svalid\sJSON\nvalues:\s9e999,\s-9e999,\sor\snull.\s\sRequires\sthe\sSQLITE_ENABLE_JSON_NAN_INF\ncompile-time\soption\sto\soperate.
-D 2023-04-01T23:29:59.248
+C Clear\sexecutable\sbit\son\sbase64.c
+D 2023-04-02T14:53:59.580
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
 F Makefile.in 764f2e3e8fb4ae1c8dfe03e65b2b3b01bd1fc57edf78ec2cab3a1301e90e1905
 F Makefile.linux-gcc f609543700659711fbd230eced1f01353117621dccae7b9fb70daa64236c5241
 F Makefile.msc ada3466f8f0112a8baead4d6cc2a99bf544d228958baae12ca35a3ee5755c806
-F README.md 8b8df9ca852aeac4864eb1e400002633ee6db84065bd01b78c33817f97d31f5e
+F README.md e05bd8fcb45da04ab045c37f79a98654e8aa3b3b8f302cfbba80a0d510df75f7
 F VERSION 17f95ae2fdf21f0e9575eb0b0511ea63f15d71dfff431b21c2b4adbfa70cfbbf
 F aclocal.m4 a5c22d164aff7ed549d53a90fa56d56955281f50
 F art/sqlite370.eps aa97a671332b432a54e1d74ff5e8775be34200c2
@@ -264,7 +264,7 @@ F ext/misc/README.md d6dd0fe1d8af77040216798a6a2b0c46c73054d2f0ea544fbbcdccf6f23
 F ext/misc/amatch.c e3ad5532799cee9a97647f483f67f43b38796b84b5a8c60594fe782a4338f358
 F ext/misc/anycollseq.c 5ffdfde9829eeac52219136ad6aa7cd9a4edb3b15f4f2532de52f4a22525eddb
 F ext/misc/appendvfs.c 9642c7a194a2a25dca7ad3e36af24a0a46d7702168c4ad7e59c9f9b0e16a3824
-F ext/misc/base64.c d43d2b209c8ab70ca3f860104bb353b0f52a1c5462a2466140025c954e4f3ea7 x
+F ext/misc/base64.c e83a915fcb94c9332e9a92aa4c3beafe2552bd3da2813fc5fff31918cca0b834
 F ext/misc/base85.c 77dfd5813d23ea561d0348f922583888e78f8eaeb2b9a4a28226d092389890b8
 F ext/misc/basexx.c 5e859e1820620aa8080fb9145eb47089de426ae808f6abb01a8e12921c3a8e67
 F ext/misc/blobio.c a867c4c4617f6ec223a307ebfe0eabb45e0992f74dd47722b96f3e631c0edb2a
@@ -585,7 +585,7 @@ F src/hash.h 3340ab6e1d13e725571d7cee6d3e3135f0779a7d8e76a9ce0a85971fa3953c51
 F src/hwtime.h b638809e083b601b618df877b2e89cb87c2a47a01f4def10be4c4ebb54664ac7
 F src/in-operator.md 10cd8f4bcd225a32518407c2fb2484089112fd71
 F src/insert.c a8de1db43335fc4946370a7a7e47d89975ad678ddb15078a150e993ba2fb37d4
-F src/json.c 5ac77e419921a0e63dafe07b560e9ce5e9823055e814308559e4d54cc885a967
+F src/json.c 9e3a6acf9e4fa8bb6c84a38538ed9c2f9ad09f106910ef0e9cc68e19c8dc4fc8
 F src/legacy.c d7874bc885906868cd51e6c2156698f2754f02d9eee1bae2d687323c3ca8e5aa
 F src/loadext.c be5af440f3192c58681b5d43167dbca3ccbfce394d89faa22378a14264781136
 F src/main.c 09bc5191f75dc48fc4dfddda143cb864c0c3dbc3297eb9a9c8e01fea58ff847d
@@ -2052,11 +2052,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P a4fb2864fe01cce9694242a0750623ca47fcecd68f74c4239d3eb5fbf978770a
-R d4fc5e6b6e165fd35d3ba84e2f999b35
-T *branch * json-nan-inf
-T *sym-json-nan-inf *
-T -sym-trunk *
-U drh
-Z 2575536ea35edbedba9ae17b565e4eb0
+P 715c00e58b774d6a29e2f60fd33a2ecb960307192ae1fdb8ed396f74fd62b444
+R 76be783a3d8976f5c3106dd2a2179fd6
+U larrybr
+Z 7cb6cca24a98be0d56433a58a4384bb2
 # Remove this line to create a well-formed Fossil manifest.
