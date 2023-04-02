@@ -1,12 +1,12 @@
-C More\soff-by-one\serrors\sin\sthe\snew\sJSON\sparsing.
-D 2023-04-02T20:46:24.359
+C With\sthe\s-DSQLITE_ENABLE_JSON_NAN_INF\scompile-time\soption,\snon-standard\nJSON\snumeric\svalues\s"Inf",\s"Infinity",\s"-Inf",\s"-Infinity",\s"NaN",\s"QNaN",\nand\s"SNaN"\sare\sall\saccepted.\s\sSQLite\sshould\snever\sgenerate\sthese\svalues,\nbut\sit\swill\saccept\sthat\swith\sthe\sappropriate\scompile-time\soption.
+D 2023-04-02T20:56:29.250
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
 F Makefile.in 764f2e3e8fb4ae1c8dfe03e65b2b3b01bd1fc57edf78ec2cab3a1301e90e1905
 F Makefile.linux-gcc f609543700659711fbd230eced1f01353117621dccae7b9fb70daa64236c5241
 F Makefile.msc ada3466f8f0112a8baead4d6cc2a99bf544d228958baae12ca35a3ee5755c806
-F README.md 8b8df9ca852aeac4864eb1e400002633ee6db84065bd01b78c33817f97d31f5e
+F README.md e05bd8fcb45da04ab045c37f79a98654e8aa3b3b8f302cfbba80a0d510df75f7
 F VERSION 17f95ae2fdf21f0e9575eb0b0511ea63f15d71dfff431b21c2b4adbfa70cfbbf
 F aclocal.m4 a5c22d164aff7ed549d53a90fa56d56955281f50
 F art/sqlite370.eps aa97a671332b432a54e1d74ff5e8775be34200c2
@@ -264,7 +264,7 @@ F ext/misc/README.md d6dd0fe1d8af77040216798a6a2b0c46c73054d2f0ea544fbbcdccf6f23
 F ext/misc/amatch.c e3ad5532799cee9a97647f483f67f43b38796b84b5a8c60594fe782a4338f358
 F ext/misc/anycollseq.c 5ffdfde9829eeac52219136ad6aa7cd9a4edb3b15f4f2532de52f4a22525eddb
 F ext/misc/appendvfs.c 9642c7a194a2a25dca7ad3e36af24a0a46d7702168c4ad7e59c9f9b0e16a3824
-F ext/misc/base64.c d43d2b209c8ab70ca3f860104bb353b0f52a1c5462a2466140025c954e4f3ea7 x
+F ext/misc/base64.c e83a915fcb94c9332e9a92aa4c3beafe2552bd3da2813fc5fff31918cca0b834
 F ext/misc/base85.c 77dfd5813d23ea561d0348f922583888e78f8eaeb2b9a4a28226d092389890b8
 F ext/misc/basexx.c 5e859e1820620aa8080fb9145eb47089de426ae808f6abb01a8e12921c3a8e67
 F ext/misc/blobio.c a867c4c4617f6ec223a307ebfe0eabb45e0992f74dd47722b96f3e631c0edb2a
@@ -564,7 +564,7 @@ F src/auth.c f4fa91b6a90bbc8e0d0f738aa284551739c9543a367071f55574681e0f24f8cf
 F src/backup.c a2891172438e385fdbe97c11c9745676bec54f518d4447090af97189fd8e52d7
 F src/bitvec.c 7c849aac407230278445cb069bebc5f89bf2ddd87c5ed9459b070a9175707b3d
 F src/btmutex.c 6ffb0a22c19e2f9110be0964d0731d2ef1c67b5f7fabfbaeb7b9dabc4b7740ca
-F src/btree.c ecce2a6cf75ccd1f419f774a026ab102399aeae90f33abb14aed363c4e0f839c
+F src/btree.c c2ececcbcb1a35bbd9efcbb43a821eaec60cc9796dccbb33f3b0fd4c7ab2f539
 F src/btree.h aa354b9bad4120af71e214666b35132712b8f2ec11869cb2315c52c81fad45cc
 F src/btreeInt.h a3268a60cbc91f578001f44ba40aae9c1b8aecbb0d2c095dd7fc54b0872ea4b8
 F src/build.c 8357d6ca9a8c9afc297c431df28bc2af407b47f3ef2311875276c944b30c4d54
@@ -888,7 +888,7 @@ F test/corruptE.test 4143791f2dfb443aec5b7fabfa5821e6063eccc3b49b06f212c2f014715
 F test/corruptF.test be9fde98e4c93648f1ba52b74e5318edc8f59fe4
 F test/corruptG.test adf79b669cbfd19e28c8191a610d083ae53a6d51
 F test/corruptH.test 79801d97ec5c2f9f3c87739aa1ec2eb786f96454
-F test/corruptI.test a17bbf54fdde78d43cf3cc34b0057719fd4a173a3d824285b67dc5257c064c7b
+F test/corruptI.test 9d8cbf6214e492abe9e822e759b9751ae336cec0a6fe3ff3b37bfbd8ff9c22ca
 F test/corruptJ.test 4d5ccc4bf959464229a836d60142831ef76a5aa4
 F test/corruptK.test 5b4212fe346699831c5ad559a62c54e11c0611bdde1ea8423a091f9c01aa32af
 F test/corruptL.test b42978028afc5eefc8b51d8d7cd6a9344ba7362d7ed4511ee2070f56e06d5a1c
@@ -2052,8 +2052,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P f7ebf3e6286ddc8cdaa9446235407785d1be2be2d9992e21ef59fcd655f68432
-R d7e51978d4e1fb261c348646bf7a99ee
+P 978dc71c388b37740da38c310674315c7d7fe814d1daa16a146b4df71385d1e1 dbc99662087b63c9ed5b398535a6091fc2c5e507907dd1fcb7ad0b6ab3f17144
+R 0c80a0a9d7056c4e9cc79fd3f48ab255
+T +closed dbc99662087b63c9ed5b398535a6091fc2c5e507907dd1fcb7ad0b6ab3f17144
 U drh
-Z 9992e24fdfdd6a2fbe49a1cdeef61dfd
+Z ff807b459bbce1f6e27ef0b5e65a972d
 # Remove this line to create a well-formed Fossil manifest.
