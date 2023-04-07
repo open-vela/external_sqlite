@@ -1919,11 +1919,6 @@ static int freeSpace(MemPage *pPage, u16 iStart, u16 iSize){
   }
   pTmp = &data[hdr+5];
   x = get2byte(pTmp);
-  if( pPage->pBt->btsFlags & BTS_FAST_SECURE ){
-    /* Overwrite deleted information with zeros when the secure_delete
-    ** option is enabled */
-    memset(&data[iStart], 0, iSize);
-  }
   if( iStart<=x ){
     /* The new freeblock is at the beginning of the cell content area,
     ** so just extend the cell content area rather than create another
@@ -1935,9 +1930,14 @@ static int freeSpace(MemPage *pPage, u16 iStart, u16 iSize){
   }else{
     /* Insert the new freeblock into the freelist */
     put2byte(&data[iPtr], iStart);
-    put2byte(&data[iStart], iFreeBlk);
-    put2byte(&data[iStart+2], iSize);
   }
+  if( pPage->pBt->btsFlags & BTS_FAST_SECURE ){
+    /* Overwrite deleted information with zeros when the secure_delete
+    ** option is enabled */
+    memset(&data[iStart], 0, iSize);
+  }
+  put2byte(&data[iStart], iFreeBlk);
+  put2byte(&data[iStart+2], iSize);
   pPage->nFree += iOrigSize;
   return SQLITE_OK;
 }
@@ -7496,49 +7496,42 @@ static int pageFreeArray(
   u8 * const pEnd = &aData[pPg->pBt->usableSize];
   u8 * const pStart = &aData[pPg->hdrOffset + 8 + pPg->childPtrSize];
   int nRet = 0;
-  int i, j;
+  int i;
   int iEnd = iFirst + nCell;
-  int nFree = 0;
-  int aOfst[10];
-  int aAfter[10];
+  u8 *pFree = 0;                  /* \__ Parameters for pending call to */
+  int szFree = 0;                 /* /   freeSpace()                    */
 
   for(i=iFirst; i<iEnd; i++){
     u8 *pCell = pCArray->apCell[i];
     if( SQLITE_WITHIN(pCell, pStart, pEnd) ){
       int sz;
-      int iAfter;
-      int iOfst;
       /* No need to use cachedCellSize() here.  The sizes of all cells that
       ** are to be freed have already been computing while deciding which
       ** cells need freeing */
       sz = pCArray->szCell[i];  assert( sz>0 );
-      iOfst = (u16)(pCell - aData);
-      iAfter = iOfst+sz;
-      for(j=0; j<nFree; j++){
-        if( aOfst[j]==iAfter ){
-          aOfst[j] = iOfst;
-          break;
-        }else if( aAfter[j]==iOfst ){
-          aAfter[j] = iAfter;
-          break;
+      if( pFree!=(pCell + sz) ){
+        if( pFree ){
+          assert( pFree>aData && (pFree - aData)<65536 );
+          freeSpace(pPg, (u16)(pFree - aData), szFree);
         }
-      }
-      if( j>=nFree ){
-        if( nFree>=sizeof(aOfst)/sizeof(aOfst[0]) ){
-          for(j=0; j<nFree; j++){
-            freeSpace(pPg, aOfst[j], aAfter[j]-aOfst[j]);
-          }
-          nFree = 0;
+        pFree = pCell;
+        szFree = sz;
+        if( pFree+sz>pEnd ){
+          return 0;
         }
-        aOfst[nFree] = iOfst;
-        aAfter[nFree] = iAfter;
-        nFree++;
+      }else{
+        /* The current cell is adjacent to and before the pFree cell.
+        ** Combine the two regions into one to reduce the number of calls
+        ** to freeSpace(). */
+        pFree = pCell;
+        szFree += sz;
       }
       nRet++;
     }
   }
-  for(j=0; j<nFree; j++){
-    freeSpace(pPg, aOfst[j], aAfter[j]-aOfst[j]);
+  if( pFree ){
+    assert( pFree>aData && (pFree - aData)<65536 );
+    freeSpace(pPg, (u16)(pFree - aData), szFree);
   }
   return nRet;
 }
