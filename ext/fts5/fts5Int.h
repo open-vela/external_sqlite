@@ -199,7 +199,6 @@ struct Fts5Config {
   int ePattern;                   /* FTS_PATTERN_XXX constant */
 
   /* Values loaded from the %_config table */
-  int iVersion;                   /* fts5 file format 'version' */
   int iCookie;                    /* Incremented when %_config is modified */
   int pgsz;                       /* Approximate page size used in %_data */
   int nAutomerge;                 /* 'automerge' setting */
@@ -208,7 +207,6 @@ struct Fts5Config {
   int nHashSize;                  /* Bytes of memory for in-memory hash */
   char *zRank;                    /* Name of rank function */
   char *zRankArgs;                /* Arguments to rank function */
-  int bSecureDelete;              /* 'secure-delete' */
 
   /* If non-NULL, points to sqlite3_vtab.base.zErrmsg. Often NULL. */
   char **pzErrmsg;
@@ -218,11 +216,8 @@ struct Fts5Config {
 #endif
 };
 
-/* Current expected value of %_config table 'version' field. And
-** the expected version if the 'secure-delete' option has ever been
-** set on the table.  */
-#define FTS5_CURRENT_VERSION               4
-#define FTS5_CURRENT_VERSION_SECUREDELETE  5
+/* Current expected value of %_config table 'version' field */
+#define FTS5_CURRENT_VERSION  4
 
 #define FTS5_CONTENT_NORMAL   0
 #define FTS5_CONTENT_NONE     1
@@ -388,7 +383,6 @@ struct Fts5IndexIter {
 ** above. */
 #define FTS5INDEX_QUERY_SKIPEMPTY  0x0010
 #define FTS5INDEX_QUERY_NOOUTPUT   0x0020
-#define FTS5INDEX_QUERY_SKIPHASH   0x0040
 
 /*
 ** Create/destroy an Fts5Index object.
