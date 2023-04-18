@@ -1,5 +1,5 @@
-C Add\scomment\son\sCLI\s^C\sfix\s(because\sit\sis\sa\sbit\ssubtle.)
-D 2023-04-18T22:53:30.926
+C CLI\sto\scease\sdumping\sback\sto\sOS\sshell\son\ssingle\s^C\swhen\sinteractive.
+D 2023-04-18T23:05:34.073
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2058,8 +2058,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 7b1f635268bd5b093b22f832c3ac9e5d642d1aac5ebc620619be5a24930feb83
+P 8b0fe63f873661037351fc1eba6071b98b5c97a0fc8bd8a504a90d047f78bc0d 19c062f1cd814a33bf9c10928217464cddaea7c3291ff44e605901a86b82a06d
 R 94128278c59c8b6776a5748252e83b85
 U larrybr
-Z e64ea4c126276298324ed24c1a272560
+Z 708f7e71cc9002b37b9149765bf28cad
 # Remove this line to create a well-formed Fossil manifest.
