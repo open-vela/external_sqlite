@@ -1,5 +1,5 @@
-C Add\s--unsafe-testing\sinvocation\soption\sto\sCLI.\sNeeds\ssome\stests\sadded\sand\schanged.
-D 2023-04-22T16:46:38.465
+C Add\sthe\s--unsafe-testing\scommand-line\soption\sto\sthe\sCLI.\s\sWithout\sthis\soption,\nfeatures\sof\sthe\sCLI\sthat\sare\sintended\sfor\stesting\sand\sthat\smight\sresult\sin\nincorrect\sanswers,\sassertion\sfaults,\sand/or\scorrupt\sdatabase\sfiles\sif\smisused\nare\sdisabled.
+D 2023-04-22T17:41:53.196
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2059,11 +2059,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P cd485b302c54aef066d751a153df34eea0cd23e54a414e291f636ad9929fe78a
+P cd485b302c54aef066d751a153df34eea0cd23e54a414e291f636ad9929fe78a b3d9ac052d5c2dd1afeeeb5c9cfac9dd91a1b8d6a74a2ef10aa2037ca505abce
 R be58d94e52d56c14dee82adb68874a9b
-T *branch * shell-for-test
-T *sym-shell-for-test *
-T -sym-trunk *
-U larrybr
-Z a5e6fd5b494a63d53c430515997654b1
+T +closed b3d9ac052d5c2dd1afeeeb5c9cfac9dd91a1b8d6a74a2ef10aa2037ca505abce
+U drh
+Z 292d5d1b263a4abd453b30cd2562934c
 # Remove this line to create a well-formed Fossil manifest.
