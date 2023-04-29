@@ -1,5 +1,5 @@
-C Replace\sduped\sgenerate_series()\stest\swith\sanother\scorner\scase.
-D 2023-04-29T15:29:29.280
+C Cure\sCLI\sgenerate_series()\soverflow\sbug\s(forum:754e2d4db2a5|noted\sby\sforum\spost\s#754e2d4db2a5)\sand\sbring\sbehavior\swith\snegative\sstep\sarguments\scloser\sto\sas-documented\sand\seponymous\sfunction\sin\sPostgreSQL.
+D 2023-04-29T15:42:46.941
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2060,8 +2060,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P ecbf7e13e6454ee879c178c53ffa6face789e93ccbebb0cfac8fde72cb3a4952
+P 91fee79a01971259b21478e60a069a711a00efc79ddfececa6224a152cd8d09a fb2f08783fdfef4d5123ad66792de2265d39272d40d7bf1be7dd21876e8ffd73
 R a43c7ce3100f5e83fb209ebd1799722b
+T +closed fb2f08783fdfef4d5123ad66792de2265d39272d40d7bf1be7dd21876e8ffd73
 U larrybr
-Z 192fa0c0899cb09731a369a2377e480a
+Z 7a730e984ce1c44cc3481738a9a4584b
 # Remove this line to create a well-formed Fossil manifest.
