@@ -1,5 +1,5 @@
-C Add\ssome\stests\sof\ssubsecond\smodifier\sfor\sdate/time\sfunctions.\sSync\swith\strunk.
-D 2023-05-04T20:19:33.316
+C Add\sthe\s"subsecond"\smodifier\sto\sthe\sdate/time\sfunctions.
+D 2023-05-04T20:28:19.528
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2068,8 +2068,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 03f2a15e8779d8ca76510badeabde62a0539ce8a6368d7a9688f5aadc215b940 83683e108bce83c105bbcce1aa62880d8f14ebf3383d87d83a1e5c85026a7817
+P 83683e108bce83c105bbcce1aa62880d8f14ebf3383d87d83a1e5c85026a7817 6499ebff545e663198bd0534be205a4e9ca68c7fb20fdcfa54fae4d9b79bfe3a
 R 8af27f80731782e09fcf7d27c983e6a4
-U larrybr
-Z e803a0dc2aef84dc50855cfa469da94e
+T +closed 6499ebff545e663198bd0534be205a4e9ca68c7fb20fdcfa54fae4d9b79bfe3a
+U drh
+Z ec3e442191ef8c8a1600e49b9abb536f
 # Remove this line to create a well-formed Fossil manifest.
