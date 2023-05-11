@@ -156,6 +156,7 @@
     }
   };
 
+  
   /**
      This is a module object for use with the emscripten-installed
      sqlite3InitModule() factory function.
