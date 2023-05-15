@@ -5119,8 +5119,7 @@ static int pushDownWindowCheck(Parse *pParse, Select *pSubq, Expr *pExpr){
 **
 **       Without this restriction, the push-down optimization might move
 **       the ON/USING filter expression from the left side of a RIGHT JOIN
-**       over to the right side, which leads to incorrect answers.  See
-**       also restriction (6) in sqlite3ExprIsSingleTableConstraint().
+**       over to the right side, which leads to incorrect answers.
 **
 **  (10) The inner query is not the right-hand table of a RIGHT JOIN.
 **
@@ -5205,7 +5204,6 @@ static int pushDownWhereTerms(
     pWhere = pWhere->pLeft;
   }
 
-#if 0 /* These checks now done by sqlite3ExprIsSingleTableConstraint() */
   if( ExprHasProperty(pWhere, EP_OuterON|EP_InnerON) /* (9a) */
    && (pSrcList->a[0].fg.jointype & JT_LTORJ)!=0     /* Fast pre-test of (9c) */
   ){
@@ -5223,6 +5221,8 @@ static int pushDownWhereTerms(
       }
     }
   }
+
+#if 0 /* These checks now done by sqlite3ExprIsSingleTableConstraint() */
   if( isLeftJoin
    && (ExprHasProperty(pWhere,EP_OuterON)==0
          || pWhere->w.iJoin!=iCursor)
@@ -5236,7 +5236,7 @@ static int pushDownWhereTerms(
   }
 #endif
 
-  if( sqlite3ExprIsSingleTableConstraint(pWhere, pSrcList, iSrc) ){
+  if( sqlite3ExprIsSingleTableConstraint(pWhere, pSrc) ){
     nChng++;
     pSubq->selFlags |= SF_PushDown;
     while( pSubq ){
