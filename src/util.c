@@ -929,6 +929,95 @@ int sqlite3Atoi(const char *z){
 }
 
 /*
+** Decode a floating-point value into an approximate decimal
+** representation.
+**
+** Round the decimal representation to n significant digits if
+** n is positive.  Or round to -n signficant digits after the
+** decimal point if n is negative.  No rounding is performed if
+** n is zero.
+*/
+void sqlite3FpDecode(FpDecode *p, double r, int iRound){
+  int i;
+  u64 v;
+  int e, exp = 0;
+  if( r<0.0 ){
+    p->sign = '-';
+    r = -r;
+  }else if( r==0.0 ){
+    p->sign = '+';
+    p->n = 1;
+    p->iDP = 1;
+    p->z[0] = '0';
+    return;
+  }else{
+    p->sign = '+';
+  }
+  memcpy(&v,&r,8);
+  e = v>>52;
+  if( e==0x7ff ){
+    if( v==0x7ff0000000000000L ){
+      p->isInf = 1;
+      p->isNan = 0;
+      p->z[0] = 'I';
+      p->z[1] = 'n';
+      p->z[2] = 'f';
+    }else{
+      p->isInf = 0;
+      p->isNan = 1;
+      p->z[0] = 'N';
+      p->z[1] = 'a';
+      p->z[2] = 'N';
+    }
+    p->n = 3;
+    p->iDP = 3;
+    return;
+  }
+  /* At this point, r is positive (non-zero) and is not Inf or NaN.
+  ** The strategy is to multiple or divide r by powers of 10 until
+  ** it is in between 1.0e+17 and 1.0e+19.  Then convert r into
+  ** an unsigned 64-bit integer v, and extract digits from v.
+  */
+  if( r>=1.0e+19 ){
+    while( r>=1.0e+119 ){ exp+=100; r /= 1.0e+100; }
+    while( r>=1.0e+29  ){ exp+=10;  r /= 1.0e+10;  }
+    while( r>=1.0e+19  ){ exp++;    r /= 10.0;     }
+  }else if( r<1.0e+17 ){
+    while( r<1.0e-97   ){ exp-=100; r *= 1.0e+100; }
+    while( r<1.0e+07   ){ exp-=10;  r *= 1.0e+10;  }
+    while( r<1.0e+17   ){ exp--;    r *= 10.0;     }
+  }
+  v = (u64)r;
+  i = sizeof(p->z)-1;
+  while( v ){  p->z[i--] = (v%10) + '0'; v /= 10; }
+  p->n = sizeof(p->z) - 1 - i;
+  p->iDP = p->n + exp;
+  if( iRound<0 ) iRound = p->iDP - iRound;
+  if( iRound>0 && iRound<p->n ){
+    char *z = &p->z[i+1];
+    p->n = iRound;
+    if( z[iRound]>='5' ){
+      int j = iRound-1;
+      while( 1 /*exit-by-break*/ ){
+        z[j]++;
+        if( z[j]<='9' ) break;
+        z[j] = '0';
+        if( j==0 ){
+          p->z[i--] = '1';
+          p->n++;
+          p->iDP++;
+          break;
+        }else{
+          j--;
+        }
+      }
+    }
+  }
+  memmove(p->z, &p->z[i+1], p->n);
+  while( p->n>0 && p->z[p->n-1]=='0' ){ p->n--; }
+}
+
+/*
 ** Try to convert z into an unsigned 32-bit integer.  Return true on
 ** success and false if there is an error.
 **
