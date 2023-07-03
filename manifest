@@ -1,5 +1,5 @@
-C Store\sthe\sfp-speed-1.c\stest\sprogram\sused\sto\smeasure\srelative\sperformance\sof\nSQLite\sversus\sthe\sstandard\slibrary,\sin\sthe\stest/\sdirectory.\s\sA\sheader\scomment\nexplains\show\sto\suse\sit.
-D 2023-07-03T15:30:50.934
+C Enhance\ssqlite3AtoF()\sso\sthat\sit\shonors\sthe\sUSELONGDOUBLE\stest-control.\nEnable\sthe\stest/atof1.test\smodule\son\snon-intel\splatforms.
+D 2023-07-03T18:18:35.350
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -705,7 +705,7 @@ F src/trigger.c ad6ab9452715fa9a8075442e15196022275b414b9141b566af8cdb7a1605f2b0
 F src/update.c 0aa36561167a7c40d01163238c297297962f31a15a8d742216b3c37cdf25f731
 F src/upsert.c 5303dc6c518fa7d4b280ec65170f465c7a70b7ac2b22491598f6d0b4875b3145
 F src/utf.c ee39565f0843775cc2c81135751ddd93eceb91a673ea2c57f61c76f288b041a0
-F src/util.c 452f1e5e4a85b7869daf15d9b6468ac754836467004fa04c3419f2bd628eb6ad
+F src/util.c 5c6a3c7a88af0cbabb17707314b07f6026410610be73c6b6fba163b1cbf8b5ea
 F src/vacuum.c 604fcdaebe76f3497c855afcbf91b8fa5046b32de3045bab89cc008d68e40104
 F src/vdbe.c 74282a947234513872a83b0bab1b8c644ece64b3e27b053ef17677c8ff9c81e0
 F src/vdbe.h 41485521f68e9437fdb7ec4a90f9d86ab294e9bb8281e33b235915e29122cfc0
@@ -775,7 +775,7 @@ F test/async2.test c0a9bd20816d7d6a2ceca7b8c03d3d69c28ffb8b
 F test/async3.test d73a062002376d7edc1fe3edff493edbec1fc2f7
 F test/async4.test 1787e3952128aa10238bf39945126de7ca23685a
 F test/async5.test 383ab533fdb9f7ad228cc99ee66e1acb34cc0dc0
-F test/atof1.test 191ce0d7b0d527aafeafe659c31e2433e430324b5ebce3fb066178b4d9035767
+F test/atof1.test f2765d7fdc1348ae58b279d096d301a208e46da623213877b2ba580dc2768975
 F test/atomic.test 065a453dde33c77ff586d91ccaa6ed419829d492dbb1a5694b8a09f3f9d7d061
 F test/atomic2.test b6863b4aa552543874f80b42fb3063f1c8c2e3d8e56b6562f00a3cc347b5c1da
 F test/atrc.c c388fac43dbba05c804432a7135ae688b32e8f25818e9994ffba4b64cf60c27c
@@ -1014,7 +1014,6 @@ F test/fkey8.test 51deda7f1a1448bca95875e4a6e1a3a75b4bd7215e924e845bd60de60e4d84
 F test/fkey_malloc.test 594a7ea1fbab553c036c70813cd8bd9407d63749
 F test/fordelete.test ba98f14446b310f9c9d935b97ec748753d0144a28b356ba30d1f4f6958fdde5c
 F test/format4.test eeae341953db8b6bda7f549044797c3278a6cc345d11ada81471671b654f8ef4
-F test/fp-speed-1.c ca95152d579530c967240ead1387dc1208052d310dfa22bc9ebded56d4e6c026
 F test/fpconv1.test d5d8aa0c427533006c112fb1957cdd1ea68c1d0709470dabb9ca02c2e4c06ad8
 F test/fts-9fd058691.test 78b887e30ae6816df0e1fed6259de4b5a64ad33c
 F test/fts3.test 672a040ea57036fb4b6fdc09027c18d7d24ab654
@@ -1511,7 +1510,7 @@ F test/speed3.test 694affeb9100526007436334cf7d08f3d74b85ef
 F test/speed4.test abc0ad3399dcf9703abed2fff8705e4f8e416715
 F test/speed4p.explain 6b5f104ebeb34a038b2f714150f51d01143e59aa
 F test/speed4p.test 377a0c48e5a92e0b11c1c5ebb1bc9d83a7312c922bc0cb05970ef5d6a96d1f0c
-F test/speedtest1.c f9505ad6f9c2c3c488a370a2d193e9603a030e51126ef3ecfeb056d21f0e7ad5
+F test/speedtest1.c 9703465daf778dd90bad7adadc1d2ee205ec90a79437cababab0a4111190f0c8
 F test/spellfix.test 951a6405d49d1a23d6b78027d3877b4a33eeb8221dcab5704b499755bb4f552e
 F test/spellfix2.test dfc8f519a3fc204cb2dfa8b4f29821ae90f6f8c3
 F test/spellfix3.test 0f9efaaa502a0e0a09848028518a6fb096c8ad33
@@ -1998,7 +1997,7 @@ F tool/showstat4.c 0682ebea7abf4d3657f53c4a243f2e7eab48eab344ed36a94bb75dcd19a5c
 F tool/showwal.c 65ecabae3a2dcff4116301d5a8dbb8c4964814da1b2aff6d85c806a88b71fa4e
 F tool/soak1.tcl 8d407956e1a45b485a8e072470a3e629a27037fe
 F tool/spaceanal.tcl 1b5be34c6223cb1af06da2a10fb77863eb869b1962d055820b0a11cf2336ab45
-F tool/speed-check.sh 72dc85b2c0484af971ee3e7d10775f72b4e771e27e162c2099b3bf25517c25fb
+F tool/speed-check.sh c24c30cddd0ecb6d1d0775411d22f7619f55fa696a305487645e27b1b8fc05a2
 F tool/speedtest.tcl 06c76698485ccf597b9e7dbb1ac70706eb873355
 F tool/speedtest16.c ecb6542862151c3e6509bbc00509b234562ae81e
 F tool/speedtest2.tcl ee2149167303ba8e95af97873c575c3e0fab58ff
@@ -2043,8 +2042,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 6bf6018a00d61c5f0e53b37b00befaf5ad1d85323f41cf0cea25d8c6c1017096
-R ef72dab00177aafb299a3d17bab4eff5
+P 02ae6caff1f7925c696ad263fe78b1036364d24b6373e1baec10d53aafb14a12
+R bad32f05b3c6a0ddbf09f09fc45b76f6
 U drh
-Z b2aa398ed798c317f62bc01949c71c6b
+Z 7edb4dd9862f63ed43ef736b26696576
 # Remove this line to create a well-formed Fossil manifest.
