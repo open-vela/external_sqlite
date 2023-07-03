@@ -1,5 +1,5 @@
-C Whether\sor\snot\sto\suse\sthe\slong-double\sfloating\spoint\sconversion\stechnique\nis\snow\sa\stest-control\ssetting.
-D 2023-07-03T14:56:49.741
+C Improved\sprecision\sof\sbinary-to-decimal\sconversion\sof\sfloating-point\svalues\non\sall\ssystems\sbut\sespecially\snon-x86\ssystems\sthat\slake\sextended\sprecision\nhardward\sfloating\spoint.
+D 2023-07-03T15:03:59.842
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2042,8 +2042,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 9435ed76cd9bb1be02768b3853a2323834f67bda75d3e3f76f6aa7bd0bade3d7
+P 7afad1f759f7ceda873c6d869422fd56fe4399c2d24d47ad9bc3b84b06d830d1 02ae6caff1f7925c696ad263fe78b1036364d24b6373e1baec10d53aafb14a12
 R c19a4cd19e732c53bd925a8fc2b0f976
 U drh
-Z ccc178a785227b10fda86cb46a381790
+Z d52b1cd0e5057b695ef6926f80a9c961
 # Remove this line to create a well-formed Fossil manifest.
