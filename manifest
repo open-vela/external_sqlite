@@ -1,5 +1,5 @@
-C Final\sclean-up\sof\sthe\sidea\sof\susing\sDekker\sdouble-precision\sfloating\ncomputations\sto\simprove\saccuracy.
-D 2023-07-03T11:39:38.542
+C Use\sDekker\sdouble-precision\sfloating\spoint\sto\sdo\sthe\svalue\snormalization\nstep\sin\ssqlite3FpDecode()\sfor\ssystems\son\swhich\s"long\sdouble"\sis\s8\sbytes\sor\nless.
+D 2023-07-03T11:44:15.056
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2041,8 +2041,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 25d1ad6df1ed460c2cc9f32e8a5106e121ae502044f83abf431c1d5b3879eb56
+P ce06982f880339cf46704e95c907249827c3e44af2b9420005200ca8abd3f371 40285d631072b79aba39cc20d4b217bdf0069f29ac9902cb97dec28d3e4cde11
 R 8a559af6860b1623fc9d9f5fb9393b11
+T +closed 40285d631072b79aba39cc20d4b217bdf0069f29ac9902cb97dec28d3e4cde11
 U drh
-Z 48672189b786297b4026c7966b4eccaa
+Z 98f04f31ed955532d376706d5d138150
 # Remove this line to create a well-formed Fossil manifest.
