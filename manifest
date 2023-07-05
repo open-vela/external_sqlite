@@ -1,5 +1,5 @@
-C This\sis\salternative\swork-around\sfor\sthe\sx86\sfloat-point\sproblem\sthat\suses\n"volatile"\srather\sthan\scompile-specific\s#pragmas.
-D 2023-07-05T22:05:18.339
+C Use\s"volatile"\sisntead\sof\s"#pragma"\sto\sget\sfloating\spoint\scalculations\nworking\scorrectly\swhen\scompiling\swith\sGCC\sfor\sx86\smachines.
+D 2023-07-06T00:55:06.161
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2043,11 +2043,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 7b4c16731e7bf6f03f5adf4fcb2008c0b19be473fb1b90b405c217c08916586a
+P 7b4c16731e7bf6f03f5adf4fcb2008c0b19be473fb1b90b405c217c08916586a 1d972a690fdc70ab40862bd38427d68b48e8802ddf8e5c301f2d58ce2178b6ec
 R edd6abc545b6b11f65503dd16b4a34c2
-T *branch * fix-dekker-with-volatile
-T *sym-fix-dekker-with-volatile *
-T -sym-trunk *
+T +closed 1d972a690fdc70ab40862bd38427d68b48e8802ddf8e5c301f2d58ce2178b6ec
 U drh
-Z 5a39b72d20727cda14b03b5876342c08
+Z 9d851cc5730e074609430b016c224723
 # Remove this line to create a well-formed Fossil manifest.
