@@ -14,10 +14,6 @@
   main JS thread and sqlite3.js must have been loaded before it.
 */
 'use strict';
-//importScripts('jswasm/sqlite3-wasmfs.js');
-//importScripts('common/SqliteTestUtil.js');
-import sqlite3InitModule from './jswasm/sqlite3-wasmfs.mjs';
-//console.log('sqlite3InitModule =',sqlite3InitModule);
 (function(){
   const toss = function(...args){throw new Error(args.join(' '))};
   const log = console.log.bind(console),
@@ -42,7 +38,6 @@ import sqlite3InitModule from './jswasm/sqlite3-wasmfs.mjs';
     const capi = sqlite3.capi,
           oo = sqlite3.oo1,
           wasm = sqlite3.wasm;
-    stdout("Loaded module:",sqlite3);
     stdout("Loaded sqlite3:",capi.sqlite3_libversion(), capi.sqlite3_sourceid());
     const persistentDir = capi.sqlite3_wasmfs_opfs_dir();
     if(persistentDir){
@@ -71,5 +66,5 @@ import sqlite3InitModule from './jswasm/sqlite3-wasmfs.mjs';
     stdout("Total test time:",(performance.now() - startTime),"ms");
   };
 
-  sqlite3InitModule().then(runTests);
+  sqlite3InitModule(self.sqlite3TestModule).then(runTests);
 })();
