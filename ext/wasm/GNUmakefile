@@ -933,6 +933,7 @@ $(speedtest1.js): $(MAKEFILE) $(speedtest1.cfiles) \
         $(speedtest1.exit-runtime0) \
         -o $@ $(speedtest1.cfiles) -lm
 	$(maybe-wasm-strip) $(speedtest1.wasm)
+	chmod -x $(speedtest1.wasm)
 	ls -la $@ $(speedtest1.wasm)
 
 speedtest1: $(speedtest1.js)
