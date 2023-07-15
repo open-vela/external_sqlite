@@ -45,7 +45,7 @@
 */
 //#if target=es6-module
 import {default as sqlite3InitModule} from './jswasm/sqlite3.mjs';
-globalThis.sqlite3InitModule = sqlite3InitModule;
+self.sqlite3InitModule = sqlite3InitModule;
 //#else
 'use strict';
 //#endif
@@ -57,7 +57,7 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
   */
   let logClass;
   /* Predicate for tests/groups. */
-  const isUIThread = ()=>(globalThis.window===self && globalThis.document);
+  const isUIThread = ()=>(self.window===self && self.document);
   /* Predicate for tests/groups. */
   const isWorker = ()=>!isUIThread();
   /* Predicate for tests/groups. */
@@ -3050,15 +3050,14 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
   ////////////////////////////////////////////////////////////////////////
   log("Loading and initializing sqlite3 WASM module...");
   if(0){
-    globalThis.sqlite3ApiConfig = {
+    self.sqlite3ApiConfig = {
       debug: ()=>{},
       log: ()=>{},
       warn: ()=>{},
       error: ()=>{}
     }
   }
-//#ifnot target=es6-module
-  if(!globalThis.sqlite3InitModule && !isUIThread()){
+  if(!self.sqlite3InitModule && !isUIThread()){
     /* Vanilla worker, as opposed to an ES6 module worker */
     /*
       If sqlite3.js is in a directory other than this script, in order
@@ -3071,28 +3070,27 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
       that's not needed.
 
       URL arguments passed as part of the filename via importScripts()
-      are simply lost, and such scripts see the globalThis.location of
+      are simply lost, and such scripts see the self.location of
       _this_ script.
     */
     let sqlite3Js = 'sqlite3.js';
-    const urlParams = new URL(globalThis.location.href).searchParams;
+    const urlParams = new URL(self.location.href).searchParams;
     if(urlParams.has('sqlite3.dir')){
       sqlite3Js = urlParams.get('sqlite3.dir') + '/' + sqlite3Js;
     }
     importScripts(sqlite3Js);
   }
-//#endif
-  globalThis.sqlite3InitModule.__isUnderTest =
+  self.sqlite3InitModule.__isUnderTest =
     true /* disables certain API-internal cleanup so that we can
             test internal APIs from here */;
-  globalThis.sqlite3InitModule({
+  self.sqlite3InitModule({
     print: log,
     printErr: error
   }).then(function(sqlite3){
     //console.log('sqlite3 =',sqlite3);
     log("Done initializing WASM/JS bits. Running tests...");
     sqlite3.config.warn("Installing sqlite3 bits as global S for local dev/test purposes.");
-    globalThis.S = sqlite3;
+    self.S = sqlite3;
     capi = sqlite3.capi;
     wasm = sqlite3.wasm;
     log("sqlite3 version:",capi.sqlite3_libversion(),
