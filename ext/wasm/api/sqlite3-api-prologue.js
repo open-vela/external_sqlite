@@ -53,7 +53,7 @@
 
    - `memory`[^1]: optional WebAssembly.Memory object, defaulting to
      `exports.memory`. In Emscripten environments this should be set
-     to `Module.wasmMemory` if the build uses `-sIMPORT_MEMORY`, or be
+     to `Module.wasmMemory` if the build uses `-sIMPORTED_MEMORY`, or be
      left undefined/falsy to default to `exports.memory` when using
      WASM-exported memory.
 
@@ -88,12 +88,27 @@
      can be replaced with (e.g.) empty functions to squelch all such
      output.
 
-   - `wasmfsOpfsDir`[^1]: As of 2022-12-17, this feature does not
-     currently work due to incompatible Emscripten-side changes made
-     in the WASMFS+OPFS combination. This option is currently ignored.
+   - `wasmfsOpfsDir`[^1]: Specifies the "mount point" of the OPFS-backed
+     filesystem in WASMFS-capable builds.
 
-   [^1] = This property may optionally be a function, in which case this
-          function re-assigns calls that function to fetch the value,
+   - `opfs-sahpool.dir`[^1]: Specifies the OPFS directory name in
+     which to store metadata for the `"opfs-sahpool"` sqlite3_vfs.
+     Changing this name will effectively orphan any databases stored
+     under previous names. The default is unspecified but descriptive.
+     This option may contain multiple path elements,
+     e.g. "foo/bar/baz", and they are created automatically.  In
+     practice there should be no driving need to change this.
+
+   - `opfs-sahpool.defaultCapacity`[^1]: Specifies the default
+     capacity of the `"opfs-sahpool"` VFS. This should not be set
+     unduly high because the VFS has to open (and keep open) a file
+     for each entry in the pool. This setting only has an effect when
+     the pool is initially empty. It does not have any effect if a
+     pool already exists.
+
+
+   [^1] = This property may optionally be a function, in which case
+          this function calls that function to fetch the value,
           enabling delayed evaluation.
 
    The returned object is the top-level sqlite3 namespace object.
@@ -125,11 +140,11 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     log: console.log.bind(console),
     wasmfsOpfsDir: '/opfs',
     /**
-       useStdAlloc is just for testing an allocator discrepancy. The
+       useStdAlloc is just for testing allocator discrepancies. The
        docs guarantee that this is false in the canonical builds. For
        99% of purposes it doesn't matter which allocators we use, but
-       it becomes significant with, e.g., sqlite3_deserialize()
-       and certain wasm.xWrap.resultAdapter()s.
+       it becomes significant with, e.g., sqlite3_deserialize() and
+       certain wasm.xWrap.resultAdapter()s.
     */
     useStdAlloc: false
   }, apiConfig || {});
@@ -143,17 +158,13 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   [
     // If any of these config options are functions, replace them with
     // the result of calling that function...
-    'exports', 'memory', 'wasmfsOpfsDir'
+    'exports', 'memory', 'wasmfsOpfsDir',
+    'opfs-sahpool.dir', 'opfs-sahpool.defaultCapacity'
   ].forEach((k)=>{
     if('function' === typeof config[k]){
       config[k] = config[k]();
     }
   });
-  config.wasmOpfsDir =
-    /* 2022-12-17: WASMFS+OPFS can no longer be activated from the
-       main thread (aborts via a failed assert() if it's attempted),
-       which eliminates any(?) benefit to supporting it. */  false;
-
   /**
       The main sqlite3 binding API gets installed into this object,
       mimicking the C API as closely as we can. The numerous members
@@ -809,7 +820,7 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
       || toss3("Missing API config.exports (WASM module exports)."),
 
     /**
-       When Emscripten compiles with `-sIMPORT_MEMORY`, it
+       When Emscripten compiles with `-sIMPORTED_MEMORY`, it
        initalizes the heap and imports it into wasm, as opposed to
        the other way around. In this case, the memory is not
        available via this.exports.memory.
@@ -1177,31 +1188,31 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   /** State for sqlite3_wasmfs_opfs_dir(). */
   let __wasmfsOpfsDir = undefined;
   /**
-     2022-12-17: incompatible WASMFS changes have made WASMFS+OPFS
-     unavailable from the main thread, which eliminates the most
-     significant benefit of supporting WASMFS. This function is now a
-     no-op which always returns a falsy value. Before that change,
-     this function behaved as documented below (and how it will again
-     if we can find a compelling reason to support it).
-
      If the wasm environment has a WASMFS/OPFS-backed persistent
      storage directory, its path is returned by this function. If it
      does not then it returns "" (noting that "" is a falsy value).
 
      The first time this is called, this function inspects the current
      environment to determine whether persistence support is available
-     and, if it is, enables it (if needed).
+     and, if it is, enables it (if needed). After the first call it
+     always returns the cached result.
 
-     This function currently only recognizes the WASMFS/OPFS storage
-     combination and its path refers to storage rooted in the
-     Emscripten-managed virtual filesystem.
+     If the returned string is not empty, any files stored under the
+     given path (recursively) are housed in OPFS storage. If the
+     returned string is empty, this particular persistent storage
+     option is not available on the client.
+
+     Though the mount point name returned by this function is intended
+     to remain stable, clients should not hard-coded it anywhere. Always call this function to get the path.
+
+     Note that this function is a no-op in must builds of this
+     library, as the WASMFS capability requires a custom
+     build.
   */
   capi.sqlite3_wasmfs_opfs_dir = function(){
     if(undefined !== __wasmfsOpfsDir) return __wasmfsOpfsDir;
     // If we have no OPFS, there is no persistent dir
     const pdir = config.wasmfsOpfsDir;
-    console.error("sqlite3_wasmfs_opfs_dir() can no longer work due "+
-                  "to incompatible WASMFS changes. It will be removed.");
     if(!pdir
        || !globalThis.FileSystemHandle
        || !globalThis.FileSystemDirectoryHandle
@@ -1223,8 +1234,6 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
   };
 
   /**
-     Experimental and subject to change or removal.
-
      Returns true if sqlite3.capi.sqlite3_wasmfs_opfs_dir() is a
      non-empty string and the given name starts with (that string +
      '/'), else returns false.
@@ -1233,13 +1242,6 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     const p = capi.sqlite3_wasmfs_opfs_dir();
     return (p && name) ? name.startsWith(p+'/') : false;
   };
-
-  // This bit is highly arguable and is incompatible with the fiddle shell.
-  if(false && 0===wasm.exports.sqlite3_vfs_find(0)){
-    /* Assume that sqlite3_initialize() has not yet been called.
-       This will be the case in an SQLITE_OS_KV build. */
-    wasm.exports.sqlite3_initialize();
-  }
 
   /**
      Given an `sqlite3*`, an sqlite3_vfs name, and an optional db name
