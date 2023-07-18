@@ -88,9 +88,9 @@
      can be replaced with (e.g.) empty functions to squelch all such
      output.
 
-   - `wasmfsOpfsDir`[^1]: Specifies the "mount point" of the OPFS-backed
-     filesystem in WASMFS-capable builds.
-
+   - `wasmfsOpfsDir`[^1]: As of 2022-12-17, this feature does not
+     currently work due to incompatible Emscripten-side changes made
+     in the WASMFS+OPFS combination. This option is currently ignored.
 
    [^1] = This property may optionally be a function, in which case
           this function calls that function to fetch the value,
@@ -125,11 +125,11 @@ globalThis.sqlite3ApiBootstrap = function sqlite3ApiBootstrap(
     log: console.log.bind(console),
     wasmfsOpfsDir: '/opfs',
     /**
-       useStdAlloc is just for testing allocator discrepancies. The
+       useStdAlloc is just for testing an allocator discrepancy. The
        docs guarantee that this is false in the canonical builds. For
        99% of purposes it doesn't matter which allocators we use, but
-       it becomes significant with, e.g., sqlite3_deserialize() and
-       certain wasm.xWrap.resultAdapter()s.
+       it becomes significant with, e.g., sqlite3_deserialize()
+       and certain wasm.xWrap.resultAdapter()s.
     */
     useStdAlloc: false
   }, apiConfig || {});
