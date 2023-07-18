@@ -1624,6 +1624,7 @@ static int fts5UpdateMethod(
   int eType0;                     /* value_type() of apVal[0] */
   int rc = SQLITE_OK;             /* Return code */
   int bUpdateOrDelete = 0;
+  
 
   /* A transaction must be open when this is called. */
   assert( pTab->ts.eState==1 || pTab->ts.eState==2 );
@@ -1653,14 +1654,7 @@ static int fts5UpdateMethod(
     if( pConfig->eContent!=FTS5_CONTENT_NORMAL 
       && 0==sqlite3_stricmp("delete", z) 
     ){
-      if( pConfig->bContentlessDelete ){
-        fts5SetVtabError(pTab, 
-            "'delete' may not be used with a contentless_delete=1 table"
-        );
-        rc = SQLITE_ERROR;
-      }else{
-        rc = fts5SpecialDelete(pTab, apVal);
-      }
+      rc = fts5SpecialDelete(pTab, apVal);
     }else{
       rc = fts5SpecialInsert(pTab, z, apVal[2 + pConfig->nCol + 1]);
     }
@@ -1677,7 +1671,7 @@ static int fts5UpdateMethod(
     ** Cases 3 and 4 may violate the rowid constraint.
     */
     int eConflict = SQLITE_ABORT;
-    if( pConfig->eContent==FTS5_CONTENT_NORMAL || pConfig->bContentlessDelete ){
+    if( pConfig->eContent==FTS5_CONTENT_NORMAL ){
       eConflict = sqlite3_vtab_on_conflict(pConfig->db);
     }
 
@@ -1685,12 +1679,8 @@ static int fts5UpdateMethod(
     assert( nArg!=1 || eType0==SQLITE_INTEGER );
 
     /* Filter out attempts to run UPDATE or DELETE on contentless tables.
-    ** This is not suported. Except - DELETE is supported if the CREATE
-    ** VIRTUAL TABLE statement contained "contentless_delete=1". */
-    if( eType0==SQLITE_INTEGER 
-     && pConfig->eContent==FTS5_CONTENT_NONE 
-     && (nArg>1 || pConfig->bContentlessDelete==0)
-    ){
+    ** This is not suported.  */
+    if( eType0==SQLITE_INTEGER && fts5IsContentless(pTab) ){
       pTab->p.base.zErrMsg = sqlite3_mprintf(
           "cannot %s contentless fts5 table: %s", 
           (nArg>1 ? "UPDATE" : "DELETE from"), pConfig->zName
