@@ -1764,10 +1764,11 @@ static void sumStep(sqlite3_context *context, int argc, sqlite3_value **argv){
           p->ovrfl = 1;
           kahanBabuskaNeumaierInit(p, p->iSum);
           p->approx = 1;
-          kahanBabuskaNeumaierStepInt64(p, sqlite3_value_int64(argv[0]));
+          kahanBabuskaNeumaierStep(p, sqlite3_value_double(argv[0]));
         }
       }
     }else{
+      p->approx = 1;
       if( type==SQLITE_INTEGER ){
         kahanBabuskaNeumaierStepInt64(p, sqlite3_value_int64(argv[0]));
       }else{
