@@ -46,11 +46,12 @@
 #    $(eval), or at least centralize the setup of the numerous vars
 #    related to each build variant $(JS_BUILD_MODES).
 #
+default: all
+#default: quick
 SHELL := $(shell which bash 2>/dev/null)
 MAKEFILE := $(lastword $(MAKEFILE_LIST))
 CLEAN_FILES :=
 DISTCLEAN_FILES := ./--dummy--
-default: all
 release: oz
 # JS_BUILD_MODES exists solely to reduce repetition in documentation
 # below.
@@ -182,7 +183,7 @@ SQLITE_OPT = \
   -DSQLITE_OMIT_SHARED_CACHE \
   -DSQLITE_OMIT_WAL \
   -DSQLITE_THREADSAFE=0 \
-  -DSQLITE_TEMP_STORE=3 \
+  -DSQLITE_TEMP_STORE=2 \
   -DSQLITE_OS_KV_OPTIONAL=1 \
   '-DSQLITE_DEFAULT_UNIX_VFS="unix-none"' \
   -DSQLITE_USE_URI=1 \
@@ -375,6 +376,7 @@ sqlite3-api.jses += $(dir.api)/sqlite3-api-oo1.js
 sqlite3-api.jses += $(dir.api)/sqlite3-api-worker1.js
 sqlite3-api.jses += $(dir.api)/sqlite3-v-helper.js
 sqlite3-api.jses += $(dir.api)/sqlite3-vfs-opfs.c-pp.js
+sqlite3-api.jses += $(dir.api)/sqlite3-vfs-opfs-sahpool.js
 sqlite3-api.jses += $(dir.api)/sqlite3-api-cleanup.js
 
 # SOAP.js is an external API file which is part of our distribution
@@ -754,7 +756,7 @@ $(5): $(4) $$(MAKEFILE) $$(sqlite3-wasm.cfiles) $$(EXPORTED_FUNCTIONS.api) $$(pr
 	esac; \
 	ls -la $$$$dotwasm $$@
 all: $(5)
-quick: $(5)
+#quick: $(5)
 CLEAN_FILES += $(4) $(5)
 endef
 # ^^^ /SETUP_LIB_BUILD_MODE
@@ -959,6 +961,7 @@ tester1: tester1.js tester1.mjs tester1.html tester1-esm.html
 # Note that we do not include $(sqlite3-bundler-friendly.mjs) in this
 # because bundlers are client-specific.
 all quick: tester1
+quick: $(sqlite3.js)
 
 ########################################################################
 # Convenience rules to rebuild with various -Ox levels. Much
