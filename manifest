@@ -1,5 +1,5 @@
-C Mark\san\sunreachable\sbranch\sas\sNEVER().
-D 2023-07-21T22:22:13.828
+C Performance\senhancements\sfor\squeries\susing\svery\slarge\sstring\svalues.
+D 2023-07-21T22:28:34.848
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2043,8 +2043,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 06f829e9e57c5aa495f519ad7bb379be611e8e21ef60d36e63d055e45f7a6117
+P 0a745897d66e9f36ea6e787fad54f0c413d52c226dc96fad36ccd33a0aa1930e 414a4d660c3b505640227066b468db1268fcb1bd3fad931644a769617c6c00cd
 R f650c894c3b7e9fe01bf709dbdf65d35
 U drh
-Z ff67cbf0340dd6d2b6c094e434a4b95a
+Z 591aef3c08eb8a7097f1d29488b469be
 # Remove this line to create a well-formed Fossil manifest.
