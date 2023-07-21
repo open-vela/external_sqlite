@@ -59,6 +59,7 @@ static const char jsonIsSpace[] = {
 typedef struct JsonString JsonString;
 typedef struct JsonNode JsonNode;
 typedef struct JsonParse JsonParse;
+typedef struct JsonTask JsonTask;
 
 /* An instance of this object represents a JSON string
 ** under construction.  Really, this is a generic string accumulator
@@ -71,7 +72,17 @@ struct JsonString {
   u64 nUsed;               /* Bytes of zBuf[] currently used */
   u8 bStatic;              /* True if zBuf is static space */
   u8 bErr;                 /* True if an error has been encountered */
+  u8 bOrig;                /* Ignore edits when rendering JSON */
   char zSpace[100];        /* Initial static space */
+};
+
+/* A deferred cleanup task.  A list of JsonTask objects might be
+** run when the JsonParse object is destroyed.
+*/
+struct JsonTask {
+  JsonTask *pJTNext;       /* Next in a list */
+  void (*xOp)(void*);      /* Routine to run */
+  void *pArg;              /* Argument to xOp() */
 };
 
 /* JSON type values
@@ -123,6 +134,7 @@ struct JsonNode {
   } u;
 };
 
+
 /* A completely parsed JSON string
 */
 struct JsonParse {
@@ -131,10 +143,13 @@ struct JsonParse {
   JsonNode *aNode;   /* Array of nodes containing the parse */
   const char *zJson; /* Original JSON string */
   u32 *aUp;          /* Index of parent of each node */
+  JsonTask *pClean;  /* Cleanup operations prior to freeing this object */
   u16 iDepth;        /* Nesting depth */
   u8 nErr;           /* Number of errors seen */
   u8 oom;            /* Set to true if out of memory */
   u8 hasNonstd;      /* True if input uses non-standard features like JSON5 */
+  u8 nJPRef;         /* Number of references to this object */
+  u8 bOrig;          /* Ignore edit marks during search */
   int nJson;         /* Length of the zJson string in bytes */
   u32 iErr;          /* Error location in zJson[] */
   u32 iHold;         /* Replace cache line with the lowest iHold value */
@@ -160,6 +175,7 @@ static void jsonZero(JsonString *p){
   p->nAlloc = sizeof(p->zSpace);
   p->nUsed = 0;
   p->bStatic = 1;
+  p->bOrig = 0;
 }
 
 /* Initialize the JsonString object
@@ -218,12 +234,35 @@ static int jsonGrow(JsonString *p, u32 N){
 
 /* Append N bytes from zIn onto the end of the JsonString string.
 */
-static void jsonAppendRaw(JsonString *p, const char *zIn, u32 N){
-  if( N==0 ) return;
-  if( (N+p->nUsed >= p->nAlloc) && jsonGrow(p,N)!=0 ) return;
+static SQLITE_NOINLINE void jsonAppendExpand(
+  JsonString *p,
+  const char *zIn,
+  u32 N
+){
+  assert( N>0 );
+  if( jsonGrow(p,N) ) return;
   memcpy(p->zBuf+p->nUsed, zIn, N);
   p->nUsed += N;
 }
+static void jsonAppendRaw(JsonString *p, const char *zIn, u32 N){
+  if( N==0 ) return;
+  if( N+p->nUsed >= p->nAlloc ){
+    jsonAppendExpand(p,zIn,N);
+  }else{
+    memcpy(p->zBuf+p->nUsed, zIn, N);
+    p->nUsed += N;
+  }
+}
+static void jsonAppendRawNZ(JsonString *p, const char *zIn, u32 N){
+  assert( N>0 );
+  if( N+p->nUsed >= p->nAlloc ){
+    jsonAppendExpand(p,zIn,N);
+  }else{
+    memcpy(p->zBuf+p->nUsed, zIn, N);
+    p->nUsed += N;
+  }
+}
+
 
 /* Append formatted text (not to exceed N bytes) to the JsonString.
 */
@@ -238,9 +277,16 @@ static void jsonPrintf(int N, JsonString *p, const char *zFormat, ...){
 
 /* Append a single character
 */
-static void jsonAppendChar(JsonString *p, char c){
-  if( p->nUsed>=p->nAlloc && jsonGrow(p,1)!=0 ) return;
+static SQLITE_NOINLINE void jsonAppendCharExpand(JsonString *p, char c){
+  if( jsonGrow(p,1) ) return;
   p->zBuf[p->nUsed++] = c;
+}
+static void jsonAppendChar(JsonString *p, char c){
+  if( p->nUsed>=p->nAlloc ){
+    jsonAppendCharExpand(p,c);
+  }else{
+    p->zBuf[p->nUsed++] = c;
+  }
 }
 
 /* Append a comma separator to the output buffer, if the previous
@@ -250,7 +296,8 @@ static void jsonAppendSeparator(JsonString *p){
   char c;
   if( p->nUsed==0 ) return;
   c = p->zBuf[p->nUsed-1];
-  if( c!='[' && c!='{' ) jsonAppendChar(p, ',');
+  if( c=='[' || c=='{' ) return;
+  jsonAppendChar(p, ',');
 }
 
 /* Append the N-byte string in zIn to the end of the JsonString string
@@ -310,7 +357,7 @@ static void jsonAppendNormalizedString(JsonString *p, const char *zIn, u32 N){
   while( N>0 ){
     for(i=0; i<N && zIn[i]!='\\'; i++){}
     if( i>0 ){
-      jsonAppendRaw(p, zIn, i);
+      jsonAppendRawNZ(p, zIn, i);
       zIn += i;
       N -= i;
       if( N==0 ) break;     
@@ -321,16 +368,16 @@ static void jsonAppendNormalizedString(JsonString *p, const char *zIn, u32 N){
         jsonAppendChar(p, '\'');
         break;
       case 'v':
-        jsonAppendRaw(p, "\\u0009", 6);
+        jsonAppendRawNZ(p, "\\u0009", 6);
         break;
       case 'x':
-        jsonAppendRaw(p, "\\u00", 4);
-        jsonAppendRaw(p, &zIn[2], 2);
+        jsonAppendRawNZ(p, "\\u00", 4);
+        jsonAppendRawNZ(p, &zIn[2], 2);
         zIn += 2;
         N -= 2;
         break;
       case '0':
-        jsonAppendRaw(p, "\\u0000", 6);
+        jsonAppendRawNZ(p, "\\u0000", 6);
         break;
       case '\r':
         if( zIn[2]=='\n' ){
@@ -348,7 +395,7 @@ static void jsonAppendNormalizedString(JsonString *p, const char *zIn, u32 N){
         N -= 2;
         break;
       default:
-        jsonAppendRaw(p, zIn, 2);
+        jsonAppendRawNZ(p, zIn, 2);
         break;
     }
     zIn += 2;
@@ -378,11 +425,12 @@ static void jsonAppendNormalizedInt(JsonString *p, const char *zIn, u32 N){
       jsonPrintf(100,p,"%lld",i);
     }else{
       assert( rc==2 );
-      jsonAppendRaw(p, "9.0e999", 7);
+      jsonAppendRawNZ(p, "9.0e999", 7);
     }
     return;
   }
-  jsonAppendRaw(p, zIn, N);
+  assert( N>0 );
+  jsonAppendRawNZ(p, zIn, N);
 }
 
 /*
@@ -414,7 +462,7 @@ static void jsonAppendNormalizedReal(JsonString *p, const char *zIn, u32 N){
     }
   }
   if( N>0 ){
-    jsonAppendRaw(p, zIn, N);
+    jsonAppendRawNZ(p, zIn, N);
   }
 }
 
@@ -430,7 +478,7 @@ static void jsonAppendValue(
 ){
   switch( sqlite3_value_type(pValue) ){
     case SQLITE_NULL: {
-      jsonAppendRaw(p, "null", 4);
+      jsonAppendRawNZ(p, "null", 4);
       break;
     }
     case SQLITE_FLOAT: {
@@ -499,6 +547,8 @@ static u32 jsonNodeSize(JsonNode *pNode){
 ** delete the JsonParse object itself.
 */
 static void jsonParseReset(JsonParse *pParse){
+  assert( pParse->pClean==0 );
+  assert( pParse->nJPRef<=1 );
   sqlite3_free(pParse->aNode);
   pParse->aNode = 0;
   pParse->nNode = 0;
@@ -511,6 +561,16 @@ static void jsonParseReset(JsonParse *pParse){
 ** Free a JsonParse object that was obtained from sqlite3_malloc().
 */
 static void jsonParseFree(JsonParse *pParse){
+  if( pParse->nJPRef>1 ){
+    pParse->nJPRef--;
+    return;
+  }
+  while( pParse->pClean ){
+    JsonTask *pTask = pParse->pClean;
+    pParse->pClean = pTask->pJTNext;
+    pTask->xOp(pTask->pArg);
+    sqlite3_free(pTask);
+  }
   jsonParseReset(pParse);
   sqlite3_free(pParse);
 }
@@ -526,7 +586,7 @@ static void jsonRenderNode(
   sqlite3_value **aReplace       /* Replacement values */
 ){
   assert( pNode!=0 );
-  if( pNode->jnFlags & (JNODE_REPLACE|JNODE_PATCH) ){
+  if( (pNode->jnFlags & (JNODE_REPLACE|JNODE_PATCH)) && !pOut->bOrig ){
     if( (pNode->jnFlags & JNODE_REPLACE)!=0 && ALWAYS(aReplace!=0) ){
       assert( pNode->eU==4 );
       jsonAppendValue(pOut, aReplace[pNode->u.iReplace]);
@@ -538,15 +598,15 @@ static void jsonRenderNode(
   switch( pNode->eType ){
     default: {
       assert( pNode->eType==JSON_NULL );
-      jsonAppendRaw(pOut, "null", 4);
+      jsonAppendRawNZ(pOut, "null", 4);
       break;
     }
     case JSON_TRUE: {
-      jsonAppendRaw(pOut, "true", 4);
+      jsonAppendRawNZ(pOut, "true", 4);
       break;
     }
     case JSON_FALSE: {
-      jsonAppendRaw(pOut, "false", 5);
+      jsonAppendRawNZ(pOut, "false", 5);
       break;
     }
     case JSON_STRING: {
@@ -562,7 +622,8 @@ static void jsonRenderNode(
       }else if( pNode->jnFlags & JNODE_JSON5 ){
         jsonAppendNormalizedString(pOut, pNode->u.zJContent, pNode->n);
       }else{
-        jsonAppendRaw(pOut, pNode->u.zJContent, pNode->n);
+        assert( pNode->n>0 );
+        jsonAppendRawNZ(pOut, pNode->u.zJContent, pNode->n);
       }
       break;
     }
@@ -571,7 +632,8 @@ static void jsonRenderNode(
       if( pNode->jnFlags & JNODE_JSON5 ){
         jsonAppendNormalizedReal(pOut, pNode->u.zJContent, pNode->n);
       }else{
-        jsonAppendRaw(pOut, pNode->u.zJContent, pNode->n);
+        assert( pNode->n>0 );
+        jsonAppendRawNZ(pOut, pNode->u.zJContent, pNode->n);
       }
       break;
     }
@@ -580,7 +642,8 @@ static void jsonRenderNode(
       if( pNode->jnFlags & JNODE_JSON5 ){
         jsonAppendNormalizedInt(pOut, pNode->u.zJContent, pNode->n);
       }else{
-        jsonAppendRaw(pOut, pNode->u.zJContent, pNode->n);
+        assert( pNode->n>0 );
+        jsonAppendRawNZ(pOut, pNode->u.zJContent, pNode->n);
       }
       break;
     }
@@ -589,13 +652,13 @@ static void jsonRenderNode(
       jsonAppendChar(pOut, '[');
       for(;;){
         while( j<=pNode->n ){
-          if( (pNode[j].jnFlags & JNODE_REMOVE)==0 ){
+          if( (pNode[j].jnFlags & JNODE_REMOVE)==0 || pOut->bOrig ){
             jsonAppendSeparator(pOut);
             jsonRenderNode(&pNode[j], pOut, aReplace);
           }
           j += jsonNodeSize(&pNode[j]);
         }
-        if( (pNode->jnFlags & JNODE_APPEND)==0 ) break;
+        if( (pNode->jnFlags & JNODE_APPEND)==0 || pOut->bOrig ) break;
         assert( pNode->eU==2 );
         pNode = &pNode[pNode->u.iAppend];
         j = 1;
@@ -608,7 +671,7 @@ static void jsonRenderNode(
       jsonAppendChar(pOut, '{');
       for(;;){
         while( j<=pNode->n ){
-          if( (pNode[j+1].jnFlags & JNODE_REMOVE)==0 ){
+          if( (pNode[j+1].jnFlags & JNODE_REMOVE)==0 || pOut->bOrig ){
             jsonAppendSeparator(pOut);
             jsonRenderNode(&pNode[j], pOut, aReplace);
             jsonAppendChar(pOut, ':');
@@ -616,7 +679,7 @@ static void jsonRenderNode(
           }
           j += 1 + jsonNodeSize(&pNode[j+1]);
         }
-        if( (pNode->jnFlags & JNODE_APPEND)==0 ) break;
+        if( (pNode->jnFlags & JNODE_APPEND)==0 || pOut->bOrig ) break;
         assert( pNode->eU==2 );
         pNode = &pNode[pNode->u.iAppend];
         j = 1;
@@ -633,10 +696,12 @@ static void jsonRenderNode(
 static void jsonReturnJson(
   JsonNode *pNode,            /* Node to return */
   sqlite3_context *pCtx,      /* Return value for this function */
-  sqlite3_value **aReplace    /* Array of replacement values */
+  sqlite3_value **aReplace,   /* Array of replacement values */
+  int bOrig                   /* Ignore edits if true */
 ){
   JsonString s;
   jsonInit(&s, pCtx);
+  s.bOrig = bOrig!=0;
   jsonRenderNode(pNode, &s, aReplace);
   jsonResult(&s);
   sqlite3_result_subtype(pCtx, JSON_SUBTYPE);
@@ -679,7 +744,8 @@ static u32 jsonHexToInt4(const char *z){
 static void jsonReturn(
   JsonNode *pNode,            /* Node to return */
   sqlite3_context *pCtx,      /* Return value for this function */
-  sqlite3_value **aReplace    /* Array of replacement values */
+  sqlite3_value **aReplace,   /* Array of replacement values */
+  int bOrig                   /* Ignore edits if true */
 ){
   switch( pNode->eType ){
     default: {
@@ -826,7 +892,7 @@ static void jsonReturn(
     }
     case JSON_ARRAY:
     case JSON_OBJECT: {
-      jsonReturnJson(pNode, pCtx, aReplace);
+      jsonReturnJson(pNode, pCtx, aReplace, bOrig);
       break;
     }
   }
@@ -882,7 +948,8 @@ static int jsonParseAddNode(
   const char *zContent      /* Content */
 ){
   JsonNode *p;
-  if( pParse->aNode==0 || pParse->nNode>=pParse->nAlloc ){
+  assert( pParse->aNode!=0 || pParse->nNode>=pParse->nAlloc );
+  if( pParse->nNode>=pParse->nAlloc ){
     return jsonParseAddNodeExpand(pParse, eType, n, zContent);
   }
   p = &pParse->aNode[pParse->nNode];
@@ -1235,15 +1302,31 @@ json_parse_restart:
     jnFlags = 0;
   parse_string:
     cDelim = z[i];
-    j = i+1;
-    for(;;){
+    for(j=i+1; 1; j++){
+      static const char aOk[256] = {
+      	  0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+      	  0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+      	  1, 1, 0, 1, 1, 1, 1, 0,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 0, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1,
+      	  1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1
+      };
+      if( aOk[(unsigned char)z[j]] ) continue;
       c = z[j];
-      if( (c & ~0x1f)==0 ){
-        /* Control characters are not allowed in strings */
-        pParse->iErr = j;
-        return -1;
-      }
-      if( c=='\\' ){
+      if( c==cDelim ){
+        break;
+      }else if( c=='\\' ){
         c = z[++j];
         if( c=='"' || c=='\\' || c=='/' || c=='b' || c=='f'
            || c=='n' || c=='r' || c=='t'
@@ -1263,10 +1346,11 @@ json_parse_restart:
           pParse->iErr = j;
           return -1;
         }
-      }else if( c==cDelim ){
-        break;
+      }else if( c<=0x1f ){
+        /* Control characters are not allowed in strings */
+        pParse->iErr = j;
+        return -1;
       }
-      j++;
     }
     jsonParseAddNode(pParse, JSON_STRING | (jnFlags<<8), j+1-i, &z[i]);
     return j+1;
@@ -1718,7 +1802,7 @@ static JsonNode *jsonLookupStep(
   const char *zKey;
   JsonNode *pRoot = &pParse->aNode[iRoot];
   if( zPath[0]==0 ) return pRoot;
-  if( pRoot->jnFlags & JNODE_REPLACE ) return 0;
+  if( (pRoot->jnFlags & JNODE_REPLACE)!=0 && !pParse->bOrig ) return 0;
   if( zPath[0]=='.' ){
     if( pRoot->eType!=JSON_OBJECT ) return 0;
     zPath++;
@@ -1751,7 +1835,7 @@ static JsonNode *jsonLookupStep(
         j++;
         j += jsonNodeSize(&pRoot[j]);
       }
-      if( (pRoot->jnFlags & JNODE_APPEND)==0 ) break;
+      if( (pRoot->jnFlags & JNODE_APPEND)==0 || pParse->bOrig ) break;
       assert( pRoot->eU==2 );
       iRoot += pRoot->u.iAppend;
       pRoot = &pParse->aNode[iRoot];
@@ -1760,6 +1844,7 @@ static JsonNode *jsonLookupStep(
     if( pApnd ){
       u32 iStart, iLabel;
       JsonNode *pNode;
+      assert( !pParse->bOrig );
       iStart = jsonParseAddNode(pParse, JSON_OBJECT, 2, 0);
       iLabel = jsonParseAddNode(pParse, JSON_STRING, nKey, zKey);
       zPath += i;
@@ -1789,10 +1874,10 @@ static JsonNode *jsonLookupStep(
         if( pRoot->eType!=JSON_ARRAY ) return 0;
         for(;;){
           while( j<=pBase->n ){
-            if( (pBase[j].jnFlags & JNODE_REMOVE)==0 ) i++;
+            if( (pBase[j].jnFlags & JNODE_REMOVE)==0 || pParse->bOrig ) i++;
             j += jsonNodeSize(&pBase[j]);
           }
-          if( (pBase->jnFlags & JNODE_APPEND)==0 ) break;
+          if( (pBase->jnFlags & JNODE_APPEND)==0 || pParse->bOrig ) break;
           assert( pBase->eU==2 );
           iBase += pBase->u.iAppend;
           pBase = &pParse->aNode[iBase];
@@ -1822,11 +1907,13 @@ static JsonNode *jsonLookupStep(
     zPath += j + 1;
     j = 1;
     for(;;){
-      while( j<=pRoot->n && (i>0 || (pRoot[j].jnFlags & JNODE_REMOVE)!=0) ){
-        if( (pRoot[j].jnFlags & JNODE_REMOVE)==0 ) i--;
+      while( j<=pRoot->n
+          && (i>0 || ((pRoot[j].jnFlags & JNODE_REMOVE) && !pParse->bOrig))
+      ){
+        if( (pRoot[j].jnFlags & JNODE_REMOVE)==0 || pParse->bOrig ) i--;
         j += jsonNodeSize(&pRoot[j]);
       }
-      if( (pRoot->jnFlags & JNODE_APPEND)==0 ) break;
+      if( (pRoot->jnFlags & JNODE_APPEND)==0 || pParse->bOrig ) break;
       assert( pRoot->eU==2 );
       iRoot += pRoot->u.iAppend;
       pRoot = &pParse->aNode[iRoot];
@@ -1838,6 +1925,7 @@ static JsonNode *jsonLookupStep(
     if( i==0 && pApnd ){
       u32 iStart;
       JsonNode *pNode;
+      assert( !pParse->bOrig );
       iStart = jsonParseAddNode(pParse, JSON_ARRAY, 1, 0);
       pNode = jsonLookupAppend(pParse, zPath, pApnd, pzErr);
       if( pParse->oom ) return 0;
@@ -2003,12 +2091,12 @@ static void jsonParseFunc(
     assert( x.aNode[i].eU==0 || x.aNode[i].eU==1 );
     if( x.aNode[i].u.zJContent!=0 ){
       assert( x.aNode[i].eU==1 );
-      jsonAppendRaw(&s, " ", 1);
+      jsonAppendChar(&s, ' ');
       jsonAppendRaw(&s, x.aNode[i].u.zJContent, x.aNode[i].n);
     }else{
       assert( x.aNode[i].eU==0 );
     }
-    jsonAppendRaw(&s, "\n", 1);
+    jsonAppendChar(&s, '\n');
   }
   jsonParseReset(&x);
   jsonResult(&s);
@@ -2175,11 +2263,11 @@ static void jsonExtractFunc(
         */
         jsonInit(&jx, ctx);
         if( sqlite3Isdigit(zPath[0]) ){
-          jsonAppendRaw(&jx, "$[", 2);
+          jsonAppendRawNZ(&jx, "$[", 2);
           jsonAppendRaw(&jx, zPath, (int)strlen(zPath));
-          jsonAppendRaw(&jx, "]", 2);
+          jsonAppendRawNZ(&jx, "]", 2);
         }else{
-          jsonAppendRaw(&jx, "$.", 1 + (zPath[0]!='['));
+          jsonAppendRawNZ(&jx, "$.", 1 + (zPath[0]!='['));
           jsonAppendRaw(&jx, zPath, (int)strlen(zPath));
           jsonAppendChar(&jx, 0);
         }
@@ -2190,15 +2278,15 @@ static void jsonExtractFunc(
       }
       if( pNode ){
         if( flags & JSON_JSON ){
-          jsonReturnJson(pNode, ctx, 0);
+          jsonReturnJson(pNode, ctx, 0, 1);
         }else{
-          jsonReturn(pNode, ctx, 0);
+          jsonReturn(pNode, ctx, 0, 1);
           sqlite3_result_subtype(ctx, 0);
         }
       }
     }else{
       pNode = jsonLookup(p, zPath, 0, ctx);
-      if( p->nErr==0 && pNode ) jsonReturn(pNode, ctx, 0);
+      if( p->nErr==0 && pNode ) jsonReturn(pNode, ctx, 0, 1);
     }
   }else{
     /* Two or more PATH arguments results in a JSON array with each
@@ -2214,7 +2302,7 @@ static void jsonExtractFunc(
       if( pNode ){
         jsonRenderNode(pNode, &jx, 0);
       }else{
-        jsonAppendRaw(&jx, "null", 4);
+        jsonAppendRawNZ(&jx, "null", 4);
       }
     }
     if( i==argc ){
@@ -2326,7 +2414,7 @@ static void jsonPatchFunc(
   pResult = jsonMergePatch(&x, 0, y.aNode);
   assert( pResult!=0 || x.oom );
   if( pResult ){
-    jsonReturnJson(pResult, ctx, 0);
+    jsonReturnJson(pResult, ctx, 0, 0);
   }else{
     sqlite3_result_error_nomem(ctx);
   }
@@ -2403,7 +2491,7 @@ static void jsonRemoveFunc(
     if( pNode ) pNode->jnFlags |= JNODE_REMOVE;
   }
   if( (x.aNode[0].jnFlags & JNODE_REMOVE)==0 ){
-    jsonReturnJson(x.aNode, ctx, 0);
+    jsonReturnJson(x.aNode, ctx, 0, 0);
   }
 remove_done:
   jsonParseReset(&x);
@@ -2448,7 +2536,7 @@ static void jsonReplaceFunc(
     assert( x.aNode[0].eU==4 );
     sqlite3_result_value(ctx, argv[x.aNode[0].u.iReplace]);
   }else{
-    jsonReturnJson(x.aNode, ctx, argv);
+    jsonReturnJson(x.aNode, ctx, argv, 0);
   }
 replace_err:
   jsonParseReset(&x);
@@ -2507,7 +2595,7 @@ static void jsonSetFunc(
     assert( x.aNode[0].eU==4 );
     sqlite3_result_value(ctx, argv[x.aNode[0].u.iReplace]);
   }else{
-    jsonReturnJson(x.aNode, ctx, argv);
+    jsonReturnJson(x.aNode, ctx, argv, 0);
   }
 jsonSetDone:
   jsonParseReset(&x);
@@ -3016,7 +3104,7 @@ static int jsonEachColumn(
     case JEACH_KEY: {
       if( p->i==0 ) break;
       if( p->eType==JSON_OBJECT ){
-        jsonReturn(pThis, ctx, 0);
+        jsonReturn(pThis, ctx, 0, 0);
       }else if( p->eType==JSON_ARRAY ){
         u32 iKey;
         if( p->bRecursive ){
@@ -3032,7 +3120,7 @@ static int jsonEachColumn(
     }
     case JEACH_VALUE: {
       if( pThis->jnFlags & JNODE_LABEL ) pThis++;
-      jsonReturn(pThis, ctx, 0);
+      jsonReturn(pThis, ctx, 0, 0);
       break;
     }
     case JEACH_TYPE: {
@@ -3043,7 +3131,7 @@ static int jsonEachColumn(
     case JEACH_ATOM: {
       if( pThis->jnFlags & JNODE_LABEL ) pThis++;
       if( pThis->eType>=JSON_ARRAY ) break;
-      jsonReturn(pThis, ctx, 0);
+      jsonReturn(pThis, ctx, 0, 0);
       break;
     }
     case JEACH_ID: {
