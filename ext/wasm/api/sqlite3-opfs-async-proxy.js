@@ -35,9 +35,6 @@
 
   https://developer.chrome.com/blog/sync-methods-for-accesshandles/
 
-  Firefox v111 and Safari 16.4, both released in March 2023, also
-  include this.
-
   We cannot change to the sync forms at this point without breaking
   clients who use Chrome v104-ish or higher. truncate(), getSize(),
   flush(), and close() are now (as of v108) synchronous. Calling them

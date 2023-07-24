@@ -4690,7 +4690,8 @@ expr_code_doover:
           }
         }
 
-        sqlite3ExprCodeExprList(pParse, pFarg, r1, 0, SQLITE_ECEL_FACTOR);
+        sqlite3ExprCodeExprList(pParse, pFarg, r1, 0,
+                                SQLITE_ECEL_DUP|SQLITE_ECEL_FACTOR);
       }else{
         r1 = 0;
       }
