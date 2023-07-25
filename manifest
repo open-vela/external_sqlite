@@ -1,5 +1,5 @@
-C Extend\sthe\senhancement\sto\sjson_set()\sand\sjson_replace().\s\sClean\sup\scruft.
-D 2023-07-26T01:05:08.003
+C Add\sthe\sconcept\sof\san\sRCStr\sstring\s-\sa\s"Reference\sCounted\sString".\s\sUse\nthese\sto\skeep\strack\sof\sbig\sJSON\sstrings\sthat\smight\sneed\sto\sbe\sused\sin\nmultiple\splaces\sat\sthe\ssame\stime\swith\sdifferent\slifetimes.\s\sAdd\stwo\ndifferent\sJSON\sstring\svalues\sto\seach\sparse\s-\sone\swith\sand\sone\swithout\nchanges.\s\sThe\snet\sresult\sis\sa\slarge\sreduction\sin\sthe\snumber\sof\sparses\nthat\soccur\swhen\sdoing\san\sUPDATE\sof\sa\sindexed\sJSON\sfield\susing\njson_replace()\sor\ssimilar.
+D 2023-07-26T01:12:08.723
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2044,8 +2044,9 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P f930b139d6db0ee799bc90397b225175103c4bf22923d1c9cbcd32509adc1738
+P 28c6e964b1e2257527df02b352f02e135f7c4b764b8b41eda6461f9538f5d042 2dbb22c75e86f2e3ced38ac14b4943570d5c2f86cd5e37e875bf0c863be28836
 R 80113afdab5484e027b5180529a678b7
+T +closed 2dbb22c75e86f2e3ced38ac14b4943570d5c2f86cd5e37e875bf0c863be28836
 U drh
-Z dc859019c8db0487fd3e03bdb875d59d
+Z b150fbb50a544ff974ea79d1ca7ea6fb
 # Remove this line to create a well-formed Fossil manifest.
