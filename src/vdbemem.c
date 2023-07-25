@@ -315,37 +315,6 @@ int sqlite3VdbeMemClearAndResize(Mem *pMem, int szNew){
 }
 
 /*
-** If pMem is already a string, detect if it is a zero-terminated
-** string, or make it into one if possible, and mark it as such.
-**
-** This is an optimization.  Correct operation continues even if
-** this routine is a no-op.
-*/
-void sqlite3VdbeMemZeroTerminateIfAble(Mem *pMem){
-  if( (pMem->flags & (MEM_Str|MEM_Term))!=MEM_Str ) return;
-  if( pMem->enc!=SQLITE_UTF8 ) return;
-  if( NEVER(pMem->z==0) ) return;
-  if( pMem->flags & MEM_Dyn ){
-    if( pMem->xDel==sqlite3_free
-     && sqlite3_msize(pMem->z) >= (u64)(pMem->n+1)
-    ){
-      pMem->z[pMem->n] = 0;
-      pMem->flags |= MEM_Term;
-      return;
-    }
-    if( pMem->xDel==(void(*)(void*))sqlite3RCStrUnref ){
-      /* Blindly assume that all RCStr objects are zero-terminated */
-      pMem->flags |= MEM_Term;
-      return;
-    }
-  }else if( pMem->szMalloc>0 && pMem->szMalloc >= pMem->n+1 ){
-    pMem->z[pMem->n] = 0;
-    pMem->flags |= MEM_Term;
-    return;
-  }
-}
-
-/*
 ** It is already known that pMem contains an unterminated string.
 ** Add the zero terminator.
 **
@@ -834,7 +803,6 @@ int sqlite3VdbeMemCast(Mem *pMem, u8 aff, u8 encoding){
       break;
     }
     default: {
-      int rc;
       assert( aff==SQLITE_AFF_TEXT );
       assert( MEM_Str==(MEM_Blob>>3) );
       pMem->flags |= (pMem->flags&MEM_Blob)>>3;
@@ -842,9 +810,7 @@ int sqlite3VdbeMemCast(Mem *pMem, u8 aff, u8 encoding){
       assert( pMem->flags & MEM_Str || pMem->db->mallocFailed );
       pMem->flags &= ~(MEM_Int|MEM_Real|MEM_IntReal|MEM_Blob|MEM_Zero);
       if( encoding!=SQLITE_UTF8 ) pMem->n &= ~1;
-      rc = sqlite3VdbeChangeEncoding(pMem, encoding);
-      if( rc ) return rc;
-      sqlite3VdbeMemZeroTerminateIfAble(pMem);
+      return sqlite3VdbeChangeEncoding(pMem, encoding);
     }
   }
   return SQLITE_OK;
@@ -1366,24 +1332,6 @@ const void *sqlite3ValueText(sqlite3_value* pVal, u8 enc){
     return 0;
   }
   return valueToText(pVal, enc);
-}
-
-/* Return true if sqlit3_value object pVal is a string or blob value
-** that uses the destructor specified in the second argument.
-**
-** TODO:  Maybe someday promote this interface into a published API so
-** that third-party extensions can get access to it?
-*/
-int sqlite3ValueIsOfClass(const sqlite3_value *pVal, void(*xFree)(void*)){
-  if( ALWAYS(pVal!=0)
-   && (pVal->flags & (MEM_Str|MEM_Blob))!=0
-   && (pVal->flags & MEM_Dyn)!=0
-   && pVal->xDel==xFree
-  ){
-    return 1;
-  }else{
-    return 0;
-  }
 }
 
 /*
