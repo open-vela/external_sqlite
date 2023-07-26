@@ -889,31 +889,8 @@ typedef INT16_TYPE LogEst;
 ** the end of buffer S.  This macro returns true if P points to something
 ** contained within the buffer S.
 */
-#define SQLITE_WITHIN(P,S,E)   (((uptr)(P)>=(uptr)(S))&&((uptr)(P)<(uptr)(E)))
+#define SQLITE_WITHIN(P,S,E) (((uptr)(P)>=(uptr)(S))&&((uptr)(P)<(uptr)(E)))
 
-/*
-** P is one byte past the end of a large buffer. Return true if a span of bytes
-** between S..E crosses the end of that buffer.  In other words, return true
-** if the sub-buffer S..E-1 overflows the buffer show last byte is P-1.
-**
-** S is the start of the span.  E is one byte past the end of end of span.
-**
-**                        P
-**     |-----------------|                FALSE
-**               |-------|
-**               S        E
-**
-**                        P
-**     |-----------------|
-**                    |-------|           TRUE
-**                    S        E
-**
-**                        P
-**     |-----------------|               
-**                        |-------|       FALSE
-**                        S        E
-*/
-#define SQLITE_OVERFLOW(P,S,E) (((uptr)(S)<(uptr)(P))&&((uptr)(E)>(uptr)(P)))
 
 /*
 ** Macros to determine whether the machine is big or little endian,
@@ -1262,7 +1239,6 @@ typedef struct Schema Schema;
 typedef struct Expr Expr;
 typedef struct ExprList ExprList;
 typedef struct FKey FKey;
-typedef struct FpDecode FpDecode;
 typedef struct FuncDestructor FuncDestructor;
 typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
@@ -1281,7 +1257,6 @@ typedef struct Parse Parse;
 typedef struct ParseCleanup ParseCleanup;
 typedef struct PreUpdate PreUpdate;
 typedef struct PrintfArguments PrintfArguments;
-typedef struct RCStr RCStr;
 typedef struct RenameToken RenameToken;
 typedef struct Returning Returning;
 typedef struct RowSet RowSet;
@@ -4062,25 +4037,6 @@ struct sqlite3_str {
 
 #define isMalloced(X)  (((X)->printfFlags & SQLITE_PRINTF_MALLOCED)!=0)
 
-/*
-** The following object is the header for an "RCStr" or "reference-counted
-** string".  An RCStr is passed around and used like any other char*
-** that has been dynamically allocated.  The important interface
-** differences:
-**
-**   1.  RCStr strings are reference counted.  They are deallocated
-**       when the reference count reaches zero.
-**
-**   2.  Use sqlite3RCStrUnref() to free an RCStr string rather than
-**       sqlite3_free()
-**
-**   3.  Make a (read-only) copy of a read-only RCStr string using
-**       sqlite3RCStrRef().
-*/
-struct RCStr {
-  u64 nRCRef;            /* Number of references */
-  /* Total structure size should be a multiple of 8 bytes for alignment */
-};
 
 /*
 ** A pointer to this structure is used to communicate information
@@ -4133,7 +4089,6 @@ struct Sqlite3Config {
   u8 bUseCis;                       /* Use covering indices for full-scans */
   u8 bSmallMalloc;                  /* Avoid large memory allocations if true */
   u8 bExtraSchemaChecks;            /* Verify type,name,tbl_name in schema */
-  u8 bUseLongDouble;                /* Make use of long double */
   int mxStrlen;                     /* Maximum string length */
   int neverCorrupt;                 /* Database is always well-formed */
   int szLookaside;                  /* Default lookaside buffer size */
@@ -4642,20 +4597,6 @@ struct PrintfArguments {
   sqlite3_value **apArg;   /* The argument values */
 };
 
-/*
-** An instance of this object receives the decoding of a floating point
-** value into an approximate decimal representation.
-*/
-struct FpDecode {
-  char sign;           /* '+' or '-' */
-  char isSpecial;      /* 1: Infinity  2: NaN */
-  int n;               /* Significant digits in the decode */
-  int iDP;             /* Location of the decimal point */
-  char *z;             /* Start of significant digits */
-  char zBuf[24];       /* Storage for significant digits */
-};
-
-void sqlite3FpDecode(FpDecode*,double,int,int);
 char *sqlite3MPrintf(sqlite3*,const char*, ...);
 char *sqlite3VMPrintf(sqlite3*,const char*, va_list);
 #if defined(SQLITE_DEBUG) || defined(SQLITE_HAVE_OS_TRACE)
@@ -5306,11 +5247,6 @@ void *sqlite3OomFault(sqlite3*);
 void sqlite3OomClear(sqlite3*);
 int sqlite3ApiExit(sqlite3 *db, int);
 int sqlite3OpenTempDatabase(Parse *);
-
-char *sqlite3RCStrRef(char*);
-void sqlite3RCStrUnref(char*);
-char *sqlite3RCStrNew(u64);
-char *sqlite3RCStrResize(char*,u64);
 
 void sqlite3StrAccumInit(StrAccum*, sqlite3*, char*, int, int);
 int sqlite3StrAccumEnlarge(StrAccum*, i64);
