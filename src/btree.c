@@ -1534,7 +1534,7 @@ static void ptrmapPutOvflPtr(MemPage *pPage, MemPage *pSrc, u8 *pCell,int *pRC){
   pPage->xParseCell(pPage, pCell, &info);
   if( info.nLocal<info.nPayload ){
     Pgno ovfl;
-    if( SQLITE_WITHIN(pSrc->aDataEnd, pCell, pCell+info.nLocal) ){
+    if( SQLITE_OVERFLOW(pSrc->aDataEnd, pCell, pCell+info.nLocal) ){
       testcase( pSrc!=pPage );
       *pRC = SQLITE_CORRUPT_BKPT;
       return;
@@ -5341,6 +5341,7 @@ static int moveToChild(BtCursor *pCur, u32 newPgno){
   pCur->ix = 0;
   pCur->iPage++;
   rc = getAndInitPage(pCur->pBt, newPgno, &pCur->pPage, pCur->curPagerFlags);
+  assert( pCur->pPage!=0 || rc!=SQLITE_OK );
   if( rc==SQLITE_OK
    && (pCur->pPage->nCell<1 || pCur->pPage->intKey!=pCur->curIntKey)
   ){
@@ -5569,7 +5570,7 @@ int sqlite3BtreeFirst(BtCursor *pCur, int *pRes){
     *pRes = 0;
     rc = moveToLeftmost(pCur);
   }else if( rc==SQLITE_EMPTY ){
-    assert( pCur->pgnoRoot==0 || pCur->pPage->nCell==0 );
+    assert( pCur->pgnoRoot==0 || (pCur->pPage!=0 && pCur->pPage->nCell==0) );
     *pRes = 1;
     rc = SQLITE_OK;
   }
@@ -8694,7 +8695,7 @@ static int balance_nonroot(
     assert( iOvflSpace <= (int)pBt->pageSize );
     for(k=0; ALWAYS(k<NB*2) && b.ixNx[k]<=j; k++){}
     pSrcEnd = b.apEnd[k];
-    if( SQLITE_WITHIN(pSrcEnd, pCell, pCell+sz) ){
+    if( SQLITE_OVERFLOW(pSrcEnd, pCell, pCell+sz) ){
       rc = SQLITE_CORRUPT_BKPT;
       goto balance_cleanup;
     }
