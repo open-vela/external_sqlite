@@ -1,5 +1,5 @@
-C Dynamically\sdetermine\swhether\sthe\swasm.xWrap()\sargc\scheck\scan\sbe\sapplied,\sdepending\son\show\sthe\swasm\senvironment\sexposes\sits\sexports.
-D 2023-07-27T17:50:10.521
+C Merge\strunk\senhancements\sinto\sthe\sjson-opt\sbranch.
+D 2023-07-27T18:19:46.300
 F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
 F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
 F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
@@ -2044,9 +2044,8 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
 F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
 F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
 F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
-P 2c5dd34199f5bcf729be814b8b46d9997821fe3a39ab12779c93df1bb2fd108d
-Q +86bb464f31b77ac7a89ee9a50c3d988a186f84fa0bbee16b15fcbbac33523fa1
+P 1bf85d4e388714a88f8940dcdec353c3e0267456697eff6963d34637912aecc9 fd59226b34fffb1479fb2d7bd7c0aff982aa4a1a73e6c0d81de6eaf9c075998c
 R 26c73044c10199d992b00944e358a20b
-U stephan
-Z 7df747b854c1185863732d1df816e30a
+U drh
+Z d6bca8891c39ac6c04dd8ce7fe687700
 # Remove this line to create a well-formed Fossil manifest.
