@@ -3790,7 +3790,7 @@ struct Parse {
     int addrCrTab;         /* Address of OP_CreateBtree on CREATE TABLE */
     Returning *pReturning; /* The RETURNING clause */
   } u1;
-  u32 nQueryLoop;      /* Est number of iterations of a query (10*log2(N)) */
+  LogEst nQueryLoop;   /* Est number of iterations of a query (10*log2(N)) */
   u32 oldmask;         /* Mask of old.* columns referenced */
   u32 newmask;         /* Mask of new.* columns referenced */
 #ifndef SQLITE_OMIT_PROGRESS_CALLBACK
@@ -5200,6 +5200,7 @@ void sqlite3FileSuffix3(const char*, char*);
 u8 sqlite3GetBoolean(const char *z,u8);
 
 const void *sqlite3ValueText(sqlite3_value*, u8);
+int sqlite3ValueIsOfClass(const sqlite3_value*, void(*)(void*));
 int sqlite3ValueBytes(sqlite3_value*, u8);
 void sqlite3ValueSetStr(sqlite3_value*, int, const void *,u8,
                         void(*)(void*));
