@@ -62,7 +62,6 @@ const toExportForESM =
   globalThis.sqlite3InitModule = function ff(...args){
     //console.warn("Using replaced sqlite3InitModule()",globalThis.location);
     return originalInit(...args).then((EmscriptenModule)=>{
-//#if wasmfs
       if('undefined'!==typeof WorkerGlobalScope &&
          EmscriptenModule['ENVIRONMENT_IS_PTHREAD']){
         /** Workaround for wasmfs-generated worker, which calls this
@@ -73,7 +72,6 @@ const toExportForESM =
         //console.warn("sqlite3InitModule() returning E-module.",EmscriptenModule);
         return EmscriptenModule;
       }
-//#endif
       //console.warn("sqlite3InitModule() returning sqlite3 object.");
       const s = EmscriptenModule.sqlite3;
       s.scriptInfo = initModuleState;
