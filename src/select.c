@@ -2101,6 +2101,13 @@ void sqlite3GenerateColumnNames(
   int fullName;    /* TABLE.COLUMN if no AS clause and is a direct table ref */
   int srcName;     /* COLUMN or TABLE.COLUMN if no AS clause and is direct */
 
+#ifndef SQLITE_OMIT_EXPLAIN
+  /* If this is an EXPLAIN, skip this step */
+  if( pParse->explain ){
+    return;
+  }
+#endif
+
   if( pParse->colNamesSet ) return;
   /* Column names are determined by the left-most term of a compound select */
   while( pSelect->pPrior ) pSelect = pSelect->pPrior;
@@ -4292,8 +4299,7 @@ static int compoundHasDifferentAffinities(Select *p){
 **        (27b) the subquery is a compound query and the RIGHT JOIN occurs
 **              in any arm of the compound query.  (See also (17g).)
 **
-**  (28)  The subquery is not a MATERIALIZED CTE.  (This is handled
-**        in the caller before ever reaching this routine.)
+**  (28)  The subquery is not a MATERIALIZED CTE.
 **
 **
 ** In this routine, the "p" parameter is a pointer to the outer query.
@@ -4403,9 +4409,9 @@ static int flattenSubquery(
   if( iFrom>0 && (pSubSrc->a[0].fg.jointype & JT_LTORJ)!=0 ){
     return 0;   /* Restriction (27a) */
   }
-
-  /* Condition (28) is blocked by the caller */
-  assert( !pSubitem->fg.isCte || pSubitem->u2.pCteUse->eM10d!=M10d_Yes );
+  if( pSubitem->fg.isCte && pSubitem->u2.pCteUse->eM10d==M10d_Yes ){
+    return 0;       /* (28) */
+  }
 
   /* Restriction (17): If the sub-query is a compound SELECT, then it must
   ** use only the UNION ALL operator. And none of the simple select queries
@@ -7286,14 +7292,6 @@ int sqlite3Select(
       goto select_end;
     }
 
-    /* Do not attempt the usual optimizations (flattening and ORDER BY
-    ** elimination) on a MATERIALIZED common table expression because
-    ** a MATERIALIZED common table expression is an optimization fence.
-    */
-    if( pItem->fg.isCte && pItem->u2.pCteUse->eM10d==M10d_Yes ){
-      continue;
-    }
-
     /* Do not try to flatten an aggregate subquery.
     **
     ** Flattening an aggregate subquery is only possible if the outer query
@@ -7323,8 +7321,6 @@ int sqlite3Select(
     **            (a)  The outer query has a different ORDER BY clause
     **            (b)  The subquery is part of a join
     **          See forum post 062d576715d277c8
-    **
-    ** Also retain the ORDER BY if the OmitOrderBy optimization is disabled.
     */
     if( pSub->pOrderBy!=0
      && (p->pOrderBy!=0 || pTabList->nSrc>1)      /* Condition (5) */
