@@ -1657,7 +1657,7 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
         .assert('number'===typeof rc[0])
         .assert(rc[0]|0 === rc[0] /* is small integer */);
     })
-    ////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////
     .t({
       name: 'sqlite3_js_db_export()',
       predicate: ()=>true,
@@ -1671,12 +1671,13 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
       }
     }/*sqlite3_js_db_export()*/)
     .t({
-      name: 'sqlite3_js_posix_create_file()',
+      name: 'sqlite3_js_vfs_create_file() with db in default VFS',
       predicate: ()=>true,
       test: function(sqlite3){
         const db = this.db;
-        const filename = "sqlite3_js_posix_create_file.db";
-        capi.sqlite3_js_posix_create_file(filename, this.dbExport);
+        const pVfs = capi.sqlite3_js_db_vfs(db);
+        const filename = "sqlite3_js_vfs_create_file().db";
+        capi.sqlite3_js_vfs_create_file(pVfs, filename, this.dbExport);
         delete this.dbExport;
         const db2 = new sqlite3.oo1.DB(filename,'r');
         try {
@@ -1685,7 +1686,7 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
           T.assert(n>0 && db2.selectValue(sql) === n);
         }finally{
           db2.close();
-          wasm.sqlite3_wasm_vfs_unlink(0, filename);
+          wasm.sqlite3_wasm_vfs_unlink(pVfs, filename);
         }
       }
     }/*sqlite3_js_vfs_create_file()*/)
@@ -2906,7 +2907,7 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
     .t({
       name: 'OPFS db sanity checks',
       test: async function(sqlite3){
-        const filename = this.opfsDbFile = '/dir/sqlite3-tester1.db';
+        const filename = this.opfsDbFile = 'sqlite3-tester1.db';
         const pVfs = this.opfsVfs = capi.sqlite3_vfs_find('opfs');
         T.assert(pVfs);
         const unlink = this.opfsUnlink =
@@ -2934,23 +2935,22 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
       }
     }/*OPFS db sanity checks*/)
     .t({
-      name: 'OPFS import',
+      name: 'OPFS export/import',
       test: async function(sqlite3){
         let db;
         try {
           const exp = this.opfsDbExport;
           delete this.opfsDbExport;
-          this.opfsImportSize = await sqlite3.oo1.OpfsDb.importDb(this.opfsDbFile, exp);
-          db = new sqlite3.oo1.OpfsDb(this.opfsDbFile);
-          T.assert(6 === db.selectValue('select count(*) from p')).
-            assert( this.opfsImportSize == exp.byteLength );
+          capi.sqlite3_js_vfs_create_file("opfs", this.opfsDbFile, exp);
+          const db = new sqlite3.oo1.OpfsDb(this.opfsDbFile);
+          T.assert(6 === db.selectValue('select count(*) from p'));
         }finally{
           if(db) db.close();
         }
       }
     }/*OPFS export/import*/)
     .t({
-      name: '(Internal-use) OPFS utility APIs',
+      name: 'OPFS utility APIs and sqlite3_js_vfs_create_file()',
       test: async function(sqlite3){
         const filename = this.opfsDbFile;
         const pVfs = this.opfsVfs;
@@ -2959,6 +2959,8 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
         delete this.opfsDbFile;
         delete this.opfsVfs;
         delete this.opfsUnlink;
+        unlink();
+        // Sanity-test sqlite3_js_vfs_create_file()...
         /**************************************************************
            ATTENTION CLIENT-SIDE USERS: sqlite3.opfs is NOT intended
            for client-side use. It is only for this project's own
@@ -2966,19 +2968,39 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
            any time.
         ***************************************************************/
         const opfs = sqlite3.opfs;
-        const fSize = this.opfsImportSize;
-        delete this.opfsImportSize;
+        const fSize = 1379;
         let sh;
         try{
+          T.assert(!(await opfs.entryExists(filename)));
+          capi.sqlite3_js_vfs_create_file(
+            pVfs, filename, null, fSize
+          );
           T.assert(await opfs.entryExists(filename));
-          const [dirHandle, filenamePart] = await opfs.getDirForFilename(filename, false);
-          const fh = await dirHandle.getFileHandle(filenamePart);
+          let fh = await opfs.rootDirectory.getFileHandle(filename);
           sh = await fh.createSyncAccessHandle();
           T.assert(fSize === await sh.getSize());
           await sh.close();
           sh = undefined;
           unlink();
           T.assert(!(await opfs.entryExists(filename)));
+
+          const ba = new Uint8Array([1,2,3,4,5]);
+          capi.sqlite3_js_vfs_create_file(
+            "opfs", filename, ba
+          );
+          T.assert(await opfs.entryExists(filename));
+          fh = await opfs.rootDirectory.getFileHandle(filename);
+          sh = await fh.createSyncAccessHandle();
+          T.assert(ba.byteLength === await sh.getSize());
+          await sh.close();
+          sh = undefined;
+          unlink();
+
+          T.mustThrowMatching(()=>{
+            capi.sqlite3_js_vfs_create_file(
+              "no-such-vfs", filename, ba
+            );
+          }, "SQLITE_NOTFOUND: Unknown sqlite3_vfs name: no-such-vfs");
         }finally{
           if(sh) await sh.close();
           unlink();
@@ -3081,7 +3103,7 @@ globalThis.sqlite3InitModule = sqlite3InitModule;
         const conf2 = JSON.parse(JSON.stringify(sahPoolConfig));
         conf2.name += '-test2';
         const POther = await inst(conf2);
-        //log("Installed second SAH instance as",conf2.name);
+        log("Installed second SAH instance as",conf2.name);
         T.assert(0 === POther.getFileCount())
           .assert(true === await POther.removeVfs());
 
