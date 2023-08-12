@@ -53,12 +53,6 @@ array set ::Configs [strip_comments {
     --enable-session
     -DSQLITE_ENABLE_RBU
   }
-  "All-Debug" {
-    --enable-debug --enable-all
-  }
-  "All-O0" {
-    -O0 --enable-all
-  }
   "Sanitize" {
     CC=clang -fsanitize=address,undefined
     -DSQLITE_ENABLE_STAT4
@@ -678,12 +672,6 @@ proc main_trscript {args} {
             lappend opts -DSQLITE_ENABLE_PREUPDATE_HOOK
             lappend opts -DSQLITE_ENABLE_SESSION
           }
-          --enable-all {
-          }
-          --enable-debug {
-            # lappend makeOpts OPTIMIZATIONS=0
-            lappend opts -DSQLITE_DEBUG
-          }
           default {
             error "Cannot translate $param for MSVC"
           }
@@ -729,12 +717,7 @@ proc main_trscript {args} {
     puts "  \$SRCDIR/configure --with-tcl=\$TCL $configOpts"
     puts {fi}
     puts {}
-    if {[info exists ::env(OPTS)]} {
-      puts "# From environment variable:"
-      puts "OPTS=$::env(OPTS)"
-      puts ""
-    }
-    puts {OPTS="$OPTS -DSQLITE_NO_SYNC=1"}
+    puts {OPTS="      -DSQLITE_NO_SYNC=1"}
     foreach o $opts { 
       puts "OPTS=\"\$OPTS $o\"" 
     }
